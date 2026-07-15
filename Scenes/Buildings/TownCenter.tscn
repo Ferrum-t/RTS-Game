@@ -1,0 +1,22 @@
+[gd_scene format=3 uid="uid://c4vqup51xixto"]
+
+[ext_resource type="Script" uid="uid://da6tht31n6qi5" path="res://Scripts/Buildings/TownCenter.gd" id="1_88qrv"]
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_88qrv"]
+albedo_color = Color(0.7699527, 0.65653944, 0.46064383, 1)
+
+[sub_resource type="BoxMesh" id="BoxMesh_f2orf"]
+material = SubResource("StandardMaterial3D_88qrv")
+size = Vector3(4, 2, 4)
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_f2orf"]
+size = Vector3(4, 2, 4)
+
+[node name="TownCenter" type="StaticBody3D" unique_id=1281271730]
+script = ExtResource("1_88qrv")
+
+[node name="MeshInstance3D" type="MeshInstance3D" parent="." unique_id=1541957372]
+mesh = SubResource("BoxMesh_f2orf")
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="." unique_id=1394722600]
+shape = SubResource("BoxShape3D_f2orf")

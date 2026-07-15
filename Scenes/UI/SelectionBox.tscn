@@ -1,0 +1,18 @@
+[gd_scene format=3 uid="uid://cbpl1yxfa0pmr"]
+
+[ext_resource type="Script" uid="uid://cmpvdd38nsnaf" path="res://Scripts/RTS/SelectionBox.gd" id="1_p2m2h"]
+
+[node name="SelectionBox" type="Control" unique_id=727309168]
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+script = ExtResource("1_p2m2h")
+
+[node name="SelectionRect" type="ColorRect" parent="." unique_id=512993761]
+layout_mode = 1
+anchors_preset = -1
+color = Color(0.21176471, 1, 1, 0.19607843)

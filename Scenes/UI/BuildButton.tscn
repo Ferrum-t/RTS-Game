@@ -1,0 +1,8 @@
+[gd_scene format=3 uid="uid://dst5qm86nn0xq"]
+
+[ext_resource type="Script" uid="uid://dpmaortp0shxs" path="res://Scripts/UI/BuildButton.gd" id="1_sa7oy"]
+
+[node name="Button" type="Button" unique_id=1308044993]
+offset_right = 8.0
+offset_bottom = 8.0
+script = ExtResource("1_sa7oy")

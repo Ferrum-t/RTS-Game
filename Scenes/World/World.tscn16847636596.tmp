@@ -1,0 +1,53 @@
+[gd_scene format=3 uid="uid://blxw0veepytk3"]
+
+[ext_resource type="PackedScene" uid="uid://dhtda3gbguxa" path="res://Scenes/Units/Player/player.tscn" id="1_0nbjp"]
+[ext_resource type="Script" uid="uid://bj5w1rt6e8vw2" path="res://Scripts/Player/player.gd" id="2_5jr8x"]
+[ext_resource type="Script" uid="uid://cq426y3xkwwyb" path="res://Scripts/Camera/camera_rts.gd" id="2_ouhkt"]
+[ext_resource type="Script" uid="uid://u61hpptia8qo" path="res://Scripts/RTS/SelectionManager.gd" id="3_5jr8x"]
+[ext_resource type="PackedScene" uid="uid://cbpl1yxfa0pmr" path="res://Scenes/UI/SelectionBox.tscn" id="5_27jhl"]
+
+[sub_resource type="PlaneMesh" id="PlaneMesh_f2orf"]
+size = Vector2(100, 100)
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_f2orf"]
+size = Vector3(100, 1, 100)
+
+[node name="World" type="Node3D" unique_id=1498708919]
+
+[node name="Ground2" type="StaticBody3D" parent="." unique_id=670337493]
+
+[node name="MeshInstance3D" type="MeshInstance3D" parent="Ground2" unique_id=432621124]
+mesh = SubResource("PlaneMesh_f2orf")
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="Ground2" unique_id=1125151294]
+shape = SubResource("BoxShape3D_f2orf")
+
+[node name="CameraRig" type="Node3D" parent="." unique_id=1099818990 node_paths=PackedStringArray("camera")]
+script = ExtResource("2_ouhkt")
+camera = NodePath("CameraPivot/CameraTilt/Camera3D")
+
+[node name="CameraPivot" type="Node3D" parent="CameraRig" unique_id=279295239]
+transform = Transform3D(1, 0, 0, 0, 0.99999994, 0, 0, 0, 0.99999994, 0, 0, 0)
+
+[node name="CameraTilt" type="Node3D" parent="CameraRig/CameraPivot" unique_id=562583072]
+transform = Transform3D(1, 0, 0, 0, 0.57357645, 0.81915206, 0, -0.81915206, 0.57357645, 0, 0, 0)
+
+[node name="Camera3D" type="Camera3D" parent="CameraRig/CameraPivot/CameraTilt" unique_id=1712057519]
+transform = Transform3D(1, 0, 0, 0, 1.0000001, 0, 0, 0, 1.0000001, 0, 25, 0)
+current = true
+
+[node name="SelectionManager" type="Node" parent="." unique_id=1199914264 node_paths=PackedStringArray("camera", "ground", "player")]
+script = ExtResource("3_5jr8x")
+camera = NodePath("../CameraRig/CameraPivot/CameraTilt/Camera3D")
+ground = NodePath("../Ground2")
+player = NodePath("../Units/player")
+
+[node name="Units" type="Node3D" parent="." unique_id=885671009]
+
+[node name="player" parent="Units" unique_id=974942000 instance=ExtResource("1_0nbjp")]
+script = ExtResource("2_5jr8x")
+
+[node name="UI" type="CanvasLayer" parent="." unique_id=692184027]
+
+[node name="SelectionBox" parent="UI" unique_id=727309168 instance=ExtResource("5_27jhl")]
+anchors_preset = 15

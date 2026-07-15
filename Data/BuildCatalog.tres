@@ -1,0 +1,10 @@
+[gd_resource type="Resource" script_class="BuildCatalog" format=3 uid="uid://dejikukq5sdm8"]
+
+[ext_resource type="Script" uid="uid://cj8xpgwb8n423" path="res://Scripts/Buildings/BuildingData.gd" id="1_7d2i7"]
+[ext_resource type="Resource" uid="uid://bcxs5u5joqu05" path="res://Data/Buildings/TownCenterData.tres" id="2_xysdt"]
+[ext_resource type="Script" uid="uid://b474rqdy2rlwg" path="res://Scripts/Buildings/BuildCatalog.gd" id="3_r34px"]
+
+[resource]
+script = ExtResource("3_r34px")
+buildings = Array[ExtResource("1_7d2i7")]([ExtResource("2_xysdt")])
+metadata/_custom_type_script = "uid://b474rqdy2rlwg"

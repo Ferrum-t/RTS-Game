@@ -1,0 +1,6 @@
+[gd_resource type="StandardMaterial3D" format=3 uid="uid://blwbc5jkuaj7o"]
+
+[resource]
+resource_name = "GhostGreen"
+transparency = 1
+albedo_color = Color(1, 0, 0, 0.1764706)
