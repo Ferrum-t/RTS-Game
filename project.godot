@@ -19,6 +19,7 @@ config/icon="res://icon.svg"
 
 UnitManager="*uid://dw3t811m6mq31"
 ConstructionManager="*uid://c24frt5x5ot3x"
+BuildingManager="*res://Scripts/Managers/BuildingManager.gd"
 
 [display]
 
