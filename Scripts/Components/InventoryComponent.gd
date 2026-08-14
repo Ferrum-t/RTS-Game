@@ -12,29 +12,28 @@ var food := 0
 var capacity := 50
 
 
-func _init(unit: BaseUnit):
-
+func _init(unit: BaseUnit) -> void:
 	owner = unit
 
 
 func is_full() -> bool:
-
 	return wood >= capacity
 
 
-func clear():
-
+func clear() -> void:
 	wood = 0
 	stone = 0
 	gold = 0
 	food = 0
 
 
-func add_wood(amount: int):
-
-	wood = clamp(wood + amount, 0, capacity)
+func add_wood(amount: int) -> void:
+	wood = clampi(wood + amount, 0, capacity)
 
 
 func has_resources() -> bool:
-
 	return wood > 0 or stone > 0 or gold > 0 or food > 0
+
+
+func get_total() -> int:
+	return wood + stone + gold + food
