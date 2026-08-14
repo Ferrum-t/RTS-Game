@@ -1,10 +1,12 @@
 [gd_scene format=3 uid="uid://c0ue6jlv400cv"]
 
+[ext_resource type="Script" path="res://Scripts/Units/Worker.gd" id="1_worker"]
+
 [sub_resource type="BoxMesh" id="BoxMesh_6ygev"]
 size = Vector3(0.5, 1, 0.5)
 
 [sub_resource type="StandardMaterial3D" id="StandardMaterial3D_0xf5w"]
-albedo_color = Color(0.7490196, 0.47843137, 0, 1)
+albedo_color = Color(0.75, 0.48, 0, 1)
 
 [sub_resource type="BoxShape3D" id="BoxShape3D_0ofek"]
 size = Vector3(0.5, 1, 0.5)
@@ -20,18 +22,22 @@ top_radius = 0.9
 bottom_radius = 0.9
 height = 0.03
 
-[node name="Worker" type="CharacterBody3D" unique_id=744888081]
+[node name="Worker" type="CharacterBody3D"]
+collision_layer = 1
+collision_mask = 1
+floor_stop_on_slope = true
+script = ExtResource("1_worker")
 
-[node name="MeshInstance3D" type="MeshInstance3D" parent="." unique_id=1439458075]
+[node name="MeshInstance3D" type="MeshInstance3D" parent="."]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.5, 0)
 mesh = SubResource("BoxMesh_6ygev")
 surface_material_override/0 = SubResource("StandardMaterial3D_0xf5w")
 
-[node name="CollisionShape3D" type="CollisionShape3D" parent="." unique_id=494952332]
+[node name="CollisionShape3D" type="CollisionShape3D" parent="."]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.5, 0)
 shape = SubResource("BoxShape3D_0ofek")
 
-[node name="SelectionRing" type="MeshInstance3D" parent="." unique_id=100149081]
+[node name="SelectionRing" type="MeshInstance3D" parent="."]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.02, 0)
 visible = false
 mesh = SubResource("CylinderMesh_ijyfw")
