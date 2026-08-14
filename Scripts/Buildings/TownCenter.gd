@@ -3,8 +3,7 @@ extends BaseBuilding
 class_name TownCenter
 
 
-func _ready():
-
+func _ready() -> void:
 	super()
-
-	print("TownCenter:", global_position)
+	add_to_group("Obstacle")
+	print("TownCenter ready at: ", global_position)

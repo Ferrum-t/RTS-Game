@@ -1,27 +1,28 @@
 [gd_scene format=3 uid="uid://bvfieio0p2t5u"]
 
-[ext_resource type="Script" uid="uid://di5di0uo3kvjy" path="res://Scripts/Systems/Buildings/GhostBuilding.gd" id="1_74edm"]
-[ext_resource type="Material" uid="uid://cf1j6mvyodixy" path="res://Materials/GhostGreen.tres" id="2_4wfgh"]
-[ext_resource type="Material" uid="uid://blwbc5jkuaj7o" path="res://Materials/GhostRed.tres" id="2_nhlaa"]
+[ext_resource type="Script" path="res://Scripts/Systems/Buildings/GhostBuilding.gd" id="1_74edm"]
+[ext_resource type="Material" path="res://Materials/GhostGreen.tres" id="2_4wfgh"]
+[ext_resource type="Material" path="res://Materials/GhostRed.tres" id="2_nhlaa"]
 
 [sub_resource type="BoxMesh" id="BoxMesh_f2orf"]
 size = Vector3(4, 2, 4)
 
 [sub_resource type="BoxShape3D" id="BoxShape3D_f2orf"]
-size = Vector3(4.5, 2.5, 4.5)
+size = Vector3(4.2, 2.2, 4.2)
 
-[node name="GhostBuilding" type="StaticBody3D" unique_id=2074848043]
+[node name="GhostBuilding" type="Node3D"]
 script = ExtResource("1_74edm")
 green_material = ExtResource("2_4wfgh")
 red_material = ExtResource("2_nhlaa")
 
-[node name="MeshInstance3D" type="MeshInstance3D" parent="." unique_id=1880783076]
+[node name="MeshInstance3D" type="MeshInstance3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1, 0)
 mesh = SubResource("BoxMesh_f2orf")
 
-[node name="Area3D" type="Area3D" parent="." unique_id=340808013]
+[node name="Area3D" type="Area3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1, 0)
+monitoring = true
+monitorable = true
 
-[node name="CollisionShape3D" type="CollisionShape3D" parent="Area3D" unique_id=1928834865]
+[node name="CollisionShape3D" type="CollisionShape3D" parent="Area3D"]
 shape = SubResource("BoxShape3D_f2orf")
-
-[connection signal="body_entered" from="Area3D" to="." method="_on_area_3d_body_entered"]
-[connection signal="body_exited" from="Area3D" to="." method="_on_area_3d_body_exited"]
