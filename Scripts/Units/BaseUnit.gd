@@ -75,7 +75,6 @@ func update_idle(_delta: float) -> void:
 
 
 func update_return(delta: float) -> void:
-	# Find Town Center if we don't have one yet
 	if return_target == null or not is_instance_valid(return_target):
 		var bm := get_node_or_null("/root/BuildingManager")
 		if bm:
@@ -89,21 +88,31 @@ func update_return(delta: float) -> void:
 
 	var distance := global_position.distance_to(return_target.global_position)
 
-	# Move towards Town Center
 	if distance > deposit_distance:
 		move_target = return_target.global_position
 		movement.update(delta)
 		return
 
-	# Arrived — deposit resources
+	# Arrived — deposit into player stockpile
 	velocity = Vector3.ZERO
-	var deposited_wood := inventory.wood
+	var deposited_wood: int = inventory.wood
+	var deposited_stone: int = inventory.stone
+	var deposited_gold: int = inventory.gold
+	var deposited_food: int = inventory.food
+
 	inventory.clear()
+
+	var rm := get_node_or_null("/root/ResourceManager")
+	if rm:
+		rm.add_wood(deposited_wood)
+		rm.add_stone(deposited_stone)
+		rm.add_gold(deposited_gold)
+		rm.add_food(deposited_food)
+
 	print(name, " deposited ", deposited_wood, " wood at ", return_target.name)
 
 	return_target = null
 
-	# Go back to harvesting if we still have a resource target
 	if harvest_target != null and is_instance_valid(harvest_target):
 		unit_state = UnitState.HARVESTING
 	else:
