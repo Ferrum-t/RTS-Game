@@ -1,40 +1,46 @@
-extends RefCounted
+extends Node
 
 class_name InventoryComponent
 
-var owner: BaseUnit
+@export var capacity: int = 10
 
-var wood := 0
-var stone := 0
-var gold := 0
-var food := 0
-
-var capacity := 50
+var resources: Dictionary = {}
 
 
-func _init(unit: BaseUnit):
+func add_resource(resource_name: String, amount: int) -> int:
+	var current_load: int = get_total_load()
+	var space_left: int = capacity - current_load
+	if space_left <= 0:
+		return amount
 
-	owner = unit
+	if amount <= space_left:
+		resources[resource_name] = resources.get(resource_name, 0) + amount
+		return 0
+	else:
+		resources[resource_name] = resources.get(resource_name, 0) + space_left
+		return amount - space_left
+
+
+func get_total_load() -> int:
+	var total: int = 0
+	for value in resources.values():
+		total += int(value)
+	return total
 
 
 func is_full() -> bool:
-
-	return wood >= capacity
-
-
-func clear():
-
-	wood = 0
-	stone = 0
-	gold = 0
-	food = 0
+	return get_total_load() >= capacity
 
 
-func add_wood(amount: int):
+func drain_all() -> Dictionary:
+	var temp: Dictionary = resources.duplicate()
+	resources.clear()
+	return temp
 
-	wood = clamp(wood + amount, 0, capacity)
+
+func get_resource_names() -> Array:
+	return resources.keys()
 
 
-func has_resources() -> bool:
-
-	return wood > 0 or stone > 0 or gold > 0 or food > 0
+func get_resource(resource_name: String) -> int:
+	return resources.get(resource_name, 0)

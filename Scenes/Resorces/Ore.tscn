@@ -1,0 +1,20 @@
+[gd_scene format=3 uid="uid://ore-resource-scene"]
+
+[ext_resource type="Script" uid="uid://ore-resource-script" path="res://Scripts/WorldObjects/Resources/OreResource.gd" id="1_ore"]
+
+[sub_resource type="CylinderShape3D" id="CylinderShape3D_1"]
+[sub_resource type="CylinderMesh" id="CylinderMesh_1"]
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_3"]
+
+[node name="Ore" type="StaticBody3D" unique_id="100000021"]
+script = ExtResource("1_ore")
+resource_name = "Ore"
+amount = 300
+max_amount = 300
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="." unique_id="100000022"]
+shape = SubResource("CylinderShape3D_1")
+
+[node name="MeshInstance3D" type="MeshInstance3D" parent="." unique_id="100000023"]
+mesh = SubResource("CylinderMesh_1")
+surface_material_override/0 = SubResource("StandardMaterial3D_3")

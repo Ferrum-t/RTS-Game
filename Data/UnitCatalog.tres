@@ -1,0 +1,13 @@
+[gd_resource type="Resource" script_class="UnitCatalog" format=3]
+
+[ext_resource type="Script" uid="uid://5e1rollx4fqp" path="res://Scripts/Units/UnitCatalog.gd" id="1_unitcatalog"]
+[ext_resource type="Resource" path="res://Data/Units/WorkerData.tres" id="2_workerdata"]
+[ext_resource type="Resource" path="res://Data/Units/SoldierData.tres" id="3_soldierdata"]
+
+
+[resource]
+script = ExtResource("1_unitcatalog")
+units = [
+	ExtResource("2_workerdata"),
+	ExtResource("3_soldierdata")
+]

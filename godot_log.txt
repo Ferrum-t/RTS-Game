@@ -1,0 +1,44 @@
+Godot Engine v4.7.stable.official.5b4e0cb0f - https://godotengine.org
+D3D12 12_0 - Forward+ - Using Device #0: NVIDIA - NVIDIA GeForce GTX 1060 6GB
+
+WARNING: res://Scenes/Resorces/Fiber.tscn:3 - ext_resource, invalid UID: uid://fiber-resource-script - using text path instead: res://Scripts/WorldObjects/Resources/FiberResource.gd
+   at: load (scene/resources/resource_format_text.cpp:501)
+WARNING: res://Scenes/Resorces/Crystal.tscn:3 - ext_resource, invalid UID: uid://crystal-resource-script - using text path instead: res://Scripts/WorldObjects/Resources/CrystalResource.gd
+   at: load (scene/resources/resource_format_text.cpp:501)
+WARNING: res://Scenes/Resorces/Ore.tscn:3 - ext_resource, invalid UID: uid://ore-resource-script - using text path instead: res://Scripts/WorldObjects/Resources/OreResource.gd
+   at: load (scene/resources/resource_format_text.cpp:501)
+WARNING: res://Scenes/UI/ProductionPanel.tscn:3 - ext_resource, invalid UID: uid://production_panel_script - using text path instead: res://Scripts/UI/ProductionPanel.gd
+   at: load (scene/resources/resource_format_text.cpp:501)
+WARNING: res://Data/Units/WorkerData.tres:3 - ext_resource, invalid UID: uid://unit_data_script - using text path instead: res://Scripts/Units/UnitData.gd
+   at: load (scene/resources/resource_format_text.cpp:501)
+WARNING: res://Data/Units/WorkerData.tres:4 - ext_resource, invalid UID: uid://worker_scene - using text path instead: res://Scenes/Units/worker.tscn
+   at: load (scene/resources/resource_format_text.cpp:501)
+WARNING: res://Scenes/Units/soldier.tscn:3 - ext_resource, invalid UID: uid://soldier_script - using text path instead: res://Scripts/Units/Soldier.gd
+   at: load (scene/resources/resource_format_text.cpp:501)
+WARNING: res://Scenes/UI/ProductionButton.tscn:3 - ext_resource, invalid UID: uid://production_button_script - using text path instead: res://Scripts/UI/ProductionButton.gd
+   at: load (scene/resources/resource_format_text.cpp:501)
+[DIAG_NAV_LIFECYCLE] Instantiated NavigationAgent3D for player. Requesting add_child.call_deferred
+Registered:player
+Player ready
+[DIAG_NAV_LIFECYCLE] Instantiated NavigationAgent3D for Worker. Requesting add_child.call_deferred
+Registered:Worker
+Worker:(7.0, 0.0, 0.0)
+TownCenter registered.
+Deposited to TownCenter:{ "Wood": 500, "Stone": 300, "Gold": 200, "Food": 100 }
+Current stock:{ "Wood": 500, "Stone": 300, "Gold": 200, "Food": 100 }
+TownCenter:(2.0, 0.939588, 2.0)
+SelectionRect:<ColorRect#54542730909>
+[NAV_DEBUG] Baking...
+WARNING: Source geometry parsing for navigation mesh baking had to parse RenderingServer meshes at runtime.
+		This poses a significant performance issues as visual meshes store geometry data on the GPU and transferring this data back to the CPU blocks the rendering.
+		For runtime (re)baking navigation meshes use and parse collision shapes as source geometry or create geometry data procedurally in scripts.
+   at: add_mesh (scene/resources/3d/navigation_mesh_source_geometry_data_3d.cpp:205)
+   GDScript backtrace (most recent call first):
+       [0] _ready (res://Scripts/World.gd:25)
+[NAV_DEBUG] Vertices immediately: 4
+[NAV_DEBUG] Polygons immediately: 2
+[NAV_DEBUG] Map RID: RID(4625679777792)
+[DIAG_NAV_LIFECYCLE] nav_agent for player successfully entered SceneTree! is_inside_tree: true | map_valid in tree_entered: false
+[DIAG_NAV_LIFECYCLE] nav_agent for Worker successfully entered SceneTree! is_inside_tree: true | map_valid in tree_entered: false
+[NAV_DEBUG_AFTER_BAKE] Vertices: 4
+[NAV_DEBUG_AFTER_BAKE] Polygons: 2

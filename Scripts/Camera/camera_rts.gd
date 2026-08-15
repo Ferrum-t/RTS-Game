@@ -16,7 +16,14 @@ extends Node3D
 var rotating := false
 
 
-func _process(delta):
+func _process(delta: float) -> void:
+	if not DisplayServer.window_is_focused():
+		return
+
+	var viewport_size := get_viewport().get_visible_rect().size
+	var mouse_pos := get_viewport().get_mouse_position()
+	if mouse_pos.x < 0 or mouse_pos.y < 0 or mouse_pos.x > viewport_size.x or mouse_pos.y > viewport_size.y:
+		return
 
 	var move = Vector3.ZERO
 

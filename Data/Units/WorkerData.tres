@@ -1,0 +1,13 @@
+[gd_resource type="Resource" script_class="UnitData" format=3 uid="uid://worker_data"]
+
+[ext_resource type="Script" uid="uid://unit_data_script" path="res://Scripts/Units/UnitData.gd" id="1_unitdata"]
+[ext_resource type="PackedScene" uid="uid://worker_scene" path="res://Scenes/Units/worker.tscn" id="2_worker_scene"]
+
+[resource]
+script = ExtResource("1_unitdata")
+unit_name = "Worker"
+unit_scene = ExtResource("2_worker_scene")
+wood = 50
+stone = 0
+gold = 0
+food = 0

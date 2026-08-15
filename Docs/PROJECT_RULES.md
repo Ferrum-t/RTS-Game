@@ -17,6 +17,13 @@ Language: GDScript 2.0
 - Components implement behavior.
 - Base classes contain only common logic.
 
+## Interaction Patterns
+
+- **Signals First**: Менеджеры подписываются на изменения, а не опрашивают коллекции каждый кадр.
+- **Duck Typing**: Проверять наличие функционала через `has_method()` перед вызовом.
+- **Component Access**: Компоненты доступаются через `get_node_or_null("Component")`.
+- **Managers Responsibility**: Менеджеры отвечают за регистрацию объектов, а не за логику их поведения.
+
 ## Coding Rules
 
 - One class = one responsibility.

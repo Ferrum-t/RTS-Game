@@ -3,7 +3,9 @@
 [ext_resource type="Script" uid="uid://bnvw21bia35hh" path="res://Scripts/UI/BuildPanel.gd" id="1_ahcct"]
 [ext_resource type="Resource" uid="uid://dejikukq5sdm8" path="res://Data/BuildCatalog.tres" id="2_de23q"]
 [ext_resource type="PackedScene" uid="uid://dst5qm86nn0xq" path="res://Scenes/UI/BuildButton.tscn" id="3_c7mb3"]
-
+[ext_resource type="PackedScene" path="res://Scenes/UI/ProductionPanel.tscn" id="4_production_panel_scene"]
+[ext_resource type="Resource" path="res://Data/UnitCatalog.tres" id="5_unit_catalog_resource"]
+[ext_resource type="PackedScene" path="res://Scenes/UI/ProductionButton.tscn" id="6_production_button_scene"]
 [node name="UI" type="CanvasLayer" unique_id=2121745724]
 
 [node name="BuildPanel" type="PanelContainer" parent="." unique_id=1136975507]
@@ -15,6 +17,12 @@ offset_bottom = 40.0
 script = ExtResource("1_ahcct")
 build_catalog = ExtResource("2_de23q")
 build_button_scene = ExtResource("3_c7mb3")
+construction_manager = NodePath("../../Managers/ConstructionManager")
 
 [node name="VBoxContainer" type="VBoxContainer" parent="BuildPanel" unique_id=126204340]
 layout_mode = 2
+
+[node name="ProductionPanel" parent="." instance=ExtResource("4_production_panel_scene") unique_id=1136975508]
+unit_catalog = ExtResource("5_unit_catalog_resource")
+production_button_scene = ExtResource("6_production_button_scene")
+production_manager = NodePath("../../Managers/ProductionManager")

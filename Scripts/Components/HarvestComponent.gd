@@ -1,56 +1,27 @@
-extends RefCounted
+extends Node
 
 class_name HarvestComponent
 
-var owner: BaseUnit
+@export var harvest_time: float = 1.0
+@export var harvest_amount: int = 1
 
-var harvest_timer := 0.0
-var harvest_interval := 1.0
-var harvest_amount := 10
-
-
-func _init(unit: BaseUnit):
-
-	owner = unit
+var _timer: float = 0.0
+@onready var unit: BaseUnit = get_parent() as BaseUnit
 
 
-func update(delta):
-
-	if owner.harvest_target == null:
-
-		owner.unit_state = BaseUnit.UnitState.IDLE
+func tick_harvest(delta: float, target_resource: Node) -> void:
+	if target_resource == null or not is_instance_valid(target_resource):
 		return
 
-	var resource := owner.harvest_target
+	_timer += delta
+	if _timer >= harvest_time:
+		_timer = 0.0
 
-	# если инвентарь полный
-	if owner.inventory.is_full():
+		if target_resource.has_method("harvest"):
+			var gathered: int = target_resource.call("harvest", harvest_amount)
 
-		owner.unit_state = BaseUnit.UnitState.RETURNING
-		return
-
-	var distance := owner.global_position.distance_to(resource.global_position)
-
-	# сначала подойти
-	if distance > 2.0:
-
-		owner.move_target = resource.global_position
-		owner.movement.update(delta)
-		return
-
-	# добыча
-	harvest_timer += delta
-
-	if harvest_timer >= harvest_interval:
-
-		harvest_timer = 0.0
-
-		owner.inventory.add_wood(harvest_amount)
-
-		print(
-			owner.name,
-			" Wood: ",
-			owner.inventory.wood,
-			"/",
-			owner.inventory.capacity
-		)
+			if gathered > 0 and unit.inventory != null:
+				var res_name: String = target_resource.get("resource_name") if "resource_name" in target_resource else "Resource"
+				var overflow: int = unit.inventory.add_resource(res_name, gathered)
+				if overflow > 0:
+					print("Inventory full!")

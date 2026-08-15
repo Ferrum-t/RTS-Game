@@ -1,0 +1,16 @@
+[gd_resource type="Resource" script_class="BuildingData" format=3 uid="uid://cx6i843fsw06q"]
+
+[ext_resource type="Script" uid="uid://cj8xpgwb8n423" path="res://Scripts/Buildings/BuildingData.gd" id="1_building_data_script"]
+[ext_resource type="PackedScene" uid="uid://cx6i843fsw06p" path="res://Scenes/Buildings/House.tscn" id="1_house_scene"]
+[ext_resource type="PackedScene" uid="uid://bvfieio0p2t5u" path="res://Scenes/Buildings/GhostBuilding.tscn" id="2_ghost_scene"]
+
+[resource]
+script = ExtResource("1_building_data_script")
+building_name = "House"
+building_scene = ExtResource("1_house_scene")
+ghost_scene = ExtResource("2_ghost_scene")
+wood = 100
+stone = 50
+gold = 0
+food = 0
+metadata/_custom_type_script = "uid://cj8xpgwb8n423"

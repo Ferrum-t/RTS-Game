@@ -1,0 +1,40 @@
+[gd_scene format=3 uid="uid://new_soldier_scene"]
+
+[ext_resource type="Script" uid="uid://soldier_script" path="res://Scripts/Units/Soldier.gd" id="1_soldier"]
+
+[sub_resource type="BoxMesh" id="BoxMesh_1"]
+size = Vector3(0.5, 1, 0.5)
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_1"]
+albedo_color = Color(0.3, 0.3, 0.9, 1)
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_1"]
+size = Vector3(0.5, 1, 0.5)
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_ek1gq"]
+transparency = 1
+shading_mode = 0
+albedo_color = Color(0, 1, 0, 1)
+
+[sub_resource type="CylinderMesh" id="CylinderMesh_1"]
+material = SubResource("StandardMaterial3D_ek1gq")
+top_radius = 0.9
+bottom_radius = 0.9
+height = 0.03
+
+[node name="Soldier" type="CharacterBody3D" unique_id="100200001"]
+script = ExtResource("1_soldier")
+
+[node name="MeshInstance3D" type="MeshInstance3D" parent="." unique_id="100200002"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.5, 0)
+mesh = SubResource("BoxMesh_1")
+surface_material_override/0 = SubResource("StandardMaterial3D_1")
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="." unique_id="100200003"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.5, 0)
+shape = SubResource("BoxShape3D_1")
+
+[node name="SelectionRing" type="MeshInstance3D" parent="." unique_id="100200004"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.02, 0)
+mesh = SubResource("CylinderMesh_1")
+surface_material_override/0 = SubResource("StandardMaterial3D_1")

@@ -1,5 +1,10 @@
 [gd_scene format=3 uid="uid://c0ue6jlv400cv"]
 
+[ext_resource type="Script" uid="uid://c3gv2hxil0wej" path="res://Scripts/Units/Worker.gd" id="1_gr6wu"]
+[ext_resource type="Script" path="res://Scripts/Components/HarvestComponent.gd" id="1_wrirg"]
+[ext_resource type="Script" uid="uid://brxyotphs0ik1" path="res://Scripts/Components/MovementComponent.gd" id="2_gr6wu"]
+[ext_resource type="Script" path="res://Scripts/Components/InventoryComponent.gd" id="3_3y3p1"]
+
 [sub_resource type="BoxMesh" id="BoxMesh_6ygev"]
 size = Vector3(0.5, 1, 0.5)
 
@@ -21,6 +26,7 @@ bottom_radius = 0.9
 height = 0.03
 
 [node name="Worker" type="CharacterBody3D" unique_id=744888081]
+script = ExtResource("1_gr6wu")
 
 [node name="MeshInstance3D" type="MeshInstance3D" parent="." unique_id=1439458075]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.5, 0)
@@ -35,3 +41,12 @@ shape = SubResource("BoxShape3D_0ofek")
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.02, 0)
 visible = false
 mesh = SubResource("CylinderMesh_ijyfw")
+
+[node name="HarvestComponent" type="Node" parent="." unique_id=1777194309]
+script = ExtResource("1_wrirg")
+
+[node name="MovementComponent" type="Node" parent="." unique_id=1034410196]
+script = ExtResource("2_gr6wu")
+
+[node name="InventoryComponent" type="Node" parent="." unique_id=1057122692]
+script = ExtResource("3_3y3p1")

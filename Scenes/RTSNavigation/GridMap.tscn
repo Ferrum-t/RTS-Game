@@ -1,0 +1,6 @@
+[gd_scene load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://Scripts/RTSNavigation/GridMap.gd" id="1_grid_map_script"]
+
+[node name="GridMap" type="Node"]
+script = ExtResource("1_grid_map_script")

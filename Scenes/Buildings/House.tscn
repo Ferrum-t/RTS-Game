@@ -1,0 +1,26 @@
+[gd_scene format=3 uid="uid://cx6i843fsw06p"]
+
+[ext_resource type="Script" uid="uid://dngal4litp6lt" path="res://Scripts/Buildings/BaseBuilding.gd" id="1_house_script"]
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_house"]
+albedo_color = Color(0.2, 0.6, 0.8, 1)
+
+[sub_resource type="BoxMesh" id="BoxMesh_house"]
+material = SubResource("StandardMaterial3D_house")
+size = Vector3(2, 1.5, 2)
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_house"]
+size = Vector3(2, 1.5, 2)
+
+[node name="House" type="StaticBody3D"]
+script = ExtResource("1_house_script")
+
+[node name="MeshInstance3D" type="MeshInstance3D" parent="."]
+mesh = SubResource("BoxMesh_house")
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="."]
+shape = SubResource("BoxShape3D_house")
+
+[node name="NavigationObstacle3D" type="NavigationObstacle3D" parent="."]
+vertices = PackedVector3Array(-1, 0, -1, 1, 0, -1, 1, 0, 1, -1, 0, 1)
+height = 1.5

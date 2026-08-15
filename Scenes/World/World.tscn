@@ -9,12 +9,19 @@
 [ext_resource type="Script" uid="uid://ml2jlymdywqp" path="res://Scripts/Systems/Managers/InteractionManager.gd" id="4_ng1ea"]
 [ext_resource type="PackedScene" uid="uid://cbpl1yxfa0pmr" path="res://Scenes/UI/SelectionBox.tscn" id="5_27jhl"]
 [ext_resource type="PackedScene" uid="uid://c0ue6jlv400cv" path="res://Scenes/Units/worker.tscn" id="5_hveh7"]
-[ext_resource type="Script" uid="uid://c3gv2hxil0wej" path="res://Scripts/Units/Worker.gd" id="6_87yka"]
 [ext_resource type="Script" uid="uid://bx815rivswsmy" path="res://Scripts/Systems/Managers/CommandManager.gd" id="7_kjd5s"]
 [ext_resource type="PackedScene" uid="uid://dehogsm5jd85s" path="res://Scenes/Resorces/Tree.tscn" id="10_ng1ea"]
 [ext_resource type="PackedScene" uid="uid://c4vqup51xixto" path="res://Scenes/Buildings/TownCenter.tscn" id="11_0d0er"]
-[ext_resource type="PackedScene" uid="uid://bvfieio0p2t5u" path="res://Scenes/Buildings/GhostBuilding.tscn" id="12_x5sp8"]
 [ext_resource type="PackedScene" uid="uid://ctoqn17qfadcq" path="res://Scenes/UI/ui.tscn" id="15_0phyg"]
+[ext_resource type="PackedScene" path="res://Scenes/Resorces/Fiber.tscn" id="16_fiber"]
+[ext_resource type="PackedScene" path="res://Scenes/Resorces/Crystal.tscn" id="17_crystal"]
+[ext_resource type="PackedScene" path="res://Scenes/Resorces/Ore.tscn" id="18_ore"]
+[ext_resource type="Script" uid="uid://cjydm01ba8mpc" path="res://Scripts/Systems/Managers/ProductionManager.gd" id="19_production_manager"]
+[ext_resource type="PackedScene" path="res://Scenes/RTSNavigation/GridMap.tscn" id="20_grid_map"]
+[ext_resource type="PackedScene" path="res://Scenes/RTSNavigation/GridPathfinder.tscn" id="21_grid_pathfinder"]
+
+[sub_resource type="NavigationMesh" id="NavigationMesh_f2orf"]
+geometry_parsed_geometry_type = 0
 
 [sub_resource type="PlaneMesh" id="PlaneMesh_f2orf"]
 size = Vector2(100, 100)
@@ -24,8 +31,11 @@ size = Vector3(100, 1, 100)
 
 [node name="World" type="Node3D" unique_id=1498708919]
 script = ExtResource("1_lp0bp")
-ghost_scene = ExtResource("12_x5sp8")
-building_scene = ExtResource("11_0d0er")
+
+[node name="GridMap" parent="." unique_id=138058488 instance=ExtResource("20_grid_map")]
+
+[node name="GridPathfinder" parent="." unique_id=1080766423 node_paths=PackedStringArray("grid") instance=ExtResource("21_grid_pathfinder")]
+grid = NodePath("../GridMap")
 
 [node name="Managers" type="Node" parent="." unique_id=724272799]
 
@@ -41,6 +51,9 @@ interaction_manager = NodePath("../InteractionManager")
 
 [node name="CommandManager" type="Node" parent="Managers" unique_id=933527636]
 script = ExtResource("7_kjd5s")
+
+[node name="ProductionManager" type="Node" parent="Managers" unique_id=933527637]
+script = ExtResource("19_production_manager")
 
 [node name="InteractionManager" type="Node" parent="Managers" unique_id=26672748 node_paths=PackedStringArray("command_manager")]
 script = ExtResource("4_ng1ea")
@@ -60,10 +73,13 @@ transform = Transform3D(1, 0, 0, 0, 0.57357645, 0.81915206, 0, -0.81915206, 0.57
 transform = Transform3D(1, 0, 0, 0, 1.0000001, 0, 0, 0, 1.0000001, 0, 25, 0)
 current = true
 
-[node name="Ground2" type="StaticBody3D" parent="." unique_id=670337493]
+[node name="NavigationRegion3D" type="NavigationRegion3D" parent="." unique_id=1099818995]
+navigation_mesh = SubResource("NavigationMesh_f2orf")
 
-[node name="MeshInstance3D" type="MeshInstance3D" parent="Ground2" unique_id=432621124]
+[node name="GroundMesh" type="MeshInstance3D" parent="NavigationRegion3D" unique_id=432621124]
 mesh = SubResource("PlaneMesh_f2orf")
+
+[node name="Ground2" type="StaticBody3D" parent="." unique_id=670337493]
 
 [node name="CollisionShape3D" type="CollisionShape3D" parent="Ground2" unique_id=1125151294]
 shape = SubResource("BoxShape3D_f2orf")
@@ -76,15 +92,24 @@ script = ExtResource("2_5jr8x")
 
 [node name="Worker" parent="Units" unique_id=744888081 instance=ExtResource("5_hveh7")]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 7, 0, 0)
-script = ExtResource("6_87yka")
+
+[node name="TownCenter" parent="." unique_id=1521441826 instance=ExtResource("11_0d0er")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 2, 0.93958783, 2)
 
 [node name="Tree" parent="." unique_id=1521441825 instance=ExtResource("10_ng1ea")]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, -12)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.88874483, -12)
 
 [node name="Recources" type="Node" parent="." unique_id=2045493035]
 
-[node name="UI" type="CanvasLayer" parent="." unique_id=692184027]
+[node name="Fiber" parent="Recources" unique_id=100000031 instance=ExtResource("16_fiber")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 6, 0.43280578, -10)
+
+[node name="Crystal" parent="Recources" unique_id=100000032 instance=ExtResource("17_crystal")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -6, 0.47172618, -8)
+
+[node name="Ore" parent="Recources" unique_id=100000033 instance=ExtResource("18_ore")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 2, 0.84774756, -14)
+
+[node name="UI" parent="." unique_id=2121745724 instance=ExtResource("15_0phyg")]
 
 [node name="SelectionBox" parent="UI" unique_id=727309168 instance=ExtResource("5_27jhl")]
-
-[node name="UI" parent="UI" unique_id=2121745724 instance=ExtResource("15_0phyg")]
