@@ -4,6 +4,8 @@ class_name InteractionManager
 
 @export var command_manager: CommandManager
 
+const BUILDING_APPROACH_DISTANCE := 3.5
+
 
 func handle_right_click(
 	selected_units: Array[BaseUnit],
@@ -30,5 +32,27 @@ func handle_right_click(
 		command_manager.issue_harvest(selected_units, collider)
 		return
 
-	# Move to ground
+	# Click on building → move to a point OUTSIDE it (never inside)
+	if collider is BaseBuilding:
+		var building := collider as BaseBuilding
+		var outside := _outside_point(building, world_position)
+		command_manager.issue_move(selected_units, outside)
+		return
+
+	# Ground move
 	command_manager.issue_move(selected_units, world_position)
+
+
+func _outside_point(building: BaseBuilding, click_pos: Vector3) -> Vector3:
+	var center: Vector3 = building.global_position
+	center.y = 0.0
+	var dir: Vector3 = click_pos - center
+	dir.y = 0.0
+	if dir.length() < 0.15:
+		# Click near center — pick a default outward direction
+		dir = Vector3(1.0, 0.0, 0.0)
+	else:
+		dir = dir.normalized()
+	var result: Vector3 = center + dir * BUILDING_APPROACH_DISTANCE
+	result.y = 0.0
+	return result
