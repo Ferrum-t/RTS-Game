@@ -4,7 +4,7 @@ class_name HarvestComponent
 
 var owner: BaseUnit
 
-## Stand this far from the resource while gathering (must be > collision radius)
+## Stand this far from the resource while gathering (> tree collision radius)
 var approach_distance: float = 2.2
 var harvest_amount: int = 10
 var harvest_interval: float = 0.8
@@ -34,30 +34,27 @@ func update(delta: float) -> void:
 	to_res.y = 0.0
 	var dist := to_res.length()
 
-	# Approach — stop at approach_distance, do not walk into the collider
+	# Approach stand-point in front of tree — do not walk into collider
 	if dist > approach_distance:
 		var stand_pos: Vector3 = resource.global_position - to_res.normalized() * approach_distance
 		stand_pos.y = 0.0
 		owner.move_target = stand_pos
 		if owner.movement:
 			owner.movement.set_target(stand_pos)
-			# Temporary MOVING-like path without leaving HARVESTING state
 			owner.movement.update(delta)
 		return
 
-	# In range — gather
+	# In range — stop and gather
 	owner.velocity = Vector3.ZERO
 	_timer -= delta
 	if _timer > 0.0:
 		return
 	_timer = harvest_interval
 
-	if resource.has_method("harvest"):
-		var got: int = resource.harvest(harvest_amount)
-		if got > 0 and owner.inventory:
-			owner.inventory.add_wood(got)
-			print(owner.name, " Wood: ", owner.inventory.wood, "/", owner.inventory.max_wood)
-		elif got <= 0:
-			# Resource depleted
-			owner.harvest_target = null
-			owner.unit_state = BaseUnit.UnitState.IDLE
+	var got: int = resource.harvest(harvest_amount)
+	if got > 0 and owner.inventory:
+		owner.inventory.add_wood(got)
+		print(owner.name, " Wood: ", owner.inventory.wood, "/", owner.inventory.capacity)
+	elif got <= 0:
+		owner.harvest_target = null
+		owner.unit_state = BaseUnit.UnitState.IDLE
