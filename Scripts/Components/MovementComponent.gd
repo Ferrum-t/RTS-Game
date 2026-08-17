@@ -2,15 +2,16 @@ extends RefCounted
 
 class_name MovementComponent
 
-## Movement with tight building bypass:
-## If the straight line to the goal hits a building, walk to a side
-## waypoint around that building, then continue to the goal.
+## Movement with building bypass.
+## - Never path into a building interior
+## - No detour while RETURNING (must approach Town Center)
+## - Side waypoint only when goal is blocked by a building
 
 var owner: BaseUnit
 var agent: NavigationAgent3D
 
 var arrival_distance: float = 0.45
-var building_clearance: float = 3.2
+var building_clearance: float = 4.0
 var separation_radius: float = 1.1
 var separation_strength: float = 2.0
 
@@ -38,7 +39,9 @@ func set_target(world_pos: Vector3) -> void:
 	owner.move_target = p
 	agent.target_position = p
 	_has_detour = false
-	_update_detour()
+	# Detour only for normal move orders, not return-to-base
+	if owner.unit_state != BaseUnit.UnitState.RETURNING:
+		_update_detour()
 
 
 func update(_delta: float) -> void:
@@ -54,35 +57,35 @@ func update(_delta: float) -> void:
 		_stop_moving()
 		return
 
-	# Refresh detour if line of sight to goal is blocked / cleared
-	_update_detour()
+	# Returning to deposit: walk straight to the point, no side detours (stops jitter)
+	var allow_detour := owner.unit_state != BaseUnit.UnitState.RETURNING \
+		and owner.unit_state != BaseUnit.UnitState.HARVESTING
 
-	# Current seek point: detour first, then final goal
+	if allow_detour:
+		_update_detour()
+	else:
+		_has_detour = false
+
 	var seek := final_target
 	if _has_detour:
 		var to_detour := _detour - owner.global_position
 		to_detour.y = 0.0
-		if to_detour.length() <= arrival_distance + 0.3:
+		if to_detour.length() <= 0.7:
 			_has_detour = false
 			seek = final_target
 		else:
 			seek = _detour
 
-	if agent.target_position.distance_to(seek) > 0.1:
+	if agent.target_position.distance_to(seek) > 0.15:
 		agent.target_position = seek
 
 	var to_seek := seek - owner.global_position
 	to_seek.y = 0.0
-	var direction := to_seek.normalized()
+	if to_seek.length() < 0.01:
+		_stop_moving()
+		return
 
-	if not agent.is_navigation_finished():
-		var next_pos: Vector3 = agent.get_next_path_position()
-		var to_next: Vector3 = next_pos - owner.global_position
-		to_next.y = 0.0
-		if to_next.length() > 0.08:
-			# Prefer nav direction only if roughly aligned with seek (prevents long wrong path)
-			if to_next.normalized().dot(direction) > 0.2:
-				direction = to_next.normalized()
+	var direction := to_seek.normalized()
 
 	var sep := _separation()
 	if sep.length_squared() > 0.001:
@@ -100,13 +103,13 @@ func _update_detour() -> void:
 
 	var origin := owner.global_position + Vector3(0.0, 0.5, 0.0)
 	var goal := owner.move_target + Vector3(0.0, 0.5, 0.0)
-	var to_goal := goal - origin
-	var dist := to_goal.length()
-	if dist < 0.5:
+	var offset := goal - origin
+	var dist := offset.length()
+	if dist < 1.0:
 		_has_detour = false
 		return
 
-	var hit := _ray(space, origin, to_goal / dist, dist)
+	var hit := _ray(space, origin, offset / dist, dist)
 	if hit.is_empty():
 		_has_detour = false
 		return
@@ -116,7 +119,6 @@ func _update_detour() -> void:
 		_has_detour = false
 		return
 
-	# Building blocks the way — pick the shorter side waypoint
 	var building := collider as BaseBuilding
 	var center: Vector3 = building.global_position
 	center.y = 0.0
@@ -132,11 +134,11 @@ func _update_detour() -> void:
 		_has_detour = false
 		return
 
+	# Side waypoints around building (tight ring, not a long drift)
 	var side := Vector3(-to_center.z, 0.0, to_center.x).normalized()
 	var wp_a: Vector3 = center + side * building_clearance
 	var wp_b: Vector3 = center - side * building_clearance
 
-	# Choose side with shorter total path: unit -> wp -> goal
 	var cost_a := from.distance_to(wp_a) + wp_a.distance_to(final_t)
 	var cost_b := from.distance_to(wp_b) + wp_b.distance_to(final_t)
 
