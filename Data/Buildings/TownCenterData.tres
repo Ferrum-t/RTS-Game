@@ -1,14 +1,15 @@
 [gd_resource type="Resource" script_class="BuildingData" format=3 uid="uid://bcxs5u5joqu05"]
 
-[ext_resource type="Script" uid="uid://cj8xpgwb8n423" path="res://Scripts/Buildings/BuildingData.gd" id="1_ltd6o"]
-[ext_resource type="PackedScene" uid="uid://c4vqup51xixto" path="res://Scenes/Buildings/TownCenter.tscn" id="1_sqbsb"]
-[ext_resource type="PackedScene" uid="uid://bvfieio0p2t5u" path="res://Scenes/Buildings/GhostBuilding.tscn" id="2_ncrgs"]
+[ext_resource type="Script" path="res://Scripts/Buildings/BuildingData.gd" id="1_ltd6o"]
+[ext_resource type="PackedScene" path="res://Scenes/Buildings/TownCenter.tscn" id="1_sqbsb"]
+[ext_resource type="PackedScene" path="res://Scenes/Buildings/GhostBuilding.tscn" id="2_ncrgs"]
 
 [resource]
 script = ExtResource("1_ltd6o")
 building_name = "Town Center"
 building_scene = ExtResource("1_sqbsb")
 ghost_scene = ExtResource("2_ncrgs")
-wood = 200
-stone = 100
-metadata/_custom_type_script = "uid://cj8xpgwb8n423"
+wood = 50
+stone = 0
+gold = 0
+food = 0
