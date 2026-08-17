@@ -2,28 +2,24 @@ extends RefCounted
 
 class_name MovementComponent
 
-## Hybrid movement:
-## - NavigationAgent path on flat navmesh
-## - Ray steer only around BUILDINGS (not trees/resources)
-## - Soft separation between units
-## - Clean arrival stop
+## Movement with tight building bypass:
+## If the straight line to the goal hits a building, walk to a side
+## waypoint around that building, then continue to the goal.
 
 var owner: BaseUnit
 var agent: NavigationAgent3D
 
 var arrival_distance: float = 0.45
-var avoid_distance: float = 1.6
-var avoid_strength: float = 2.0
+var building_clearance: float = 3.2
 var separation_radius: float = 1.1
 var separation_strength: float = 2.0
 
-var _stuck_time: float = 0.0
-var _last_pos: Vector3 = Vector3.ZERO
+var _detour: Vector3 = Vector3.ZERO
+var _has_detour: bool = false
 
 
 func _init(unit: BaseUnit) -> void:
 	owner = unit
-	_last_pos = unit.global_position
 
 	agent = NavigationAgent3D.new()
 	owner.add_child(agent)
@@ -41,112 +37,119 @@ func set_target(world_pos: Vector3) -> void:
 	p.y = 0.0
 	owner.move_target = p
 	agent.target_position = p
-	_stuck_time = 0.0
+	_has_detour = false
+	_update_detour()
 
 
-func update(delta: float) -> void:
+func update(_delta: float) -> void:
 	agent.max_speed = owner.move_speed
 
-	var target := owner.move_target
-	target.y = 0.0
+	var final_target := owner.move_target
+	final_target.y = 0.0
 
-	var to_target := target - owner.global_position
-	to_target.y = 0.0
-	var dist_to_target := to_target.length()
-
-	if dist_to_target <= arrival_distance:
+	var to_final := final_target - owner.global_position
+	to_final.y = 0.0
+	if to_final.length() <= arrival_distance:
+		_has_detour = false
 		_stop_moving()
 		return
 
-	if agent.target_position.distance_to(target) > 0.05:
-		agent.target_position = target
+	# Refresh detour if line of sight to goal is blocked / cleared
+	_update_detour()
 
-	# Preferred direction from nav path or direct line
-	var direction := to_target.normalized()
+	# Current seek point: detour first, then final goal
+	var seek := final_target
+	if _has_detour:
+		var to_detour := _detour - owner.global_position
+		to_detour.y = 0.0
+		if to_detour.length() <= arrival_distance + 0.3:
+			_has_detour = false
+			seek = final_target
+		else:
+			seek = _detour
+
+	if agent.target_position.distance_to(seek) > 0.1:
+		agent.target_position = seek
+
+	var to_seek := seek - owner.global_position
+	to_seek.y = 0.0
+	var direction := to_seek.normalized()
+
 	if not agent.is_navigation_finished():
 		var next_pos: Vector3 = agent.get_next_path_position()
 		var to_next: Vector3 = next_pos - owner.global_position
 		to_next.y = 0.0
 		if to_next.length() > 0.08:
-			direction = to_next.normalized()
-
-	# Only avoid buildings — never trees/resources (need to approach them)
-	var avoid := _building_avoidance(direction)
-	if avoid.length_squared() > 0.001:
-		# Weaker blend when close to final target so deposit/approach works
-		var blend := avoid_strength
-		if dist_to_target < 3.5:
-			blend *= 0.35
-		direction = (direction + avoid * blend).normalized()
+			# Prefer nav direction only if roughly aligned with seek (prevents long wrong path)
+			if to_next.normalized().dot(direction) > 0.2:
+				direction = to_next.normalized()
 
 	var sep := _separation()
 	if sep.length_squared() > 0.001:
 		direction = (direction + sep * separation_strength).normalized()
 
-	# Mild stuck escape (no wild side-swapping)
-	var moved := owner.global_position.distance_to(_last_pos)
-	_last_pos = owner.global_position
-	if moved < 0.015 and dist_to_target > arrival_distance * 2.0:
-		_stuck_time += delta
-	else:
-		_stuck_time = 0.0
-
-	if _stuck_time > 0.5:
-		var side := Vector3(-direction.z, 0.0, direction.x)
-		direction = (direction * 0.5 + side).normalized()
-
 	owner.velocity = direction * owner.move_speed
 	owner.move_and_slide()
 
 
-func _stop_moving() -> void:
-	owner.velocity = Vector3.ZERO
-	_stuck_time = 0.0
-	if owner.unit_state == BaseUnit.UnitState.MOVING:
-		owner.unit_state = BaseUnit.UnitState.IDLE
-
-
-func _building_avoidance(move_dir: Vector3) -> Vector3:
+func _update_detour() -> void:
 	var space := owner.get_world_3d().direct_space_state
 	if space == null:
-		return Vector3.ZERO
+		_has_detour = false
+		return
 
 	var origin := owner.global_position + Vector3(0.0, 0.5, 0.0)
-	var forward := move_dir.normalized()
-	var hit := _ray(space, origin, forward, avoid_distance)
+	var goal := owner.move_target + Vector3(0.0, 0.5, 0.0)
+	var to_goal := goal - origin
+	var dist := to_goal.length()
+	if dist < 0.5:
+		_has_detour = false
+		return
+
+	var hit := _ray(space, origin, to_goal / dist, dist)
 	if hit.is_empty():
-		return Vector3.ZERO
+		_has_detour = false
+		return
 
 	var collider = hit.get("collider")
-	# IMPORTANT: only buildings, never resources/trees
 	if collider == null or not (collider is BaseBuilding):
-		return Vector3.ZERO
+		_has_detour = false
+		return
 
-	var n: Vector3 = hit.normal
-	n.y = 0.0
-	if n.length_squared() < 0.001:
-		n = Vector3(-forward.z, 0.0, forward.x)
-	else:
-		n = n.normalized()
+	# Building blocks the way — pick the shorter side waypoint
+	var building := collider as BaseBuilding
+	var center: Vector3 = building.global_position
+	center.y = 0.0
 
-	var left := Vector3(-forward.z, 0.0, forward.x)
-	var right := -left
-	var hit_l := _ray(space, origin, (forward + left * 0.8).normalized(), avoid_distance)
-	var hit_r := _ray(space, origin, (forward + right * 0.8).normalized(), avoid_distance)
+	var from: Vector3 = owner.global_position
+	from.y = 0.0
+	var final_t: Vector3 = owner.move_target
+	final_t.y = 0.0
 
-	var left_blocked := not hit_l.is_empty() and hit_l.get("collider") is BaseBuilding
-	var right_blocked := not hit_r.is_empty() and hit_r.get("collider") is BaseBuilding
+	var to_center: Vector3 = center - from
+	to_center.y = 0.0
+	if to_center.length() < 0.01:
+		_has_detour = false
+		return
 
-	if not left_blocked and right_blocked:
-		return left
-	if not right_blocked and left_blocked:
-		return right
+	var side := Vector3(-to_center.z, 0.0, to_center.x).normalized()
+	var wp_a: Vector3 = center + side * building_clearance
+	var wp_b: Vector3 = center - side * building_clearance
 
-	var to_goal := owner.move_target - owner.global_position
-	to_goal.y = 0.0
-	if left.dot(to_goal) >= right.dot(to_goal):
-		return (left + n * 0.5).normalized()
-	return (right + n * 0.5).normalized()
+	# Choose side with shorter total path: unit -> wp -> goal
+	var cost_a := from.distance_to(wp_a) + wp_a.distance_to(final_t)
+	var cost_b := from.distance_to(wp_b) + wp_b.distance_to(final_t)
+
+	_detour = wp_a if cost_a <= cost_b else wp_b
+	_detour.y = 0.0
+	_has_detour = true
+
+
+func _stop_moving() -> void:
+	owner.velocity = Vector3.ZERO
+	_has_detour = false
+	if owner.unit_state == BaseUnit.UnitState.MOVING:
+		owner.unit_state = BaseUnit.UnitState.IDLE
 
 
 func _separation() -> Vector3:
