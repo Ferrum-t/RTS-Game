@@ -2,30 +2,33 @@
 
 [ext_resource type="Script" path="res://Scripts/UI/HealthBar3D.gd" id="1_hp"]
 
-[sub_resource type="BoxMesh" id="BoxMesh_bg"]
-size = Vector3(1.4, 0.14, 0.05)
+[sub_resource type="QuadMesh" id="Quad_bg"]
+size = Vector2(2.0, 0.28)
 
 [sub_resource type="StandardMaterial3D" id="Mat_bg"]
 shading_mode = 0
-albedo_color = Color(0.08, 0.08, 0.08, 1)
+albedo_color = Color(0.05, 0.05, 0.05, 1)
+no_depth_test = true
+render_priority = 5
 
-[sub_resource type="BoxMesh" id="BoxMesh_fill"]
-size = Vector3(1.4, 0.12, 0.05)
+[sub_resource type="QuadMesh" id="Quad_fill"]
+size = Vector2(2.0, 0.22)
 
 [sub_resource type="StandardMaterial3D" id="Mat_fill"]
 shading_mode = 0
-albedo_color = Color(0.25, 0.95, 0.3, 1)
+albedo_color = Color(0.2, 1.0, 0.25, 1)
+no_depth_test = true
+render_priority = 6
 
 [node name="HealthBar3D" type="Node3D"]
 script = ExtResource("1_hp")
 
 [node name="Background" type="MeshInstance3D" parent="."]
-mesh = SubResource("BoxMesh_bg")
+mesh = SubResource("Quad_bg")
 surface_material_override/0 = SubResource("Mat_bg")
 cast_shadow = 0
 
 [node name="Fill" type="MeshInstance3D" parent="."]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0.03)
-mesh = SubResource("BoxMesh_fill")
+mesh = SubResource("Quad_fill")
 surface_material_override/0 = SubResource("Mat_fill")
 cast_shadow = 0
