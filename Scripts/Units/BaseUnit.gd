@@ -41,15 +41,20 @@ var inventory : InventoryComponent
 var harvest : HarvestComponent
 var combat : CombatComponent
 
+const GRAVITY := 30.0
+
 
 func _ready() -> void:
 	health = max_health
 	add_to_group("Unit")
 
-	# Layer 2 = units. Mask 1 = world/buildings/resources only.
-	# Units do NOT hard-collide with each other (classic RTS soft stacking).
+	# Layer 2 = units. Mask 1 = world only (no unit-unit hard block).
 	collision_layer = 2
 	collision_mask = 1
+
+	var pos := global_position
+	pos.y = 0.0
+	global_position = pos
 
 	UnitManager.register_unit(self)
 
@@ -61,12 +66,19 @@ func _ready() -> void:
 	combat.attack_range = attack_range
 	combat.attack_cooldown = attack_cooldown
 
+	print(name, " ready at ", global_position)
+
 
 func _exit_tree() -> void:
 	UnitManager.unregister_unit(self)
 
 
 func _physics_process(delta: float) -> void:
+	if not is_on_floor():
+		velocity.y -= GRAVITY * delta
+	else:
+		velocity.y = 0.0
+
 	match unit_state:
 		UnitState.IDLE:
 			update_idle(delta)
@@ -83,9 +95,15 @@ func _physics_process(delta: float) -> void:
 		UnitState.DEAD:
 			pass
 
+	if global_position.y < 0.0:
+		global_position.y = 0.0
+		velocity.y = 0.0
+
 
 func update_idle(_delta: float) -> void:
-	velocity = Vector3.ZERO
+	velocity.x = 0.0
+	velocity.z = 0.0
+	move_and_slide()
 
 
 func update_return(delta: float) -> void:
