@@ -5,10 +5,15 @@ extends Node
 
 signal resources_changed
 
-var wood: int = 0
+var wood: int = 100
 var stone: int = 0
 var gold: int = 0
 var food: int = 0
+
+
+func _ready() -> void:
+	resources_changed.emit()
+	print("ResourceManager ready. Wood: ", wood)
 
 
 func add_wood(amount: int) -> void:
