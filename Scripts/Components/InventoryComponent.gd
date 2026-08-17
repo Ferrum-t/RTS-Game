@@ -17,7 +17,7 @@ func _init(unit: BaseUnit) -> void:
 
 
 func is_full() -> bool:
-	return wood >= capacity
+	return get_total() >= capacity
 
 
 func clear() -> void:
@@ -29,6 +29,10 @@ func clear() -> void:
 
 func add_wood(amount: int) -> void:
 	wood = clampi(wood + amount, 0, capacity)
+
+
+func add_stone(amount: int) -> void:
+	stone = clampi(stone + amount, 0, capacity)
 
 
 func has_resources() -> bool:
