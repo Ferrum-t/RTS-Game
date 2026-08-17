@@ -45,6 +45,12 @@ var combat : CombatComponent
 func _ready() -> void:
 	health = max_health
 	add_to_group("Unit")
+
+	# Layer 2 = units. Mask 1 = world/buildings/resources only.
+	# Units do NOT hard-collide with each other (classic RTS soft stacking).
+	collision_layer = 2
+	collision_mask = 1
+
 	UnitManager.register_unit(self)
 
 	movement = MovementComponent.new(self)
