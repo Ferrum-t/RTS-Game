@@ -4,8 +4,7 @@ class_name HarvestComponent
 
 var owner: BaseUnit
 
-## Stand this far from the resource while gathering (> tree collision radius)
-var approach_distance: float = 2.2
+var approach_distance: float = 1.7
 var harvest_amount: int = 10
 var harvest_interval: float = 0.8
 var _timer: float = 0.0
@@ -34,17 +33,24 @@ func update(delta: float) -> void:
 	to_res.y = 0.0
 	var dist := to_res.length()
 
-	# Approach stand-point in front of tree — do not walk into collider
 	if dist > approach_distance:
-		var stand_pos: Vector3 = resource.global_position - to_res.normalized() * approach_distance
+		# Stand point just outside the tree
+		var stand_pos: Vector3 = resource.global_position
+		if to_res.length() > 0.01:
+			stand_pos = resource.global_position - to_res.normalized() * approach_distance
 		stand_pos.y = 0.0
 		owner.move_target = stand_pos
-		if owner.movement:
-			owner.movement.set_target(stand_pos)
-			owner.movement.update(delta)
+		# Direct step toward stand_pos (no set_target spam / detour)
+		var step := stand_pos - owner.global_position
+		step.y = 0.0
+		if step.length() > 0.05:
+			owner.velocity = step.normalized() * owner.move_speed
+			owner.move_and_slide()
+		else:
+			owner.velocity = Vector3.ZERO
 		return
 
-	# In range — stop and gather
+	# In harvest range
 	owner.velocity = Vector3.ZERO
 	_timer -= delta
 	if _timer > 0.0:
