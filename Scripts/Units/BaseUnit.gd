@@ -21,6 +21,7 @@ enum UnitState
 @export var attack_damage := 10
 @export var attack_range := 2.0
 @export var attack_cooldown := 1.0
+@export var health_bar_height := 1.6
 
 var health := 100
 
@@ -40,15 +41,16 @@ var movement : MovementComponent
 var inventory : InventoryComponent
 var harvest : HarvestComponent
 var combat : CombatComponent
+var health_bar: HealthBar3D = null
 
 const GRAVITY := 30.0
+const HEALTH_BAR_SCENE := preload("res://Scenes/UI/HealthBar3D.tscn")
 
 
 func _ready() -> void:
 	health = max_health
 	add_to_group("Unit")
 
-	# Layer 2 = units. Mask 1 = world only (no unit-unit hard block).
 	collision_layer = 2
 	collision_mask = 1
 
@@ -66,7 +68,16 @@ func _ready() -> void:
 	combat.attack_range = attack_range
 	combat.attack_cooldown = attack_cooldown
 
+	_setup_health_bar()
+
 	print(name, " ready at ", global_position)
+
+
+func _setup_health_bar() -> void:
+	health_bar = HEALTH_BAR_SCENE.instantiate() as HealthBar3D
+	add_child(health_bar)
+	health_bar.position = Vector3(0.0, health_bar_height, 0.0)
+	health_bar.setup(max_health)
 
 
 func _exit_tree() -> void:
@@ -203,6 +214,8 @@ func damage(amount: int) -> void:
 	if unit_state == UnitState.DEAD:
 		return
 	health -= amount
+	if health_bar:
+		health_bar.set_health(health)
 	if health <= 0:
 		health = 0
 		die()
