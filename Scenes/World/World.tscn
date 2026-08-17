@@ -15,7 +15,7 @@
 size = Vector2(100, 100)
 
 [sub_resource type="BoxShape3D" id="BoxShape3D_f2orf"]
-size = Vector3(100, 1, 100)
+size = Vector3(100, 2, 100)
 
 [node name="World" type="Node3D"]
 script = ExtResource("1_lp0bp")
@@ -53,18 +53,23 @@ transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 25, 0)
 current = true
 
 [node name="Ground2" type="StaticBody3D" parent="."]
+collision_layer = 1
+collision_mask = 0
 
 [node name="MeshInstance3D" type="MeshInstance3D" parent="Ground2"]
 mesh = SubResource("PlaneMesh_f2orf")
 
 [node name="CollisionShape3D" type="CollisionShape3D" parent="Ground2"]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -0.5, 0)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -1, 0)
 shape = SubResource("BoxShape3D_f2orf")
 
 [node name="Units" type="Node3D" parent="."]
 
 [node name="Worker" parent="Units" instance=ExtResource("5_hveh7")]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 7, 0, 0)
+
+[node name="Worker2" parent="Units" instance=ExtResource("5_hveh7")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 10, 0, 0)
 
 [node name="Tree" parent="." instance=ExtResource("10_ng1ea")]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, -12)
