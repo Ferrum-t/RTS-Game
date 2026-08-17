@@ -1,18 +1,20 @@
 [gd_scene format=3 uid="uid://ba6aiqwlx8fay"]
 
 [sub_resource type="CylinderMesh" id="CylinderMesh_6ygev"]
-top_radius = 0.4
-bottom_radius = 0.4
-height = 0.05
+top_radius = 0.35
+bottom_radius = 0.35
+height = 0.04
 
 [sub_resource type="StandardMaterial3D" id="StandardMaterial3D_0xf5w"]
-albedo_color = Color(1, 0, 0, 1)
+albedo_color = Color(1, 0.15, 0.1, 1)
 emission_enabled = true
-emission = Color(1, 0, 0, 1)
-emission_energy_multiplier = 2.0
+emission = Color(1, 0.2, 0.1, 1)
+emission_energy_multiplier = 2.5
 
-[node name="Marker" type="Node3D" unique_id=327617852]
+[node name="Marker" type="Node3D"]
 
-[node name="MeshInstance3D" type="MeshInstance3D" parent="." unique_id=662150298]
+[node name="MeshInstance3D" type="MeshInstance3D" parent="."]
+# Slight lift so the disc sits on the ground plane, not through it
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.02, 0)
 mesh = SubResource("CylinderMesh_6ygev")
 surface_material_override/0 = SubResource("StandardMaterial3D_0xf5w")
