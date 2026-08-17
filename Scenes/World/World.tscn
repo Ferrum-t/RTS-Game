@@ -17,6 +17,14 @@ size = Vector2(100, 100)
 [sub_resource type="BoxShape3D" id="BoxShape3D_f2orf"]
 size = Vector3(100, 2, 100)
 
+[sub_resource type="NavigationMesh" id="NavigationMesh_map"]
+vertices = PackedVector3Array(-50, 0, -50, 50, 0, -50, 50, 0, 50, -50, 0, 50)
+polygons = [PackedInt32Array(3, 0, 1, 2), PackedInt32Array(3, 0, 2, 3)]
+agent_radius = 0.5
+agent_height = 1.5
+agent_max_climb = 0.3
+agent_max_slope = 45.0
+
 [node name="World" type="Node3D"]
 script = ExtResource("1_lp0bp")
 
@@ -62,6 +70,9 @@ mesh = SubResource("PlaneMesh_f2orf")
 [node name="CollisionShape3D" type="CollisionShape3D" parent="Ground2"]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -1, 0)
 shape = SubResource("BoxShape3D_f2orf")
+
+[node name="NavigationRegion3D" type="NavigationRegion3D" parent="."]
+navigation_mesh = SubResource("NavigationMesh_map")
 
 [node name="Units" type="Node3D" parent="."]
 
