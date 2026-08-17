@@ -1,4 +1,4 @@
-[gd_scene format=3 uid="uid://bhealthbar3d001"]
+[gd_scene format=3 uid="uid://c1cniwgt7d2gy"]
 
 [ext_resource type="Script" path="res://Scripts/UI/HealthBar3D.gd" id="1_hp"]
 
