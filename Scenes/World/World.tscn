@@ -9,6 +9,7 @@
 [ext_resource type="PackedScene" path="res://Scenes/Units/worker.tscn" id="5_hveh7"]
 [ext_resource type="Script" path="res://Scripts/Systems/Managers/CommandManager.gd" id="7_kjd5s"]
 [ext_resource type="PackedScene" path="res://Scenes/Resorces/Tree.tscn" id="10_ng1ea"]
+[ext_resource type="PackedScene" path="res://Scenes/Resorces/Stone.tscn" id="11_stone"]
 [ext_resource type="PackedScene" path="res://Scenes/UI/ui.tscn" id="15_0phyg"]
 
 [sub_resource type="PlaneMesh" id="PlaneMesh_f2orf"]
@@ -84,6 +85,9 @@ transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 10, 0, 0)
 
 [node name="Tree" parent="." instance=ExtResource("10_ng1ea")]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, -12)
+
+[node name="Stone" parent="." instance=ExtResource("11_stone")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 8, 0, -10)
 
 [node name="Resources" type="Node" parent="."]
 
