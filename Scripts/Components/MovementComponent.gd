@@ -2,16 +2,14 @@ extends RefCounted
 
 class_name MovementComponent
 
-## Movement with building bypass.
-## - Never path into a building interior
-## - No detour while RETURNING (must approach Town Center)
-## - Side waypoint only when goal is blocked by a building
+## Movement with corner-clearing building bypass.
+## Detour sits beside + slightly past the building toward the goal.
 
 var owner: BaseUnit
 var agent: NavigationAgent3D
 
 var arrival_distance: float = 0.45
-var building_clearance: float = 4.0
+var building_clearance: float = 4.5
 var separation_radius: float = 1.1
 var separation_strength: float = 2.0
 
@@ -39,8 +37,8 @@ func set_target(world_pos: Vector3) -> void:
 	owner.move_target = p
 	agent.target_position = p
 	_has_detour = false
-	# Detour only for normal move orders, not return-to-base
-	if owner.unit_state != BaseUnit.UnitState.RETURNING:
+	if owner.unit_state != BaseUnit.UnitState.RETURNING \
+		and owner.unit_state != BaseUnit.UnitState.HARVESTING:
 		_update_detour()
 
 
@@ -57,7 +55,6 @@ func update(_delta: float) -> void:
 		_stop_moving()
 		return
 
-	# Returning to deposit: walk straight to the point, no side detours (stops jitter)
 	var allow_detour := owner.unit_state != BaseUnit.UnitState.RETURNING \
 		and owner.unit_state != BaseUnit.UnitState.HARVESTING
 
@@ -70,7 +67,7 @@ func update(_delta: float) -> void:
 	if _has_detour:
 		var to_detour := _detour - owner.global_position
 		to_detour.y = 0.0
-		if to_detour.length() <= 0.7:
+		if to_detour.length() <= 0.8:
 			_has_detour = false
 			seek = final_target
 		else:
@@ -134,10 +131,17 @@ func _update_detour() -> void:
 		_has_detour = false
 		return
 
-	# Side waypoints around building (tight ring, not a long drift)
 	var side := Vector3(-to_center.z, 0.0, to_center.x).normalized()
-	var wp_a: Vector3 = center + side * building_clearance
-	var wp_b: Vector3 = center - side * building_clearance
+
+	# Place waypoint beside building AND a bit past it toward the goal (clears corners)
+	var toward_goal: Vector3 = final_t - center
+	toward_goal.y = 0.0
+	var past := Vector3.ZERO
+	if toward_goal.length() > 0.1:
+		past = toward_goal.normalized() * 2.5
+
+	var wp_a: Vector3 = center + side * building_clearance + past
+	var wp_b: Vector3 = center - side * building_clearance + past
 
 	var cost_a := from.distance_to(wp_a) + wp_a.distance_to(final_t)
 	var cost_b := from.distance_to(wp_b) + wp_b.distance_to(final_t)
