@@ -4,10 +4,11 @@ class_name HarvestComponent
 
 var owner: BaseUnit
 
-var harvest_timer := 0.0
-var harvest_interval := 1.0
-var harvest_amount := 10
-var approach_distance := 2.0
+## Stand this far from the resource while gathering (must be > collision radius)
+var approach_distance: float = 2.2
+var harvest_amount: int = 10
+var harvest_interval: float = 0.8
+var _timer: float = 0.0
 
 
 func _init(unit: BaseUnit) -> void:
@@ -15,37 +16,48 @@ func _init(unit: BaseUnit) -> void:
 
 
 func update(delta: float) -> void:
-	if owner.harvest_target == null or not is_instance_valid(owner.harvest_target):
+	if owner.inventory != null and owner.inventory.is_full():
+		print(owner.name, " inventory full, returning to Town Center")
+		owner.unit_state = BaseUnit.UnitState.RETURNING
+		owner.return_target = null
+		owner.velocity = Vector3.ZERO
+		return
+
+	var resource: BaseResource = owner.harvest_target
+	if resource == null or not is_instance_valid(resource):
 		owner.harvest_target = null
 		owner.unit_state = BaseUnit.UnitState.IDLE
+		owner.velocity = Vector3.ZERO
 		return
 
-	# Inventory full → go return resources
-	if owner.inventory.is_full():
-		owner.unit_state = BaseUnit.UnitState.RETURNING
-		print(owner.name, " inventory full, returning to Town Center")
+	var to_res: Vector3 = resource.global_position - owner.global_position
+	to_res.y = 0.0
+	var dist := to_res.length()
+
+	# Approach — stop at approach_distance, do not walk into the collider
+	if dist > approach_distance:
+		var stand_pos: Vector3 = resource.global_position - to_res.normalized() * approach_distance
+		stand_pos.y = 0.0
+		owner.move_target = stand_pos
+		if owner.movement:
+			owner.movement.set_target(stand_pos)
+			# Temporary MOVING-like path without leaving HARVESTING state
+			owner.movement.update(delta)
 		return
 
-	var resource := owner.harvest_target
-	var distance := owner.global_position.distance_to(resource.global_position)
-
-	# Approach resource
-	if distance > approach_distance:
-		owner.move_target = resource.global_position
-		owner.movement.update(delta)
-		return
-
-	# Stop and harvest
+	# In range — gather
 	owner.velocity = Vector3.ZERO
-	harvest_timer += delta
+	_timer -= delta
+	if _timer > 0.0:
+		return
+	_timer = harvest_interval
 
-	if harvest_timer >= harvest_interval:
-		harvest_timer = 0.0
-		owner.inventory.add_wood(harvest_amount)
-		print(
-			owner.name,
-			" Wood: ",
-			owner.inventory.wood,
-			"/",
-			owner.inventory.capacity
-		)
+	if resource.has_method("harvest"):
+		var got: int = resource.harvest(harvest_amount)
+		if got > 0 and owner.inventory:
+			owner.inventory.add_wood(got)
+			print(owner.name, " Wood: ", owner.inventory.wood, "/", owner.inventory.max_wood)
+		elif got <= 0:
+			# Resource depleted
+			owner.harvest_target = null
+			owner.unit_state = BaseUnit.UnitState.IDLE
