@@ -133,6 +133,7 @@ func update_return(delta: float) -> void:
 
 	if distance > deposit_distance:
 		move_target = return_target.global_position
+		movement.set_target(move_target)
 		movement.update(delta)
 		return
 
@@ -171,6 +172,8 @@ func set_move_target(target: Vector3) -> void:
 	harvest_target = null
 	attack_target = null
 	return_target = null
+	if movement:
+		movement.set_target(target)
 
 
 func set_harvest_target(resource: BaseResource) -> void:
