@@ -2,16 +2,17 @@ extends RefCounted
 
 class_name MovementComponent
 
-## Direct move + two-point building detour (side, then past corner).
+## Direct move + detour around buildings AND trees (move orders only).
+## Harvest/return do not use detour — they approach the target on purpose.
 
 var owner: BaseUnit
 
 var arrival_distance: float = 0.5
 var building_clearance: float = 5.5
+var tree_clearance: float = 2.6
 var separation_radius: float = 1.1
 var separation_strength: float = 1.8
 
-# Detour path: index 0 = side point, index 1 = past-corner point
 var _waypoints: Array[Vector3] = []
 var _wp_index: int = 0
 
@@ -50,7 +51,6 @@ func update(delta: float) -> void:
 		if _waypoints.is_empty() and _line_blocked(owner.global_position, final_target):
 			_build_detour()
 		elif not _waypoints.is_empty() and not _line_blocked(owner.global_position, final_target):
-			# Straight path free again
 			_waypoints.clear()
 			_wp_index = 0
 	else:
@@ -62,7 +62,7 @@ func update(delta: float) -> void:
 		var wp: Vector3 = _waypoints[_wp_index]
 		var to_wp := wp - owner.global_position
 		to_wp.y = 0.0
-		if to_wp.length() <= 0.9:
+		if to_wp.length() <= 0.85:
 			_wp_index += 1
 			if _wp_index < _waypoints.size():
 				seek = _waypoints[_wp_index]
@@ -79,7 +79,7 @@ func update(delta: float) -> void:
 
 	var direction := to_seek.normalized()
 
-	# Stuck on a corner: slide sideways along the block
+	# Stuck recovery — slide along whatever is blocking
 	var moved := owner.global_position.distance_to(_last_pos)
 	_last_pos = owner.global_position
 	if moved < 0.02:
@@ -87,17 +87,13 @@ func update(delta: float) -> void:
 	else:
 		_stuck_time = 0.0
 
-	if _stuck_time > 0.25:
+	if _stuck_time > 0.2:
 		var side := Vector3(-direction.z, 0.0, direction.x)
-		# Prefer the side that still aims toward the goal
 		if side.dot(to_final) < 0.0:
 			side = -side
-		direction = (direction * 0.3 + side).normalized()
-		# Rebuild a wider detour once if stuck long
-		if _stuck_time > 0.6 and _can_use_detour():
-			building_clearance = 6.5
+		direction = (direction * 0.25 + side).normalized()
+		if _stuck_time > 0.45 and _can_use_detour():
 			_build_detour()
-			building_clearance = 5.5
 			_stuck_time = 0.0
 
 	var sep := _separation()
@@ -129,10 +125,26 @@ func _build_detour() -> void:
 		return
 
 	var collider = hit.get("collider")
-	if collider == null or not (collider is BaseBuilding):
+	if collider == null:
 		return
 
-	var center: Vector3 = (collider as BaseBuilding).global_position
+	var clearance := 0.0
+	var center := Vector3.ZERO
+
+	if collider is BaseBuilding:
+		clearance = building_clearance
+		center = (collider as BaseBuilding).global_position
+	elif collider is BaseResource:
+		clearance = tree_clearance
+		center = (collider as BaseResource).global_position
+	else:
+		# Other static props (not ground — ray is at y=0.5)
+		if collider is StaticBody3D:
+			clearance = tree_clearance
+			center = (collider as StaticBody3D).global_position
+		else:
+			return
+
 	center.y = 0.0
 
 	var to_center := center - from
@@ -147,18 +159,18 @@ func _build_detour() -> void:
 	if toward_goal.length() > 0.1:
 		past_dir = toward_goal.normalized()
 
-	# Pick shorter side
 	var side_a := side
 	var side_b := -side
-	var cost_a := from.distance_to(center + side_a * building_clearance) + (center + side_a * building_clearance).distance_to(final_t)
-	var cost_b := from.distance_to(center + side_b * building_clearance) + (center + side_b * building_clearance).distance_to(final_t)
+	var cost_a := from.distance_to(center + side_a * clearance) + (center + side_a * clearance).distance_to(final_t)
+	var cost_b := from.distance_to(center + side_b * clearance) + (center + side_b * clearance).distance_to(final_t)
 	var chosen_side := side_a if cost_a <= cost_b else side_b
 
-	# 1) Beside the building
-	var wp_side: Vector3 = center + chosen_side * building_clearance
+	# Beside obstacle
+	var wp_side: Vector3 = center + chosen_side * clearance
 	wp_side.y = 0.0
-	# 2) Past the corner toward the goal (clears the angle)
-	var wp_past: Vector3 = center + chosen_side * building_clearance + past_dir * 4.0
+	# Past it toward the goal (clears cylinder "faces")
+	var past_amount := 3.0 if collider is BaseBuilding else 2.2
+	var wp_past: Vector3 = center + chosen_side * clearance + past_dir * past_amount
 	wp_past.y = 0.0
 
 	_waypoints.append(wp_side)
@@ -169,7 +181,11 @@ func _line_blocked(from: Vector3, to: Vector3) -> bool:
 	var hit := _ray_to(from, to)
 	if hit.is_empty():
 		return false
-	return hit.get("collider") is BaseBuilding
+	var c = hit.get("collider")
+	if c is BaseBuilding or c is BaseResource:
+		return true
+	# Ignore ground / unknown
+	return false
 
 
 func _ray_to(from: Vector3, to: Vector3) -> Dictionary:
