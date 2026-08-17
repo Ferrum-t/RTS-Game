@@ -10,15 +10,13 @@ func _ready() -> void:
 	if bm:
 		bm.register_building(self)
 
-	# Runtime obstacle for NavigationAgent avoidance (no full navmesh rebake needed)
+	# RVO obstacle — agents feel a solid body around the building
 	_nav_obstacle = NavigationObstacle3D.new()
 	add_child(_nav_obstacle)
-	_nav_obstacle.radius = 2.0
+	_nav_obstacle.radius = 2.8
 	_nav_obstacle.height = 3.0
 	_nav_obstacle.avoidance_enabled = true
 	_nav_obstacle.avoidance_layers = 1
-
-	print(name, " registered: ", name)
 
 
 func _exit_tree() -> void:
