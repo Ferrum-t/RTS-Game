@@ -23,7 +23,6 @@ bottom_radius = 0.55
 height = 0.04
 
 [node name="Worker" type="CharacterBody3D"]
-# Layer 2 = units; mask 1 = ground/buildings/trees only (no unit-unit hard block)
 collision_layer = 2
 collision_mask = 1
 floor_stop_on_slope = true
