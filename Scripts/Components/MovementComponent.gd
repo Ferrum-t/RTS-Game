@@ -2,67 +2,74 @@ extends RefCounted
 
 class_name MovementComponent
 
-## Reliable RTS movement (foundation):
-## - Walk straight to the goal
-## - If a building blocks the line, go to a side waypoint, then to the goal
-## - No NavigationAgent (flat navmesh was fighting local steers)
+## Direct move + two-point building detour (side, then past corner).
 
 var owner: BaseUnit
 
 var arrival_distance: float = 0.5
-var building_clearance: float = 5.0
+var building_clearance: float = 5.5
 var separation_radius: float = 1.1
 var separation_strength: float = 1.8
 
-var _detour: Vector3 = Vector3.ZERO
-var _has_detour: bool = false
+# Detour path: index 0 = side point, index 1 = past-corner point
+var _waypoints: Array[Vector3] = []
+var _wp_index: int = 0
+
+var _stuck_time: float = 0.0
+var _last_pos: Vector3 = Vector3.ZERO
 
 
 func _init(unit: BaseUnit) -> void:
 	owner = unit
+	_last_pos = unit.global_position
 
 
 func set_target(world_pos: Vector3) -> void:
 	var p := world_pos
 	p.y = 0.0
 	owner.move_target = p
-	_has_detour = false
+	_waypoints.clear()
+	_wp_index = 0
+	_stuck_time = 0.0
 	if _can_use_detour():
-		_compute_detour()
+		_build_detour()
 
 
-func update(_delta: float) -> void:
+func update(delta: float) -> void:
 	var final_target := owner.move_target
 	final_target.y = 0.0
 
 	var to_final := final_target - owner.global_position
 	to_final.y = 0.0
-	var dist_final := to_final.length()
-
-	if dist_final <= arrival_distance:
-		_has_detour = false
+	if to_final.length() <= arrival_distance:
+		_waypoints.clear()
 		_stop_if_moving()
 		return
 
-	# Recompute detour only for normal move orders
 	if _can_use_detour():
-		if not _has_detour:
-			_compute_detour()
-		elif not _line_blocked(owner.global_position, final_target):
-			# Path opened — cancel detour
-			_has_detour = false
+		if _waypoints.is_empty() and _line_blocked(owner.global_position, final_target):
+			_build_detour()
+		elif not _waypoints.is_empty() and not _line_blocked(owner.global_position, final_target):
+			# Straight path free again
+			_waypoints.clear()
+			_wp_index = 0
 	else:
-		_has_detour = false
+		_waypoints.clear()
+		_wp_index = 0
 
 	var seek := final_target
-	if _has_detour:
-		var to_detour := _detour - owner.global_position
-		to_detour.y = 0.0
-		if to_detour.length() <= 0.9:
-			_has_detour = false
-			seek = final_target
+	if _wp_index < _waypoints.size():
+		var wp: Vector3 = _waypoints[_wp_index]
+		var to_wp := wp - owner.global_position
+		to_wp.y = 0.0
+		if to_wp.length() <= 0.9:
+			_wp_index += 1
+			if _wp_index < _waypoints.size():
+				seek = _waypoints[_wp_index]
+			else:
+				seek = final_target
 		else:
-			seek = _detour
+			seek = wp
 
 	var to_seek := seek - owner.global_position
 	to_seek.y = 0.0
@@ -71,6 +78,27 @@ func update(_delta: float) -> void:
 		return
 
 	var direction := to_seek.normalized()
+
+	# Stuck on a corner: slide sideways along the block
+	var moved := owner.global_position.distance_to(_last_pos)
+	_last_pos = owner.global_position
+	if moved < 0.02:
+		_stuck_time += delta
+	else:
+		_stuck_time = 0.0
+
+	if _stuck_time > 0.25:
+		var side := Vector3(-direction.z, 0.0, direction.x)
+		# Prefer the side that still aims toward the goal
+		if side.dot(to_final) < 0.0:
+			side = -side
+		direction = (direction * 0.3 + side).normalized()
+		# Rebuild a wider detour once if stuck long
+		if _stuck_time > 0.6 and _can_use_detour():
+			building_clearance = 6.5
+			_build_detour()
+			building_clearance = 5.5
+			_stuck_time = 0.0
 
 	var sep := _separation()
 	if sep.length_squared() > 0.001:
@@ -84,24 +112,24 @@ func _can_use_detour() -> bool:
 	return owner.unit_state == BaseUnit.UnitState.MOVING
 
 
-func _compute_detour() -> void:
+func _build_detour() -> void:
+	_waypoints.clear()
+	_wp_index = 0
+
 	var from: Vector3 = owner.global_position
 	from.y = 0.0
 	var final_t: Vector3 = owner.move_target
 	final_t.y = 0.0
 
 	if not _line_blocked(from, final_t):
-		_has_detour = false
 		return
 
 	var hit := _ray_to(from, final_t)
 	if hit.is_empty():
-		_has_detour = false
 		return
 
 	var collider = hit.get("collider")
 	if collider == null or not (collider is BaseBuilding):
-		_has_detour = false
 		return
 
 	var center: Vector3 = (collider as BaseBuilding).global_position
@@ -110,26 +138,31 @@ func _compute_detour() -> void:
 	var to_center := center - from
 	to_center.y = 0.0
 	if to_center.length() < 0.01:
-		_has_detour = false
 		return
 
 	var side := Vector3(-to_center.z, 0.0, to_center.x).normalized()
 	var toward_goal := final_t - center
 	toward_goal.y = 0.0
-	var past := Vector3.ZERO
+	var past_dir := Vector3.ZERO
 	if toward_goal.length() > 0.1:
-		past = toward_goal.normalized() * 3.0
+		past_dir = toward_goal.normalized()
 
-	var wp_a: Vector3 = center + side * building_clearance + past
-	var wp_b: Vector3 = center - side * building_clearance + past
-	wp_a.y = 0.0
-	wp_b.y = 0.0
+	# Pick shorter side
+	var side_a := side
+	var side_b := -side
+	var cost_a := from.distance_to(center + side_a * building_clearance) + (center + side_a * building_clearance).distance_to(final_t)
+	var cost_b := from.distance_to(center + side_b * building_clearance) + (center + side_b * building_clearance).distance_to(final_t)
+	var chosen_side := side_a if cost_a <= cost_b else side_b
 
-	var cost_a := from.distance_to(wp_a) + wp_a.distance_to(final_t)
-	var cost_b := from.distance_to(wp_b) + wp_b.distance_to(final_t)
+	# 1) Beside the building
+	var wp_side: Vector3 = center + chosen_side * building_clearance
+	wp_side.y = 0.0
+	# 2) Past the corner toward the goal (clears the angle)
+	var wp_past: Vector3 = center + chosen_side * building_clearance + past_dir * 4.0
+	wp_past.y = 0.0
 
-	_detour = wp_a if cost_a <= cost_b else wp_b
-	_has_detour = true
+	_waypoints.append(wp_side)
+	_waypoints.append(wp_past)
 
 
 func _line_blocked(from: Vector3, to: Vector3) -> bool:
@@ -146,8 +179,7 @@ func _ray_to(from: Vector3, to: Vector3) -> Dictionary:
 	var a := from + Vector3(0.0, 0.5, 0.0)
 	var b := to + Vector3(0.0, 0.5, 0.0)
 	var offset := b - a
-	var dist := offset.length()
-	if dist < 0.2:
+	if offset.length() < 0.2:
 		return {}
 	var query := PhysicsRayQueryParameters3D.create(a, a + offset)
 	query.collision_mask = 1
@@ -157,6 +189,8 @@ func _ray_to(from: Vector3, to: Vector3) -> Dictionary:
 
 func _stop_if_moving() -> void:
 	owner.velocity = Vector3.ZERO
+	_waypoints.clear()
+	_wp_index = 0
 	if owner.unit_state == BaseUnit.UnitState.MOVING:
 		owner.unit_state = BaseUnit.UnitState.IDLE
 
