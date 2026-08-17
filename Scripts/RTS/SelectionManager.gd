@@ -4,6 +4,7 @@ class_name SelectionManager
 
 const MARKER_SCENE = preload("res://Scenes/Marker/marker.tscn")
 const MARKER_HEIGHT := 0.05
+const MARKER_VISIBLE_TIME := 0.8
 
 @export var camera: Camera3D
 @export var ground: StaticBody3D
@@ -12,6 +13,7 @@ const MARKER_HEIGHT := 0.05
 
 var marker: Node3D = null
 var selected_units: Array[BaseUnit] = []
+var _marker_timer: float = 0.0
 
 
 func _ready() -> void:
@@ -21,6 +23,14 @@ func _ready() -> void:
 
 	if selection_box:
 		selection_box.selection_finished.connect(_on_selection_finished)
+
+
+func _process(delta: float) -> void:
+	if marker == null or not marker.visible:
+		return
+	_marker_timer -= delta
+	if _marker_timer <= 0.0:
+		marker.visible = false
 
 
 func clear_selection() -> void:
@@ -37,11 +47,11 @@ func add_to_selection(unit: BaseUnit) -> void:
 
 
 func _place_marker_on_ground(world_pos: Vector3) -> void:
-	# Flat map: pin marker to ground so it never floats mid-air
 	if marker == null:
 		return
 	marker.global_position = Vector3(world_pos.x, MARKER_HEIGHT, world_pos.z)
 	marker.visible = true
+	_marker_timer = MARKER_VISIBLE_TIME
 
 
 func _unhandled_input(event: InputEvent) -> void:
