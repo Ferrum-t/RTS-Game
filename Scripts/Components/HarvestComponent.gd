@@ -34,13 +34,11 @@ func update(delta: float) -> void:
 	var dist := to_res.length()
 
 	if dist > approach_distance:
-		# Stand point just outside the tree
 		var stand_pos: Vector3 = resource.global_position
 		if to_res.length() > 0.01:
 			stand_pos = resource.global_position - to_res.normalized() * approach_distance
 		stand_pos.y = 0.0
 		owner.move_target = stand_pos
-		# Direct step toward stand_pos (no set_target spam / detour)
 		var step := stand_pos - owner.global_position
 		step.y = 0.0
 		if step.length() > 0.05:
@@ -50,7 +48,6 @@ func update(delta: float) -> void:
 			owner.velocity = Vector3.ZERO
 		return
 
-	# In harvest range
 	owner.velocity = Vector3.ZERO
 	_timer -= delta
 	if _timer > 0.0:
@@ -59,8 +56,23 @@ func update(delta: float) -> void:
 
 	var got: int = resource.harvest(harvest_amount)
 	if got > 0 and owner.inventory:
-		owner.inventory.add_wood(got)
-		print(owner.name, " Wood: ", owner.inventory.wood, "/", owner.inventory.capacity)
+		_add_to_inventory(resource.resource_type, got)
 	elif got <= 0:
 		owner.harvest_target = null
 		owner.unit_state = BaseUnit.UnitState.IDLE
+
+
+func _add_to_inventory(type: BaseResource.Type, amount: int) -> void:
+	match type:
+		BaseResource.Type.WOOD:
+			owner.inventory.add_wood(amount)
+			print(owner.name, " Wood: ", owner.inventory.wood, "/", owner.inventory.capacity)
+		BaseResource.Type.STONE:
+			owner.inventory.stone = mini(owner.inventory.stone + amount, owner.inventory.capacity)
+			print(owner.name, " Stone: ", owner.inventory.stone, "/", owner.inventory.capacity)
+		BaseResource.Type.GOLD:
+			owner.inventory.gold = mini(owner.inventory.gold + amount, owner.inventory.capacity)
+			print(owner.name, " Gold: ", owner.inventory.gold, "/", owner.inventory.capacity)
+		BaseResource.Type.FOOD:
+			owner.inventory.food = mini(owner.inventory.food + amount, owner.inventory.capacity)
+			print(owner.name, " Food: ", owner.inventory.food, "/", owner.inventory.capacity)
