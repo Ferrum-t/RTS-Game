@@ -31,7 +31,6 @@ func _process(delta: float) -> void:
 		if _marker_timer <= 0.0:
 			marker.visible = false
 
-	# Cheap safety: drop freed refs if die() raced past tree_exiting
 	_prune_selection()
 
 
@@ -44,9 +43,7 @@ func clear_selection() -> void:
 
 
 func add_to_selection(unit: BaseUnit) -> void:
-	if unit == null or not is_instance_valid(unit):
-		return
-	if unit.unit_state == BaseUnit.UnitState.DEAD:
+	if not TeamRules.can_select(unit):
 		return
 	if unit in selected_units:
 		return
@@ -69,6 +66,11 @@ func _prune_selection() -> void:
 		if unit.unit_state == BaseUnit.UnitState.DEAD:
 			_disconnect_unit_exit(unit)
 			continue
+		# Drop if team no longer selectable (e.g. team changed later)
+		if not TeamRules.can_select(unit):
+			_disconnect_unit_exit(unit)
+			unit.deselect()
+			continue
 		alive.append(unit)
 	selected_units = alive
 
@@ -88,7 +90,6 @@ func _disconnect_unit_exit(unit: BaseUnit) -> void:
 
 
 func _on_selected_unit_tree_exiting(unit: BaseUnit) -> void:
-	# Fires before free — remove from selection immediately
 	selected_units.erase(unit)
 
 
@@ -144,8 +145,6 @@ func _on_selection_finished(selection: Rect2) -> void:
 
 	for unit in UnitManager.units:
 		if not is_instance_valid(unit):
-			continue
-		if unit.unit_state == BaseUnit.UnitState.DEAD:
 			continue
 		var screen_pos: Vector2 = camera.unproject_position(unit.global_position)
 		if selection.has_point(screen_pos):
