@@ -43,7 +43,7 @@ var harvest : HarvestComponent
 var combat : CombatComponent
 var health_bar: HealthBar3D = null
 
-## M1: why we entered IDLE after a move (debug / future orders)
+## M1: why we entered IDLE after a move
 var last_move_end_reason: String = ""
 
 const GRAVITY := 30.0
@@ -99,13 +99,13 @@ func _physics_process(delta: float) -> void:
 		UnitState.MOVING:
 			update_moving(delta)
 		UnitState.HARVESTING:
-			harvest.update(delta)
+			update_harvesting(delta)
 		UnitState.RETURNING:
 			update_return(delta)
 		UnitState.BUILDING:
 			update_build(delta)
 		UnitState.ATTACKING:
-			combat.update(delta)
+			update_attacking(delta)
 		UnitState.DEAD:
 			pass
 
@@ -120,7 +120,7 @@ func update_idle(_delta: float) -> void:
 	move_and_slide()
 
 
-## M1: Unit is the only writer of unit_state when a move ends.
+## M1: Unit consumes Movement status
 func update_moving(delta: float) -> void:
 	movement.update(delta)
 
@@ -138,7 +138,40 @@ func update_moving(delta: float) -> void:
 			last_move_end_reason = "CANCELLED"
 			unit_state = UnitState.IDLE
 		_:
-			pass # MOVING / IDLE status — keep unit_state MOVING
+			pass
+
+
+## M2: Unit consumes Harvest status
+func update_harvesting(delta: float) -> void:
+	harvest.update(delta)
+
+	match harvest.status:
+		HarvestComponent.Status.BAG_FULL:
+			return_target = null
+			unit_state = UnitState.RETURNING
+		HarvestComponent.Status.RESOURCE_GONE:
+			harvest_target = null
+			velocity = Vector3.ZERO
+			unit_state = UnitState.IDLE
+		_:
+			pass # MOVING_TO_RESOURCE / GATHERING — stay HARVESTING
+
+
+## M2: Unit consumes Combat status
+func update_attacking(delta: float) -> void:
+	combat.update(delta)
+
+	match combat.status:
+		CombatComponent.Status.TARGET_LOST:
+			attack_target = null
+			velocity = Vector3.ZERO
+			unit_state = UnitState.IDLE
+		CombatComponent.Status.TARGET_DEAD:
+			attack_target = null
+			velocity = Vector3.ZERO
+			unit_state = UnitState.IDLE
+		_:
+			pass # CHASING / IN_RANGE — stay ATTACKING
 
 
 func update_return(delta: float) -> void:
@@ -165,7 +198,6 @@ func update_return(delta: float) -> void:
 		move_target = approach
 		movement.set_target(move_target)
 		movement.update(delta)
-		# RETURNING owns state — do not consume ARRIVED into IDLE here (M1 scope)
 		return
 
 	velocity = Vector3.ZERO
@@ -206,6 +238,10 @@ func set_move_target(target: Vector3) -> void:
 	attack_target = null
 	return_target = null
 	last_move_end_reason = ""
+	if harvest:
+		harvest.reset()
+	if combat:
+		combat.reset()
 	if movement:
 		movement.request_move(target)
 
@@ -215,6 +251,8 @@ func set_harvest_target(resource: BaseResource) -> void:
 	attack_target = null
 	return_target = null
 	unit_state = UnitState.HARVESTING
+	if combat:
+		combat.reset()
 	if harvest:
 		harvest.reset()
 
@@ -232,6 +270,10 @@ func set_attack_target(enemy: BaseUnit) -> void:
 	harvest_target = null
 	return_target = null
 	unit_state = UnitState.ATTACKING
+	if harvest:
+		harvest.reset()
+	if combat:
+		combat.reset()
 	print(name, " -> attack ", enemy.name)
 
 
@@ -264,5 +306,9 @@ func die() -> void:
 	unit_state = UnitState.DEAD
 	if movement:
 		movement.cancel()
+	if harvest:
+		harvest.reset()
+	if combat:
+		combat.reset()
 	print(name, " died")
 	queue_free()
