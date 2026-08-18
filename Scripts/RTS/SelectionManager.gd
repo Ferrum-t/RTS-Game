@@ -2,7 +2,6 @@ extends Node
 
 class_name SelectionManager
 
-const TeamRules = preload("res://Scripts/Systems/TeamRules.gd")
 const MARKER_SCENE = preload("res://Scenes/Marker/marker.tscn")
 const MARKER_HEIGHT := 0.05
 const MARKER_VISIBLE_TIME := 0.8
