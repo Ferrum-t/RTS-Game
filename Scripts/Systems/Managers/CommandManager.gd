@@ -4,20 +4,43 @@ class_name CommandManager
 
 
 func issue_move(units: Array[BaseUnit], position: Vector3) -> void:
-	var targets: Array[Vector3] = Formation.generate_positions(position, units.size())
+	var valid: Array[BaseUnit] = _filter_valid(units)
+	if valid.is_empty():
+		return
 
-	for i: int in range(units.size()):
-		units[i].set_move_target(targets[i])
+	var targets: Array[Vector3] = Formation.generate_positions(position, valid.size())
+
+	for i: int in range(valid.size()):
+		valid[i].set_move_target(targets[i])
 
 
 func issue_harvest(units: Array[BaseUnit], resource: BaseResource) -> void:
-	for unit: BaseUnit in units:
+	if resource == null or not is_instance_valid(resource):
+		return
+	for unit: BaseUnit in _filter_valid(units):
 		unit.set_harvest_target(resource)
 		print(unit.name, " -> ", resource.name)
 
 
 func issue_attack(units: Array[BaseUnit], enemy: BaseUnit) -> void:
-	for unit: BaseUnit in units:
+	if enemy == null or not is_instance_valid(enemy):
+		return
+	if enemy.unit_state == BaseUnit.UnitState.DEAD:
+		return
+	for unit: BaseUnit in _filter_valid(units):
 		if unit == enemy:
 			continue
 		unit.set_attack_target(enemy)
+
+
+func _filter_valid(units: Array[BaseUnit]) -> Array[BaseUnit]:
+	var out: Array[BaseUnit] = []
+	for unit in units:
+		if unit == null:
+			continue
+		if not is_instance_valid(unit):
+			continue
+		if unit.unit_state == BaseUnit.UnitState.DEAD:
+			continue
+		out.append(unit)
+	return out
