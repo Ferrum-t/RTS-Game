@@ -17,7 +17,7 @@ enum UnitState
 
 @export var move_speed := 4.0
 @export var max_health := 100
-@export var deposit_distance := 3.0
+@export var deposit_distance := 3.5
 @export var attack_damage := 10
 @export var attack_range := 2.0
 @export var attack_cooldown := 1.0
@@ -132,7 +132,14 @@ func update_return(delta: float) -> void:
 	var distance := global_position.distance_to(return_target.global_position)
 
 	if distance > deposit_distance:
-		move_target = return_target.global_position
+		# Approach a point outside the building, not the center inside walls
+		var to_tc := return_target.global_position - global_position
+		to_tc.y = 0.0
+		var approach := return_target.global_position
+		if to_tc.length() > 0.1:
+			approach = return_target.global_position - to_tc.normalized() * 0.5
+		approach.y = 0.0
+		move_target = approach
 		movement.set_target(move_target)
 		movement.update(delta)
 		return
@@ -152,11 +159,13 @@ func update_return(delta: float) -> void:
 		rm.add_gold(deposited_gold)
 		rm.add_food(deposited_food)
 
-	print(name, " deposited ", deposited_wood, " wood at ", return_target.name)
+	print(name, " deposited W:", deposited_wood, " S:", deposited_stone, " at ", return_target.name)
 
 	return_target = null
 
 	if harvest_target != null and is_instance_valid(harvest_target):
+		if harvest:
+			harvest.reset()
 		unit_state = UnitState.HARVESTING
 	else:
 		unit_state = UnitState.IDLE
@@ -181,6 +190,8 @@ func set_harvest_target(resource: BaseResource) -> void:
 	attack_target = null
 	return_target = null
 	unit_state = UnitState.HARVESTING
+	if harvest:
+		harvest.reset()
 
 
 func set_build_target(building: BaseBuilding) -> void:
