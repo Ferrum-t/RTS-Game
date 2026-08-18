@@ -2,6 +2,8 @@ extends CharacterBody3D
 
 class_name BaseUnit
 
+const TeamRules = preload("res://Scripts/Systems/TeamRules.gd")
+
 
 enum UnitState
 {
