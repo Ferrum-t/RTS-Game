@@ -1,0 +1,15 @@
+[gd_resource type="Resource" script_class="BuildingData" format=3 uid="uid://bbarracksdata01"]
+
+[ext_resource type="Script" path="res://Scripts/Buildings/BuildingData.gd" id="1_data"]
+[ext_resource type="PackedScene" path="res://Scenes/Buildings/Barracks.tscn" id="2_scene"]
+[ext_resource type="PackedScene" path="res://Scenes/Buildings/GhostBuilding.tscn" id="3_ghost"]
+
+[resource]
+script = ExtResource("1_data")
+building_name = "Barracks"
+building_scene = ExtResource("2_scene")
+ghost_scene = ExtResource("3_ghost")
+wood = 100
+stone = 50
+gold = 0
+food = 0
