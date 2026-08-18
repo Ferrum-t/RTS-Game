@@ -2,6 +2,8 @@ extends StaticBody3D
 
 class_name BaseBuilding
 
+@export var team_id: int = 0
+
 var _nav_obstacle: NavigationObstacle3D
 
 
