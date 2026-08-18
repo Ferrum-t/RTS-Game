@@ -25,6 +25,7 @@ enum OrderType
 }
 
 
+@export var team_id: int = 0
 @export var move_speed := 4.0
 @export var max_health := 100
 @export var deposit_distance := 3.5
@@ -161,7 +162,6 @@ func update_harvesting(delta: float) -> void:
 
 	match harvest.status:
 		HarvestComponent.Status.BAG_FULL:
-			# Keep current_order = HARVEST through RETURNING (resume after deposit)
 			return_target = null
 			unit_state = UnitState.RETURNING
 		HarvestComponent.Status.RESOURCE_GONE:
@@ -240,7 +240,6 @@ func update_return(delta: float) -> void:
 	if harvest_target != null and is_instance_valid(harvest_target):
 		if harvest:
 			harvest.reset()
-		# current_order stays HARVEST
 		unit_state = UnitState.HARVESTING
 	else:
 		current_order = OrderType.NONE
@@ -252,7 +251,8 @@ func update_build(_delta: float) -> void:
 
 
 # ---------------------------------------------------------------------------
-# M3: replace_order — sets current_order, then delegates to set_* (state owner)
+# M3: replace_order — sets current_order, then delegates to set_*
+# M4: attack path validates TeamRules before mutating order/state
 # ---------------------------------------------------------------------------
 
 func replace_order_move(destination: Vector3) -> void:
@@ -263,14 +263,15 @@ func replace_order_move(destination: Vector3) -> void:
 func replace_order_harvest(resource: BaseResource) -> void:
 	if resource == null or not is_instance_valid(resource):
 		return
+	if not TeamRules.can_harvest(self, resource):
+		return
 	current_order = OrderType.HARVEST
 	set_harvest_target(resource)
 
 
 func replace_order_attack(enemy: BaseUnit) -> void:
-	if enemy == null or not is_instance_valid(enemy):
-		return
-	if enemy == self or enemy.unit_state == UnitState.DEAD:
+	# M4: invalid/friendly → no change to current_order or unit_state
+	if not TeamRules.can_attack(self, enemy):
 		return
 	current_order = OrderType.ATTACK
 	set_attack_target(enemy)
@@ -284,7 +285,7 @@ func replace_order_build(building: BaseBuilding) -> void:
 
 
 # ---------------------------------------------------------------------------
-# Execution API (unchanged contracts; still public for internal/return paths)
+# Execution API
 # ---------------------------------------------------------------------------
 
 func set_move_target(target: Vector3) -> void:
@@ -320,7 +321,8 @@ func set_build_target(building: BaseBuilding) -> void:
 
 
 func set_attack_target(enemy: BaseUnit) -> void:
-	if enemy == null or enemy == self:
+	# M4 defensive: friendly / invalid never mutates state
+	if not TeamRules.can_attack(self, enemy):
 		return
 	attack_target = enemy
 	harvest_target = null
