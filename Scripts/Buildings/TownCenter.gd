@@ -2,21 +2,16 @@ extends BaseBuilding
 
 class_name TownCenter
 
-@export var worker_scene: PackedScene
-@export var soldier_scene: PackedScene
+## Economy hub. Trains Workers only. Soldiers come from Barracks.
 
+@export var worker_scene: PackedScene
 @export var worker_cost_wood: int = 50
 @export var worker_train_time: float = 3.0
-
-@export var soldier_cost_wood: int = 80
-@export var soldier_train_time: float = 5.0
-
 @export var spawn_offset: Vector3 = Vector3(3.0, 0.0, 0.0)
 
 var is_training: bool = false
 var train_timer: float = 0.0
 var _pending_scene: PackedScene = null
-var _pending_name: String = ""
 
 
 func _ready() -> void:
@@ -24,8 +19,6 @@ func _ready() -> void:
 	add_to_group("Obstacle")
 	if worker_scene == null:
 		worker_scene = load("res://Scenes/Units/worker.tscn") as PackedScene
-	if soldier_scene == null:
-		soldier_scene = load("res://Scenes/Units/soldier.tscn") as PackedScene
 	print("TownCenter ready at: ", global_position)
 
 
@@ -38,36 +31,26 @@ func _process(delta: float) -> void:
 
 
 func try_train_worker() -> bool:
-	return _start_training(worker_scene, worker_cost_wood, worker_train_time, "Worker")
-
-
-func try_train_soldier() -> bool:
-	return _start_training(soldier_scene, soldier_cost_wood, soldier_train_time, "Soldier")
-
-
-func _start_training(scene: PackedScene, wood_cost: int, time: float, unit_name: String) -> bool:
 	if is_training:
-		print("TownCenter: already training ", _pending_name)
+		print("TownCenter: already training Worker")
 		return false
 
-	if scene == null:
-		push_error("TownCenter: scene is null for ", unit_name)
+	if worker_scene == null:
+		push_error("TownCenter: worker_scene is null")
 		return false
 
 	var rm := get_node_or_null("/root/ResourceManager")
 	if rm == null:
-		push_warning("ResourceManager not found")
 		return false
 
-	if not rm.spend(wood_cost):
-		print("TownCenter: not enough wood for ", unit_name, " (need ", wood_cost, ")")
+	if not rm.spend(worker_cost_wood):
+		print("TownCenter: not enough wood for Worker (need ", worker_cost_wood, ")")
 		return false
 
 	is_training = true
-	train_timer = time
-	_pending_scene = scene
-	_pending_name = unit_name
-	print("TownCenter: training ", unit_name, "... (", time, "s, cost ", wood_cost, " wood)")
+	train_timer = worker_train_time
+	_pending_scene = worker_scene
+	print("TownCenter: training Worker... (", worker_train_time, "s, cost ", worker_cost_wood, " wood)")
 	return true
 
 
@@ -76,7 +59,6 @@ func _finish_training() -> void:
 	train_timer = 0.0
 
 	if _pending_scene == null:
-		push_error("TownCenter: pending scene is null")
 		return
 
 	var unit := _pending_scene.instantiate()
@@ -87,6 +69,5 @@ func _finish_training() -> void:
 	units_parent.add_child(unit)
 	unit.global_position = global_position + spawn_offset
 
-	print("TownCenter: ", _pending_name, " trained at ", unit.global_position)
+	print("TownCenter: Worker trained at ", unit.global_position)
 	_pending_scene = null
-	_pending_name = ""
