@@ -25,7 +25,6 @@ var tree_clearance: float = 2.6
 var separation_radius: float = 1.1
 var separation_strength: float = 1.8
 
-## No progress for this long → BLOCKED (after recovery attempts)
 var block_timeout: float = 1.75
 
 var _waypoints: Array[Vector3] = []
@@ -42,12 +41,10 @@ func _init(unit: BaseUnit) -> void:
 	status = Status.IDLE
 
 
-## Public contract: request a new geometric goal.
 func request_move(world_pos: Vector3) -> void:
 	set_target(world_pos)
 
 
-## Kept for callers (BaseUnit.set_move_target, update_return).
 func set_target(world_pos: Vector3) -> void:
 	var p := world_pos
 	p.y = 0.0
@@ -79,11 +76,25 @@ func get_target() -> Vector3:
 
 
 func update(delta: float) -> void:
-	# Terminal statuses stay until new request_move / cancel handled by Unit
-	if status == Status.ARRIVED or status == Status.BLOCKED \
-		or status == Status.FAILED or status == Status.CANCELLED:
+	# CANCELLED stays until explicit request_move
+	if status == Status.CANCELLED:
 		owner.velocity = Vector3.ZERO
 		return
+
+	# Callers (e.g. Combat) may update owner.move_target without request_move.
+	# If goal is no longer at arrival range, resume pathing.
+	if status == Status.ARRIVED or status == Status.BLOCKED or status == Status.FAILED:
+		var wake := owner.move_target - owner.global_position
+		wake.y = 0.0
+		if wake.length() > arrival_distance * 1.25:
+			status = Status.MOVING
+			_stuck_time = 0.0
+			_no_progress_time = 0.0
+			_waypoints.clear()
+			_wp_index = 0
+		else:
+			owner.velocity = Vector3.ZERO
+			return
 
 	var final_target := owner.move_target
 	final_target.y = 0.0
@@ -92,12 +103,10 @@ func update(delta: float) -> void:
 	to_final.y = 0.0
 	var dist_final := to_final.length()
 
-	# --- Arrival (final target only) ---
 	if dist_final <= arrival_distance:
 		_set_arrived()
 		return
 
-	# Active move
 	if status == Status.IDLE:
 		status = Status.MOVING
 
@@ -105,7 +114,6 @@ func update(delta: float) -> void:
 		if _waypoints.is_empty() and _line_blocked(owner.global_position, final_target):
 			_build_detour()
 		elif not _waypoints.is_empty() and not _line_blocked(owner.global_position, final_target):
-			# Line of sight clear — drop detour, go direct
 			_waypoints.clear()
 			_wp_index = 0
 	else:
@@ -129,7 +137,6 @@ func update(delta: float) -> void:
 	var to_seek := seek - owner.global_position
 	to_seek.y = 0.0
 	if to_seek.length() < 0.01:
-		# Degenerate seek but not at final — rebuild detour or count as no progress
 		if _can_use_detour():
 			_build_detour()
 		_no_progress_time += delta
@@ -139,7 +146,6 @@ func update(delta: float) -> void:
 
 	var direction := to_seek.normalized()
 
-	# Stuck recovery
 	var moved := owner.global_position.distance_to(_last_pos)
 	_last_pos = owner.global_position
 	if moved < 0.02:
@@ -178,7 +184,6 @@ func _set_arrived() -> void:
 	_stuck_time = 0.0
 	_no_progress_time = 0.0
 	status = Status.ARRIVED
-	# Does NOT touch owner.unit_state (M1 contract)
 
 
 func _set_blocked() -> void:
@@ -188,12 +193,9 @@ func _set_blocked() -> void:
 	_stuck_time = 0.0
 	_no_progress_time = 0.0
 	status = Status.BLOCKED
-	# Does NOT touch owner.unit_state (M1 contract)
 
 
 func _can_use_detour() -> bool:
-	# Detour only for explicit move orders (unit in MOVING).
-	# Harvest / Return / Attack approach without detour.
 	return owner.unit_state == BaseUnit.UnitState.MOVING
 
 
