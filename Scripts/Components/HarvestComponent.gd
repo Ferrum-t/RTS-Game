@@ -2,10 +2,20 @@ extends RefCounted
 
 class_name HarvestComponent
 
-var owner: BaseUnit
+## M2: reports Status; BaseUnit owns unit_state transitions.
 
-## Must be larger than resource collision radius + unit radius
-## Stone sphere r=0.7, unit ~0.5 → contact ~1.2; use 2.5 so we always gather
+enum Status {
+	IDLE,
+	MOVING_TO_RESOURCE,
+	GATHERING,
+	BAG_FULL,
+	RESOURCE_GONE,
+	CANCELLED,
+}
+
+var owner: BaseUnit
+var status: Status = Status.IDLE
+
 var approach_distance: float = 2.5
 var harvest_amount: int = 10
 var harvest_interval: float = 0.7
@@ -20,29 +30,31 @@ func _init(unit: BaseUnit) -> void:
 func reset() -> void:
 	_timer = 0.0
 	_stuck_near = 0.0
+	status = Status.IDLE
+
+
+func get_status() -> Status:
+	return status
 
 
 func update(delta: float) -> void:
 	if owner.inventory != null and owner.inventory.is_full():
 		print(owner.name, " inventory full, returning to Town Center")
-		owner.unit_state = BaseUnit.UnitState.RETURNING
-		owner.return_target = null
 		owner.velocity = Vector3.ZERO
 		_stuck_near = 0.0
+		status = Status.BAG_FULL
 		return
 
 	var resource: BaseResource = owner.harvest_target
 	if resource == null or not is_instance_valid(resource):
-		owner.harvest_target = null
-		owner.unit_state = BaseUnit.UnitState.IDLE
 		owner.velocity = Vector3.ZERO
+		status = Status.RESOURCE_GONE
 		return
 
 	var to_res: Vector3 = resource.global_position - owner.global_position
 	to_res.y = 0.0
 	var dist := to_res.length()
 
-	# In range OR stuck against the resource collider → gather
 	var in_range := dist <= approach_distance
 	if not in_range and dist <= approach_distance + 1.0:
 		_stuck_near += delta
@@ -52,6 +64,7 @@ func update(delta: float) -> void:
 		_stuck_near = 0.0
 
 	if not in_range:
+		status = Status.MOVING_TO_RESOURCE
 		var stand_pos: Vector3 = resource.global_position
 		if dist > 0.01:
 			stand_pos = resource.global_position - to_res.normalized() * (approach_distance * 0.85)
@@ -67,6 +80,7 @@ func update(delta: float) -> void:
 		return
 
 	# Gather
+	status = Status.GATHERING
 	owner.velocity = Vector3.ZERO
 	_timer -= delta
 	if _timer > 0.0:
@@ -76,17 +90,15 @@ func update(delta: float) -> void:
 	var got: int = resource.harvest(harvest_amount)
 	if got <= 0:
 		print(owner.name, " — resource empty")
-		owner.harvest_target = null
-		owner.unit_state = BaseUnit.UnitState.IDLE
+		status = Status.RESOURCE_GONE
 		return
 
 	if owner.inventory == null:
 		return
 
-	# Remaining bag space (total capacity)
 	var space_left: int = owner.inventory.capacity - owner.inventory.get_total()
 	if space_left <= 0:
-		owner.unit_state = BaseUnit.UnitState.RETURNING
+		status = Status.BAG_FULL
 		return
 	got = mini(got, space_left)
 
@@ -94,24 +106,21 @@ func update(delta: float) -> void:
 
 	if owner.inventory.is_full():
 		print(owner.name, " inventory full, returning to Town Center")
-		owner.unit_state = BaseUnit.UnitState.RETURNING
-		owner.return_target = null
+		status = Status.BAG_FULL
 
 
 func _add_to_inventory(resource: BaseResource, amount: int) -> void:
-	var t = resource.resource_type
-	# Compare as int — more reliable across class reloads
-	var ti: int = int(t)
+	var ti: int = int(resource.resource_type)
 	match ti:
-		1: # STONE
+		1:
 			owner.inventory.add_stone(amount)
 			print(owner.name, " Stone: ", owner.inventory.stone, " (bag ", owner.inventory.get_total(), "/", owner.inventory.capacity, ")")
-		2: # GOLD
+		2:
 			owner.inventory.gold = mini(owner.inventory.gold + amount, owner.inventory.capacity)
 			print(owner.name, " Gold: ", owner.inventory.gold)
-		3: # FOOD
+		3:
 			owner.inventory.food = mini(owner.inventory.food + amount, owner.inventory.capacity)
 			print(owner.name, " Food: ", owner.inventory.food)
-		_: # WOOD (0) and fallback
+		_:
 			owner.inventory.add_wood(amount)
 			print(owner.name, " Wood: ", owner.inventory.wood, " (bag ", owner.inventory.get_total(), "/", owner.inventory.capacity, ")")
