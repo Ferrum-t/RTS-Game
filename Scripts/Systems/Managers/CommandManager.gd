@@ -11,14 +11,14 @@ func issue_move(units: Array[BaseUnit], position: Vector3) -> void:
 	var targets: Array[Vector3] = Formation.generate_positions(position, valid.size())
 
 	for i: int in range(valid.size()):
-		valid[i].set_move_target(targets[i])
+		valid[i].replace_order_move(targets[i])
 
 
 func issue_harvest(units: Array[BaseUnit], resource: BaseResource) -> void:
 	if resource == null or not is_instance_valid(resource):
 		return
 	for unit: BaseUnit in _filter_valid(units):
-		unit.set_harvest_target(resource)
+		unit.replace_order_harvest(resource)
 		print(unit.name, " -> ", resource.name)
 
 
@@ -30,7 +30,7 @@ func issue_attack(units: Array[BaseUnit], enemy: BaseUnit) -> void:
 	for unit: BaseUnit in _filter_valid(units):
 		if unit == enemy:
 			continue
-		unit.set_attack_target(enemy)
+		unit.replace_order_attack(enemy)
 
 
 func _filter_valid(units: Array[BaseUnit]) -> Array[BaseUnit]:
