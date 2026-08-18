@@ -18,6 +18,8 @@ func issue_harvest(units: Array[BaseUnit], resource: BaseResource) -> void:
 	if resource == null or not is_instance_valid(resource):
 		return
 	for unit: BaseUnit in _filter_valid(units):
+		if not TeamRules.can_harvest(unit, resource):
+			continue
 		unit.replace_order_harvest(resource)
 		print(unit.name, " -> ", resource.name)
 
@@ -30,17 +32,15 @@ func issue_attack(units: Array[BaseUnit], enemy: BaseUnit) -> void:
 	for unit: BaseUnit in _filter_valid(units):
 		if unit == enemy:
 			continue
+		if not TeamRules.can_attack(unit, enemy):
+			continue
 		unit.replace_order_attack(enemy)
 
 
 func _filter_valid(units: Array[BaseUnit]) -> Array[BaseUnit]:
 	var out: Array[BaseUnit] = []
 	for unit in units:
-		if unit == null:
-			continue
-		if not is_instance_valid(unit):
-			continue
-		if unit.unit_state == BaseUnit.UnitState.DEAD:
+		if not TeamRules.can_command(unit):
 			continue
 		out.append(unit)
 	return out
