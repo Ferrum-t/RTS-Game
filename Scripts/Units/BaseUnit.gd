@@ -14,6 +14,16 @@ enum UnitState
 	DEAD
 }
 
+## M3: player/AI intent — not unit_state, not component status
+enum OrderType
+{
+	NONE,
+	MOVE,
+	HARVEST,
+	ATTACK,
+	BUILD
+}
+
 
 @export var move_speed := 4.0
 @export var max_health := 100
@@ -28,6 +38,7 @@ var health := 100
 var selected := false
 
 var unit_state : UnitState = UnitState.IDLE
+var current_order: OrderType = OrderType.NONE
 
 var move_target : Vector3
 
@@ -43,7 +54,6 @@ var harvest : HarvestComponent
 var combat : CombatComponent
 var health_bar: HealthBar3D = null
 
-## M1: why we entered IDLE after a move
 var last_move_end_reason: String = ""
 
 const GRAVITY := 30.0
@@ -127,15 +137,19 @@ func update_moving(delta: float) -> void:
 	match movement.status:
 		MovementComponent.Status.ARRIVED:
 			last_move_end_reason = "ARRIVED"
+			current_order = OrderType.NONE
 			unit_state = UnitState.IDLE
 		MovementComponent.Status.BLOCKED:
 			last_move_end_reason = "BLOCKED"
+			current_order = OrderType.NONE
 			unit_state = UnitState.IDLE
 		MovementComponent.Status.FAILED:
 			last_move_end_reason = "FAILED"
+			current_order = OrderType.NONE
 			unit_state = UnitState.IDLE
 		MovementComponent.Status.CANCELLED:
 			last_move_end_reason = "CANCELLED"
+			current_order = OrderType.NONE
 			unit_state = UnitState.IDLE
 		_:
 			pass
@@ -147,14 +161,16 @@ func update_harvesting(delta: float) -> void:
 
 	match harvest.status:
 		HarvestComponent.Status.BAG_FULL:
+			# Keep current_order = HARVEST through RETURNING (resume after deposit)
 			return_target = null
 			unit_state = UnitState.RETURNING
 		HarvestComponent.Status.RESOURCE_GONE:
 			harvest_target = null
+			current_order = OrderType.NONE
 			velocity = Vector3.ZERO
 			unit_state = UnitState.IDLE
 		_:
-			pass # MOVING_TO_RESOURCE / GATHERING — stay HARVESTING
+			pass
 
 
 ## M2: Unit consumes Combat status
@@ -164,14 +180,16 @@ func update_attacking(delta: float) -> void:
 	match combat.status:
 		CombatComponent.Status.TARGET_LOST:
 			attack_target = null
+			current_order = OrderType.NONE
 			velocity = Vector3.ZERO
 			unit_state = UnitState.IDLE
 		CombatComponent.Status.TARGET_DEAD:
 			attack_target = null
+			current_order = OrderType.NONE
 			velocity = Vector3.ZERO
 			unit_state = UnitState.IDLE
 		_:
-			pass # CHASING / IN_RANGE — stay ATTACKING
+			pass
 
 
 func update_return(delta: float) -> void:
@@ -222,14 +240,52 @@ func update_return(delta: float) -> void:
 	if harvest_target != null and is_instance_valid(harvest_target):
 		if harvest:
 			harvest.reset()
+		# current_order stays HARVEST
 		unit_state = UnitState.HARVESTING
 	else:
+		current_order = OrderType.NONE
 		unit_state = UnitState.IDLE
 
 
 func update_build(_delta: float) -> void:
 	pass
 
+
+# ---------------------------------------------------------------------------
+# M3: replace_order — sets current_order, then delegates to set_* (state owner)
+# ---------------------------------------------------------------------------
+
+func replace_order_move(destination: Vector3) -> void:
+	current_order = OrderType.MOVE
+	set_move_target(destination)
+
+
+func replace_order_harvest(resource: BaseResource) -> void:
+	if resource == null or not is_instance_valid(resource):
+		return
+	current_order = OrderType.HARVEST
+	set_harvest_target(resource)
+
+
+func replace_order_attack(enemy: BaseUnit) -> void:
+	if enemy == null or not is_instance_valid(enemy):
+		return
+	if enemy == self or enemy.unit_state == UnitState.DEAD:
+		return
+	current_order = OrderType.ATTACK
+	set_attack_target(enemy)
+
+
+func replace_order_build(building: BaseBuilding) -> void:
+	if building == null or not is_instance_valid(building):
+		return
+	current_order = OrderType.BUILD
+	set_build_target(building)
+
+
+# ---------------------------------------------------------------------------
+# Execution API (unchanged contracts; still public for internal/return paths)
+# ---------------------------------------------------------------------------
 
 func set_move_target(target: Vector3) -> void:
 	move_target = target
@@ -304,6 +360,7 @@ func damage(amount: int) -> void:
 
 func die() -> void:
 	unit_state = UnitState.DEAD
+	current_order = OrderType.NONE
 	if movement:
 		movement.cancel()
 	if harvest:
