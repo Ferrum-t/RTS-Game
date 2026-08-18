@@ -5,7 +5,7 @@ class_name MovementComponent
 ## M1 Movement contract:
 ## - Owns path execution + MovementStatus only
 ## - NEVER writes owner.unit_state
-## - Backend: SimpleDetour (waypoints + rays); swappable later
+## - Backend: SimpleDetour with validated side candidates
 
 enum Status {
 	IDLE,
@@ -20,8 +20,8 @@ var owner: BaseUnit
 var status: Status = Status.IDLE
 
 var arrival_distance: float = 0.5
-var building_clearance: float = 5.5
-var tree_clearance: float = 2.6
+var building_clearance: float = 6.0
+var tree_clearance: float = 2.8
 var separation_radius: float = 1.1
 var separation_strength: float = 1.8
 
@@ -33,6 +33,7 @@ var _wp_index: int = 0
 var _stuck_time: float = 0.0
 var _no_progress_time: float = 0.0
 var _last_pos: Vector3 = Vector3.ZERO
+var _detour_failed: bool = false
 
 
 func _init(unit: BaseUnit) -> void:
@@ -53,6 +54,7 @@ func set_target(world_pos: Vector3) -> void:
 	_wp_index = 0
 	_stuck_time = 0.0
 	_no_progress_time = 0.0
+	_detour_failed = false
 	status = Status.MOVING
 	if _can_use_detour():
 		_build_detour()
@@ -64,6 +66,7 @@ func cancel() -> void:
 	_wp_index = 0
 	_stuck_time = 0.0
 	_no_progress_time = 0.0
+	_detour_failed = false
 	status = Status.CANCELLED
 
 
@@ -76,13 +79,10 @@ func get_target() -> Vector3:
 
 
 func update(delta: float) -> void:
-	# CANCELLED stays until explicit request_move
 	if status == Status.CANCELLED:
 		owner.velocity = Vector3.ZERO
 		return
 
-	# Callers (e.g. Combat) may update owner.move_target without request_move.
-	# If goal is no longer at arrival range, resume pathing.
 	if status == Status.ARRIVED or status == Status.BLOCKED or status == Status.FAILED:
 		var wake := owner.move_target - owner.global_position
 		wake.y = 0.0
@@ -90,6 +90,7 @@ func update(delta: float) -> void:
 			status = Status.MOVING
 			_stuck_time = 0.0
 			_no_progress_time = 0.0
+			_detour_failed = false
 			_waypoints.clear()
 			_wp_index = 0
 		else:
@@ -111,11 +112,11 @@ func update(delta: float) -> void:
 		status = Status.MOVING
 
 	if _can_use_detour():
-		if _waypoints.is_empty() and _line_blocked(owner.global_position, final_target):
-			_build_detour()
-		elif not _waypoints.is_empty() and not _line_blocked(owner.global_position, final_target):
-			_waypoints.clear()
-			_wp_index = 0
+		if _waypoints.is_empty() and not _detour_failed:
+			if _line_blocked(owner.global_position, final_target):
+				_build_detour()
+		# Do NOT clear waypoints just because a thin ray to goal is free —
+		# body can still be clipped on a corner while the ray misses the AABB.
 	else:
 		_waypoints.clear()
 		_wp_index = 0
@@ -137,7 +138,7 @@ func update(delta: float) -> void:
 	var to_seek := seek - owner.global_position
 	to_seek.y = 0.0
 	if to_seek.length() < 0.01:
-		if _can_use_detour():
+		if _can_use_detour() and not _detour_failed:
 			_build_detour()
 		_no_progress_time += delta
 		if _no_progress_time >= block_timeout:
@@ -160,7 +161,7 @@ func update(delta: float) -> void:
 		if side.dot(to_final) < 0.0:
 			side = -side
 		direction = (direction * 0.25 + side).normalized()
-		if _stuck_time > 0.45 and _can_use_detour():
+		if _stuck_time > 0.45 and _can_use_detour() and not _detour_failed:
 			_build_detour()
 			_stuck_time = 0.0
 
@@ -183,6 +184,7 @@ func _set_arrived() -> void:
 	_wp_index = 0
 	_stuck_time = 0.0
 	_no_progress_time = 0.0
+	_detour_failed = false
 	status = Status.ARRIVED
 
 
@@ -219,17 +221,17 @@ func _build_detour() -> void:
 	if collider == null:
 		return
 
-	var clearance := 0.0
+	var clearance := tree_clearance
+	var past_amount := 2.2
 	var center := Vector3.ZERO
 
 	if collider is BaseBuilding:
 		clearance = building_clearance
+		past_amount = 4.0
 		center = (collider as BaseBuilding).global_position
 	elif collider is BaseResource:
-		clearance = tree_clearance
 		center = (collider as BaseResource).global_position
 	elif collider is StaticBody3D:
-		clearance = tree_clearance
 		center = (collider as StaticBody3D).global_position
 	else:
 		return
@@ -248,20 +250,47 @@ func _build_detour() -> void:
 	if toward_goal.length() > 0.1:
 		past_dir = toward_goal.normalized()
 
-	var side_a := side
-	var side_b := -side
-	var cost_a := from.distance_to(center + side_a * clearance) + (center + side_a * clearance).distance_to(final_t)
-	var cost_b := from.distance_to(center + side_b * clearance) + (center + side_b * clearance).distance_to(final_t)
-	var chosen_side := side_a if cost_a <= cost_b else side_b
+	# Two side candidates; validate full corridor before committing
+	var candidates: Array = []
+	for s in [side, -side]:
+		var wp_side: Vector3 = center + s * clearance
+		wp_side.y = 0.0
+		var wp_past: Vector3 = center + s * clearance + past_dir * past_amount
+		wp_past.y = 0.0
+		var cost := from.distance_to(wp_side) + wp_side.distance_to(wp_past) + wp_past.distance_to(final_t)
+		candidates.append({"side": s, "wp_side": wp_side, "wp_past": wp_past, "cost": cost})
 
-	var past_amount := 3.0 if collider is BaseBuilding else 2.2
-	var wp_side: Vector3 = center + chosen_side * clearance
-	wp_side.y = 0.0
-	var wp_past: Vector3 = center + chosen_side * clearance + past_dir * past_amount
-	wp_past.y = 0.0
+	candidates.sort_custom(func(a, b): return a["cost"] < b["cost"])
 
-	_waypoints.append(wp_side)
-	_waypoints.append(wp_past)
+	for attempt_clearance in [clearance, clearance + 1.5]:
+		for c in candidates:
+			var s: Vector3 = c["side"]
+			var wp_side: Vector3 = center + s * attempt_clearance
+			wp_side.y = 0.0
+			var wp_past: Vector3 = center + s * attempt_clearance + past_dir * past_amount
+			wp_past.y = 0.0
+
+			if _corridor_clear(from, wp_side, wp_past, final_t):
+				_waypoints.append(wp_side)
+				_waypoints.append(wp_past)
+				_detour_failed = false
+				return
+
+	# No valid side — stop generating endless detours; progress timeout → BLOCKED
+	_detour_failed = true
+	_waypoints.clear()
+	_wp_index = 0
+
+
+func _corridor_clear(from: Vector3, wp_side: Vector3, wp_past: Vector3, final_t: Vector3) -> bool:
+	# Unit -> side, side -> past, past -> goal must not hit building/resource
+	if _line_blocked(from, wp_side):
+		return false
+	if _line_blocked(wp_side, wp_past):
+		return false
+	if _line_blocked(wp_past, final_t):
+		return false
+	return true
 
 
 func _line_blocked(from: Vector3, to: Vector3) -> bool:
