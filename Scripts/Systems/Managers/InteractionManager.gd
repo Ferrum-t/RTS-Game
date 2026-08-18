@@ -2,8 +2,6 @@ extends Node
 
 class_name InteractionManager
 
-const TeamRules = preload("res://Scripts/Systems/TeamRules.gd")
-
 @export var command_manager: CommandManager
 
 const BUILDING_APPROACH_DISTANCE := 3.5
