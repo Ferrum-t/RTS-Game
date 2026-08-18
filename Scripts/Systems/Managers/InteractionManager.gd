@@ -20,16 +20,29 @@ func handle_right_click(
 		push_warning("InteractionManager: command_manager not set")
 		return
 
-	# Attack unit
+	# Click on unit: attack only if enemy; same team → no-op (no auto-MOVE)
 	if collider is BaseUnit:
-		var enemy := collider as BaseUnit
-		if enemy.unit_state != BaseUnit.UnitState.DEAD:
-			command_manager.issue_attack(selected_units, enemy)
+		var target := collider as BaseUnit
+		if not is_instance_valid(target):
 			return
+		if target.unit_state == BaseUnit.UnitState.DEAD:
+			return
+
+		var can_any := false
+		for u in selected_units:
+			if TeamRules.can_attack(u, target):
+				can_any = true
+				break
+
+		if can_any:
+			command_manager.issue_attack(selected_units, target)
+		# same team or no valid attacker → no-op
+		return
 
 	# Harvest resource
 	if collider is BaseResource:
-		command_manager.issue_harvest(selected_units, collider)
+		if TeamRules.can_harvest(selected_units[0], collider):
+			command_manager.issue_harvest(selected_units, collider)
 		return
 
 	# Click on building → move to a point OUTSIDE it (never inside)
@@ -49,7 +62,6 @@ func _outside_point(building: BaseBuilding, click_pos: Vector3) -> Vector3:
 	var dir: Vector3 = click_pos - center
 	dir.y = 0.0
 	if dir.length() < 0.15:
-		# Click near center — pick a default outward direction
 		dir = Vector3(1.0, 0.0, 0.0)
 	else:
 		dir = dir.normalized()
