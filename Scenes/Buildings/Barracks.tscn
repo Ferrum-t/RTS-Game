@@ -1,0 +1,26 @@
+[gd_scene format=3 uid="uid://cbarracks001"]
+
+[ext_resource type="Script" path="res://Scripts/Buildings/Barracks.gd" id="1_barracks"]
+
+[sub_resource type="StandardMaterial3D" id="Mat_barracks"]
+albedo_color = Color(0.35, 0.4, 0.55, 1)
+
+[sub_resource type="BoxMesh" id="BoxMesh_barracks"]
+material = SubResource("Mat_barracks")
+size = Vector3(3.5, 1.8, 3.5)
+
+[sub_resource type="BoxShape3D" id="BoxShape_barracks"]
+size = Vector3(3.5, 1.8, 3.5)
+
+[node name="Barracks" type="StaticBody3D"]
+collision_layer = 1
+collision_mask = 1
+script = ExtResource("1_barracks")
+
+[node name="MeshInstance3D" type="MeshInstance3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.9, 0)
+mesh = SubResource("BoxMesh_barracks")
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.9, 0)
+shape = SubResource("BoxShape_barracks")
