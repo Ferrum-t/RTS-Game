@@ -26,24 +26,70 @@ func _ready() -> void:
 
 
 func _process(delta: float) -> void:
-	if marker == null or not marker.visible:
-		return
-	_marker_timer -= delta
-	if _marker_timer <= 0.0:
-		marker.visible = false
+	if marker != null and marker.visible:
+		_marker_timer -= delta
+		if _marker_timer <= 0.0:
+			marker.visible = false
+
+	# Cheap safety: drop freed refs if die() raced past tree_exiting
+	_prune_selection()
 
 
 func clear_selection() -> void:
 	for unit in selected_units:
 		if is_instance_valid(unit):
+			_disconnect_unit_exit(unit)
 			unit.deselect()
 	selected_units.clear()
 
 
 func add_to_selection(unit: BaseUnit) -> void:
-	if unit not in selected_units:
-		selected_units.append(unit)
-		unit.select()
+	if unit == null or not is_instance_valid(unit):
+		return
+	if unit.unit_state == BaseUnit.UnitState.DEAD:
+		return
+	if unit in selected_units:
+		return
+
+	selected_units.append(unit)
+	unit.select()
+	_connect_unit_exit(unit)
+
+
+func get_valid_selection() -> Array[BaseUnit]:
+	_prune_selection()
+	return selected_units
+
+
+func _prune_selection() -> void:
+	var alive: Array[BaseUnit] = []
+	for unit in selected_units:
+		if not is_instance_valid(unit):
+			continue
+		if unit.unit_state == BaseUnit.UnitState.DEAD:
+			_disconnect_unit_exit(unit)
+			continue
+		alive.append(unit)
+	selected_units = alive
+
+
+func _connect_unit_exit(unit: BaseUnit) -> void:
+	if unit == null or not is_instance_valid(unit):
+		return
+	if not unit.tree_exiting.is_connected(_on_selected_unit_tree_exiting):
+		unit.tree_exiting.connect(_on_selected_unit_tree_exiting.bind(unit))
+
+
+func _disconnect_unit_exit(unit: BaseUnit) -> void:
+	if unit == null or not is_instance_valid(unit):
+		return
+	if unit.tree_exiting.is_connected(_on_selected_unit_tree_exiting):
+		unit.tree_exiting.disconnect(_on_selected_unit_tree_exiting)
+
+
+func _on_selected_unit_tree_exiting(unit: BaseUnit) -> void:
+	# Fires before free — remove from selection immediately
+	selected_units.erase(unit)
 
 
 func _place_marker_on_ground(world_pos: Vector3) -> void:
@@ -74,10 +120,13 @@ func _unhandled_input(event: InputEvent) -> void:
 		if event.button_index == MOUSE_BUTTON_LEFT:
 			clear_selection()
 			for unit in UnitManager.units:
+				if not is_instance_valid(unit):
+					continue
 				if collider == unit:
 					add_to_selection(unit)
 
 		elif event.button_index == MOUSE_BUTTON_RIGHT:
+			_prune_selection()
 			if interaction_manager:
 				interaction_manager.handle_right_click(
 					selected_units,
@@ -95,6 +144,8 @@ func _on_selection_finished(selection: Rect2) -> void:
 
 	for unit in UnitManager.units:
 		if not is_instance_valid(unit):
+			continue
+		if unit.unit_state == BaseUnit.UnitState.DEAD:
 			continue
 		var screen_pos: Vector2 = camera.unproject_position(unit.global_position)
 		if selection.has_point(screen_pos):
