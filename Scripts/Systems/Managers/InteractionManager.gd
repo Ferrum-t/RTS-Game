@@ -2,6 +2,8 @@ extends Node
 
 class_name InteractionManager
 
+const TeamRules = preload("res://Scripts/Systems/TeamRules.gd")
+
 @export var command_manager: CommandManager
 
 const BUILDING_APPROACH_DISTANCE := 3.5
@@ -36,23 +38,19 @@ func handle_right_click(
 
 		if can_any:
 			command_manager.issue_attack(selected_units, target)
-		# same team or no valid attacker → no-op
 		return
 
-	# Harvest resource
 	if collider is BaseResource:
 		if TeamRules.can_harvest(selected_units[0], collider):
 			command_manager.issue_harvest(selected_units, collider)
 		return
 
-	# Click on building → move to a point OUTSIDE it (never inside)
 	if collider is BaseBuilding:
 		var building := collider as BaseBuilding
 		var outside := _outside_point(building, world_position)
 		command_manager.issue_move(selected_units, outside)
 		return
 
-	# Ground move
 	command_manager.issue_move(selected_units, world_position)
 
 

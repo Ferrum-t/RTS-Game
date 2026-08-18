@@ -2,6 +2,7 @@ extends Node
 
 class_name SelectionManager
 
+const TeamRules = preload("res://Scripts/Systems/TeamRules.gd")
 const MARKER_SCENE = preload("res://Scenes/Marker/marker.tscn")
 const MARKER_HEIGHT := 0.05
 const MARKER_VISIBLE_TIME := 0.8
@@ -66,7 +67,6 @@ func _prune_selection() -> void:
 		if unit.unit_state == BaseUnit.UnitState.DEAD:
 			_disconnect_unit_exit(unit)
 			continue
-		# Drop if team no longer selectable (e.g. team changed later)
 		if not TeamRules.can_select(unit):
 			_disconnect_unit_exit(unit)
 			unit.deselect()

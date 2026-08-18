@@ -2,6 +2,8 @@ extends Node
 
 class_name CommandManager
 
+const TeamRules = preload("res://Scripts/Systems/TeamRules.gd")
+
 
 func issue_move(units: Array[BaseUnit], position: Vector3) -> void:
 	var valid: Array[BaseUnit] = _filter_valid(units)
