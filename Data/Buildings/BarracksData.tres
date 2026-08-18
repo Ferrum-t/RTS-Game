@@ -1,4 +1,4 @@
-[gd_resource type="Resource" script_class="BuildingData" format=3 uid="uid://bbarracksdata01"]
+[gd_resource type="Resource" script_class="BuildingData" format=3 uid="uid://d37m6orcjpmi"]
 
 [ext_resource type="Script" path="res://Scripts/Buildings/BuildingData.gd" id="1_data"]
 [ext_resource type="PackedScene" path="res://Scenes/Buildings/Barracks.tscn" id="2_scene"]
