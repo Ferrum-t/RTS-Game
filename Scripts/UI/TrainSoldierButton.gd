@@ -1,6 +1,6 @@
 extends Button
 
-## Requests the first Town Center to train a Soldier (80 wood).
+## Trains a Soldier from the first Barracks (80 wood).
 
 const COST_WOOD := 80
 
@@ -28,10 +28,15 @@ func _on_pressed() -> void:
 		push_warning("BuildingManager not found")
 		return
 
-	if bm.town_centers.is_empty():
-		print("Train Soldier: no Town Center built yet")
+	var barracks = null
+	if bm.has_method("get_first_barracks"):
+		barracks = bm.get_first_barracks()
+	elif "barracks_list" in bm and not bm.barracks_list.is_empty():
+		barracks = bm.barracks_list[0]
+
+	if barracks == null:
+		print("Train Soldier: build a Barracks first")
 		return
 
-	var tc = bm.town_centers[0]
-	if tc and tc.has_method("try_train_soldier"):
-		tc.try_train_soldier()
+	if barracks.has_method("try_train_soldier"):
+		barracks.try_train_soldier()
