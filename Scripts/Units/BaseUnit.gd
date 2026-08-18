@@ -43,6 +43,9 @@ var harvest : HarvestComponent
 var combat : CombatComponent
 var health_bar: HealthBar3D = null
 
+## M1: why we entered IDLE after a move (debug / future orders)
+var last_move_end_reason: String = ""
+
 const GRAVITY := 30.0
 const HEALTH_BAR_SCENE := preload("res://Scenes/UI/HealthBar3D.tscn")
 
@@ -94,7 +97,7 @@ func _physics_process(delta: float) -> void:
 		UnitState.IDLE:
 			update_idle(delta)
 		UnitState.MOVING:
-			movement.update(delta)
+			update_moving(delta)
 		UnitState.HARVESTING:
 			harvest.update(delta)
 		UnitState.RETURNING:
@@ -117,6 +120,27 @@ func update_idle(_delta: float) -> void:
 	move_and_slide()
 
 
+## M1: Unit is the only writer of unit_state when a move ends.
+func update_moving(delta: float) -> void:
+	movement.update(delta)
+
+	match movement.status:
+		MovementComponent.Status.ARRIVED:
+			last_move_end_reason = "ARRIVED"
+			unit_state = UnitState.IDLE
+		MovementComponent.Status.BLOCKED:
+			last_move_end_reason = "BLOCKED"
+			unit_state = UnitState.IDLE
+		MovementComponent.Status.FAILED:
+			last_move_end_reason = "FAILED"
+			unit_state = UnitState.IDLE
+		MovementComponent.Status.CANCELLED:
+			last_move_end_reason = "CANCELLED"
+			unit_state = UnitState.IDLE
+		_:
+			pass # MOVING / IDLE status — keep unit_state MOVING
+
+
 func update_return(delta: float) -> void:
 	if return_target == null or not is_instance_valid(return_target):
 		var bm := get_node_or_null("/root/BuildingManager")
@@ -132,7 +156,6 @@ func update_return(delta: float) -> void:
 	var distance := global_position.distance_to(return_target.global_position)
 
 	if distance > deposit_distance:
-		# Approach a point outside the building, not the center inside walls
 		var to_tc := return_target.global_position - global_position
 		to_tc.y = 0.0
 		var approach := return_target.global_position
@@ -142,6 +165,7 @@ func update_return(delta: float) -> void:
 		move_target = approach
 		movement.set_target(move_target)
 		movement.update(delta)
+		# RETURNING owns state — do not consume ARRIVED into IDLE here (M1 scope)
 		return
 
 	velocity = Vector3.ZERO
@@ -181,8 +205,9 @@ func set_move_target(target: Vector3) -> void:
 	harvest_target = null
 	attack_target = null
 	return_target = null
+	last_move_end_reason = ""
 	if movement:
-		movement.set_target(target)
+		movement.request_move(target)
 
 
 func set_harvest_target(resource: BaseResource) -> void:
@@ -237,5 +262,7 @@ func damage(amount: int) -> void:
 
 func die() -> void:
 	unit_state = UnitState.DEAD
+	if movement:
+		movement.cancel()
 	print(name, " died")
 	queue_free()
