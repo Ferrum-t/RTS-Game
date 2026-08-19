@@ -33,7 +33,8 @@ enum OrderType
 @export var attack_damage := 10
 @export var attack_range := 2.0
 @export var attack_cooldown := 1.0
-@export var building_attack_range := 4.0
+## Must exceed building half-extent (~2) + unit radius so strike is possible while colliding with wall
+@export var building_attack_range := 6.5
 @export var health_bar_height := 1.6
 
 var health := 100
@@ -60,6 +61,9 @@ var health_bar: HealthBar3D = null
 
 var last_move_end_reason: String = ""
 var _building_attack_timer: float = 0.0
+var _siege_stuck_time: float = 0.0
+var _siege_last_pos: Vector3 = Vector3.ZERO
+var _siege_debug_t: float = 0.0
 
 const GRAVITY := 30.0
 const HEALTH_BAR_SCENE := preload("res://Scenes/UI/HealthBar3D.tscn")
@@ -212,17 +216,54 @@ func update_attacking_building(delta: float) -> void:
 	to_b.y = 0.0
 	var dist := to_b.length()
 
-	if dist > building_attack_range:
+	# Progress / stuck vs building collider
+	var moved := global_position.distance_to(_siege_last_pos)
+	_siege_last_pos = global_position
+	if moved < 0.03:
+		_siege_stuck_time += delta
+	else:
+		_siege_stuck_time = 0.0
+
+	# In range OR pressed against building wall near target
+	var in_range := dist <= building_attack_range
+	if not in_range and dist <= building_attack_range + 2.5 and _siege_stuck_time >= 0.35:
+		in_range = true
+
+	# Temporary M5 diagnostics (throttle)
+	_siege_debug_t -= delta
+	if _siege_debug_t <= 0.0:
+		_siege_debug_t = 0.5
+		print(
+			"[SIEGE] ", name,
+			" order=", current_order,
+			" state=", unit_state,
+			" tgt=", building.name,
+			" tgt_team=", building.team_id,
+			" atk_team=", team_id,
+			" dist=", snapped(dist, 0.01),
+			" range=", building_attack_range,
+			" in_range=", in_range,
+			" can=", TeamRules.can_attack_building(self, building)
+		)
+
+	if not in_range:
+		# Stand-off outside box (~half-extent 2) — aim past collision surface
+		var stand := maxf(building_attack_range * 0.9, 5.0)
 		var approach := building.global_position
 		if to_b.length() > 0.1:
-			approach = building.global_position - to_b.normalized() * (building_attack_range * 0.85)
+			approach = building.global_position - to_b.normalized() * stand
 		approach.y = 0.0
 		move_target = approach
 		movement.set_target(approach)
 		movement.update(delta)
 		return
 
+	# Strike range: stop pathing so we do not push into collider forever
+	if movement:
+		movement.cancel()
 	velocity = Vector3.ZERO
+	_siege_stuck_time = 0.0
+
 	_building_attack_timer -= delta
 	if _building_attack_timer > 0.0:
 		return
@@ -238,6 +279,8 @@ func update_attacking_building(delta: float) -> void:
 func _clear_building_attack() -> void:
 	attack_building_target = null
 	_building_attack_timer = 0.0
+	_siege_stuck_time = 0.0
+	_siege_debug_t = 0.0
 	velocity = Vector3.ZERO
 	current_order = OrderType.NONE
 	unit_state = UnitState.IDLE
@@ -327,7 +370,9 @@ func replace_order_attack(enemy: BaseUnit) -> void:
 
 
 func replace_order_attack_building(building: BaseBuilding) -> void:
-	if not TeamRules.can_attack_building(self, building):
+	var ok := TeamRules.can_attack_building(self, building)
+	print("[SIEGE] replace_order_attack_building can=", ok, " building=", building)
+	if not ok:
 		return
 	current_order = OrderType.ATTACK_BUILDING
 	set_attack_building_target(building)
@@ -352,6 +397,7 @@ func set_move_target(target: Vector3) -> void:
 	attack_building_target = null
 	return_target = null
 	_building_attack_timer = 0.0
+	_siege_stuck_time = 0.0
 	last_move_end_reason = ""
 	if harvest:
 		harvest.reset()
@@ -399,18 +445,24 @@ func set_attack_target(enemy: BaseUnit) -> void:
 
 func set_attack_building_target(building: BaseBuilding) -> void:
 	if not TeamRules.can_attack_building(self, building):
+		print("[SIEGE] set_attack_building_target REJECTED")
 		return
 	attack_building_target = building
 	attack_target = null
 	harvest_target = null
 	return_target = null
 	_building_attack_timer = 0.0
+	_siege_stuck_time = 0.0
+	_siege_last_pos = global_position
 	unit_state = UnitState.ATTACKING
+	current_order = OrderType.ATTACK_BUILDING
 	if harvest:
 		harvest.reset()
 	if combat:
 		combat.reset()
-	print(name, " -> attack building ", building.name)
+	if movement:
+		movement.cancel()
+	print(name, " -> attack building ", building.name, " (team ", building.team_id, ") order=", current_order)
 
 
 func select() -> void:
