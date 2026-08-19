@@ -20,7 +20,7 @@ func handle_right_click(
 		push_warning("InteractionManager: command_manager not set")
 		return
 
-	# Click on unit: attack only if enemy; same team → no-op (no auto-MOVE)
+	# Click on unit: attack only if enemy; same team → no-op
 	if collider is BaseUnit:
 		var target := collider as BaseUnit
 		if not is_instance_valid(target):
@@ -45,8 +45,21 @@ func handle_right_click(
 
 	if collider is BaseBuilding:
 		var building := collider as BaseBuilding
-		var outside := _outside_point(building, world_position)
-		command_manager.issue_move(selected_units, outside)
+		if not is_instance_valid(building) or building.is_destroyed:
+			return
+
+		var can_siege := false
+		for u in selected_units:
+			if TeamRules.can_attack_building(u, building):
+				can_siege = true
+				break
+
+		if can_siege:
+			command_manager.issue_attack_building(selected_units, building)
+		else:
+			# Same-team / invalid → move outside (not attack)
+			var outside := _outside_point(building, world_position)
+			command_manager.issue_move(selected_units, outside)
 		return
 
 	command_manager.issue_move(selected_units, world_position)
