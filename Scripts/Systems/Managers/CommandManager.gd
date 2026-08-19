@@ -37,6 +37,17 @@ func issue_attack(units: Array[BaseUnit], enemy: BaseUnit) -> void:
 		unit.replace_order_attack(enemy)
 
 
+func issue_attack_building(units: Array[BaseUnit], building: BaseBuilding) -> void:
+	if building == null or not is_instance_valid(building):
+		return
+	if building.is_destroyed:
+		return
+	for unit: BaseUnit in _filter_valid(units):
+		if not TeamRules.can_attack_building(unit, building):
+			continue
+		unit.replace_order_attack_building(building)
+
+
 func _filter_valid(units: Array[BaseUnit]) -> Array[BaseUnit]:
 	var out: Array[BaseUnit] = []
 	for unit in units:
