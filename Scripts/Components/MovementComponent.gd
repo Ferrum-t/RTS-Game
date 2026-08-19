@@ -2,8 +2,12 @@ extends RefCounted
 
 class_name MovementComponent
 
-## M6 Movement (M1 status contract)
-## DIAGNOSTIC: temporary MOVE logs (M6.1 freeze investigation)
+## M6 Movement (M1 status contract):
+## - Owns path execution + MovementStatus only
+## - NEVER writes owner.unit_state
+## - Backend: NavigationAgent3D path follow
+## - ARRIVED = distance to move_target only
+## - First path point often equals start pos — skip near waypoints on XZ
 
 enum Status {
 	IDLE,
@@ -22,16 +26,15 @@ var arrival_distance: float = 0.55
 var block_timeout: float = 1.75
 var separation_radius: float = 1.1
 var separation_strength: float = 1.2
+## Horizontal distance under which a path point is treated as "already here"
+var waypoint_skip_distance: float = 0.4
 
 var _stuck_time: float = 0.0
 var _no_progress_time: float = 0.0
 var _last_pos: Vector3 = Vector3.ZERO
-var _repath_cooldown: float = 0.0
 var _last_bake_id: int = -1
 
-## Temporary diagnostics — remove after root cause confirmed
 var _diag_frames_left: int = 0
-var _diag_label: String = ""
 
 
 func _init(unit: BaseUnit, nav_agent: NavigationAgent3D = null) -> void:
@@ -68,20 +71,17 @@ func set_target(world_pos: Vector3) -> void:
 	owner.move_target = p
 	_stuck_time = 0.0
 	_no_progress_time = 0.0
-	_repath_cooldown = 0.0
 	_last_pos = owner.global_position
 	status = Status.MOVING
-	_apply_agent_target(p)
-	_diag_frames_left = 8
-	_diag_label = owner.name
-	_diag_log("set_target")
+	if agent:
+		agent.target_position = p
+	_diag_frames_left = 6
 
 
 func cancel() -> void:
 	owner.velocity = Vector3.ZERO
 	_stuck_time = 0.0
 	_no_progress_time = 0.0
-	_repath_cooldown = 0.0
 	status = Status.CANCELLED
 	if agent:
 		agent.target_position = owner.global_position
@@ -95,60 +95,46 @@ func get_target() -> Vector3:
 	return owner.move_target
 
 
-func _apply_agent_target(p: Vector3) -> void:
-	if agent == null:
-		return
-	agent.target_position = p
-
-
 func _refresh_path_if_bake_changed() -> void:
 	var nav = owner.get_node_or_null("/root/NavigationBakeService")
-	if nav == null:
-		return
-	if not ("bake_id" in nav):
+	if nav == null or not ("bake_id" in nav):
 		return
 	var bid: int = nav.bake_id
 	if bid == _last_bake_id:
 		return
 	_last_bake_id = bid
 	if status == Status.MOVING and agent:
-		_apply_agent_target(owner.move_target)
+		agent.target_position = owner.move_target
 		_no_progress_time = 0.0
 		_stuck_time = 0.0
-		_repath_cooldown = 0.15
 
 
-func _diag_log(tag: String) -> void:
-	var agent_map := "none"
-	var world_map := "none"
-	var finished := false
-	var path_count := -1
-	var next_pos := Vector3.ZERO
-	var tgt := Vector3.ZERO
-	if agent:
-		finished = agent.is_navigation_finished()
-		tgt = agent.target_position
-		next_pos = agent.get_next_path_position()
-		var path: PackedVector3Array = agent.get_current_navigation_path()
-		path_count = path.size()
-		var am: RID = agent.get_navigation_map()
-		agent_map = str(am)
-	if owner and owner.is_inside_tree():
-		var wm: RID = owner.get_world_3d().get_navigation_map()
-		world_map = str(wm)
-	print(
-		"[NAV-DIAG] ", _diag_label, " ", tag,
-		" status=", status,
-		" pos=", owner.global_position if owner else Vector3.ZERO,
-		" move_target=", owner.move_target if owner else Vector3.ZERO,
-		" agent_tgt=", tgt,
-		" finished=", finished,
-		" path_n=", path_count,
-		" next=", next_pos,
-		" vel=", owner.velocity if owner else Vector3.ZERO,
-		" agent_map=", agent_map,
-		" world_map=", world_map
-	)
+## Pick a path point that is meaningfully ahead on XZ (skip start-point == current pos).
+func _get_follow_point(final_target: Vector3) -> Vector3:
+	if agent == null:
+		return final_target
+
+	var path: PackedVector3Array = agent.get_current_navigation_path()
+	var pos := owner.global_position
+	pos.y = 0.0
+
+	if path.is_empty():
+		# No path yet — aim at final; do not invent FAILED
+		return final_target
+
+	var start_i := 0
+	if agent.has_method("get_current_navigation_path_index"):
+		start_i = int(agent.get_current_navigation_path_index())
+		start_i = clampi(start_i, 0, path.size() - 1)
+
+	for i in range(start_i, path.size()):
+		var p: Vector3 = path[i]
+		p.y = 0.0
+		if pos.distance_to(p) > waypoint_skip_distance:
+			return p
+
+	# All remaining path points are at/near us — drive to final target
+	return final_target
 
 
 func update(delta: float) -> void:
@@ -163,8 +149,8 @@ func update(delta: float) -> void:
 			status = Status.MOVING
 			_stuck_time = 0.0
 			_no_progress_time = 0.0
-			_repath_cooldown = 0.0
-			_apply_agent_target(owner.move_target)
+			if agent:
+				agent.target_position = owner.move_target
 		else:
 			owner.velocity = Vector3.ZERO
 			return
@@ -175,6 +161,7 @@ func update(delta: float) -> void:
 	to_final.y = 0.0
 	var dist_final := to_final.length()
 
+	# M1 ARRIVED — distance to move_target only
 	if dist_final <= arrival_distance:
 		_set_arrived()
 		return
@@ -188,53 +175,25 @@ func update(delta: float) -> void:
 		_direct_steer(delta, final_target)
 		return
 
-	if _repath_cooldown > 0.0:
-		_repath_cooldown -= delta
+	var follow := _get_follow_point(final_target)
+	follow.y = 0.0
+	var to_follow := follow - owner.global_position
+	to_follow.y = 0.0
 
-	# --- CRITICAL PATH (current behavior, unchanged except logs) ---
-	# If is_navigation_finished() is always true, velocity stays 0 and unit never moves.
-	if agent.is_navigation_finished():
-		if _repath_cooldown <= 0.0:
-			_apply_agent_target(final_target)
-			_repath_cooldown = 0.2
-		owner.velocity = Vector3.ZERO
-		var moved_f := owner.global_position.distance_to(_last_pos)
+	if to_follow.length() < 0.001:
+		# Degenerate — still far from final only if path empty; count no-progress
+		var moved0 := owner.global_position.distance_to(_last_pos)
 		_last_pos = owner.global_position
-		if moved_f < 0.02:
-			_no_progress_time += delta
-		else:
-			_no_progress_time = 0.0
-		if _no_progress_time >= block_timeout * 2.0:
-			_set_blocked()
-		if _diag_frames_left > 0:
-			_diag_frames_left -= 1
-			_diag_log("update_finished_branch")
-		return
-
-	var next := agent.get_next_path_position()
-	next.y = 0.0
-	var to_next := next - owner.global_position
-	to_next.y = 0.0
-	var next_len := to_next.length()
-
-	if next_len < 0.05:
-		if _repath_cooldown <= 0.0:
-			_apply_agent_target(final_target)
-			_repath_cooldown = 0.1
-		var moved_n := owner.global_position.distance_to(_last_pos)
-		_last_pos = owner.global_position
-		if moved_n < 0.02:
+		if moved0 < 0.02:
 			_no_progress_time += delta
 		else:
 			_no_progress_time = 0.0
 		if _no_progress_time >= block_timeout:
 			_set_blocked()
-		if _diag_frames_left > 0:
-			_diag_frames_left -= 1
-			_diag_log("update_next_near")
+		owner.velocity = Vector3.ZERO
 		return
 
-	var direction := to_next.normalized()
+	var direction := to_follow.normalized()
 
 	var moved := owner.global_position.distance_to(_last_pos)
 	_last_pos = owner.global_position
@@ -260,7 +219,17 @@ func update(delta: float) -> void:
 
 	if _diag_frames_left > 0:
 		_diag_frames_left -= 1
-		_diag_log("update_moving")
+		var finished := agent.is_navigation_finished()
+		var path_n := agent.get_current_navigation_path().size()
+		print(
+			"[NAV] ", owner.name,
+			" pos=", owner.global_position,
+			" next=", follow,
+			" path_n=", path_n,
+			" finished=", finished,
+			" dir=", direction,
+			" vel=", owner.velocity
+		)
 
 
 func _direct_steer(_delta: float, final_target: Vector3) -> void:
