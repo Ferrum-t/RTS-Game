@@ -2,12 +2,8 @@ extends RefCounted
 
 class_name MovementComponent
 
-## M6 Movement (M1 status contract):
-## - Owns path execution + MovementStatus only
-## - NEVER writes owner.unit_state
-## - Backend: NavigationAgent3D path follow
-## - ARRIVED = distance to move_target only (M1)
-## - is_navigation_finished must NOT force FAILED while far from target
+## M6 Movement (M1 status contract)
+## DIAGNOSTIC: temporary MOVE logs (M6.1 freeze investigation)
 
 enum Status {
 	IDLE,
@@ -33,6 +29,10 @@ var _last_pos: Vector3 = Vector3.ZERO
 var _repath_cooldown: float = 0.0
 var _last_bake_id: int = -1
 
+## Temporary diagnostics — remove after root cause confirmed
+var _diag_frames_left: int = 0
+var _diag_label: String = ""
+
 
 func _init(unit: BaseUnit, nav_agent: NavigationAgent3D = null) -> void:
 	owner = unit
@@ -55,7 +55,6 @@ func _configure_agent() -> void:
 	agent.radius = 0.4
 	agent.height = 1.2
 	agent.avoidance_enabled = false
-	# Do not use a tight path_max_distance — it caused spurious path invalidation
 	agent.path_max_distance = 50.0
 
 
@@ -73,6 +72,9 @@ func set_target(world_pos: Vector3) -> void:
 	_last_pos = owner.global_position
 	status = Status.MOVING
 	_apply_agent_target(p)
+	_diag_frames_left = 8
+	_diag_label = owner.name
+	_diag_log("set_target")
 
 
 func cancel() -> void:
@@ -116,13 +118,44 @@ func _refresh_path_if_bake_changed() -> void:
 		_repath_cooldown = 0.15
 
 
+func _diag_log(tag: String) -> void:
+	var agent_map := "none"
+	var world_map := "none"
+	var finished := false
+	var path_count := -1
+	var next_pos := Vector3.ZERO
+	var tgt := Vector3.ZERO
+	if agent:
+		finished = agent.is_navigation_finished()
+		tgt = agent.target_position
+		next_pos = agent.get_next_path_position()
+		var path: PackedVector3Array = agent.get_current_navigation_path()
+		path_count = path.size()
+		var am: RID = agent.get_navigation_map()
+		agent_map = str(am)
+	if owner and owner.is_inside_tree():
+		var wm: RID = owner.get_world_3d().get_navigation_map()
+		world_map = str(wm)
+	print(
+		"[NAV-DIAG] ", _diag_label, " ", tag,
+		" status=", status,
+		" pos=", owner.global_position if owner else Vector3.ZERO,
+		" move_target=", owner.move_target if owner else Vector3.ZERO,
+		" agent_tgt=", tgt,
+		" finished=", finished,
+		" path_n=", path_count,
+		" next=", next_pos,
+		" vel=", owner.velocity if owner else Vector3.ZERO,
+		" agent_map=", agent_map,
+		" world_map=", world_map
+	)
+
+
 func update(delta: float) -> void:
 	if status == Status.CANCELLED:
 		owner.velocity = Vector3.ZERO
 		return
 
-	# Terminal states: resume only if set_target already flipped to MOVING,
-	# or legacy wake when still far (kept for safety).
 	if status == Status.ARRIVED or status == Status.BLOCKED or status == Status.FAILED:
 		var wake := owner.move_target - owner.global_position
 		wake.y = 0.0
@@ -142,7 +175,6 @@ func update(delta: float) -> void:
 	to_final.y = 0.0
 	var dist_final := to_final.length()
 
-	# --- M1 ARRIVED: distance only ---
 	if dist_final <= arrival_distance:
 		_set_arrived()
 		return
@@ -159,14 +191,13 @@ func update(delta: float) -> void:
 	if _repath_cooldown > 0.0:
 		_repath_cooldown -= delta
 
-	# Path not ready / finished while still far: keep MOVING, repath, do NOT FAILED
+	# --- CRITICAL PATH (current behavior, unchanged except logs) ---
+	# If is_navigation_finished() is always true, velocity stays 0 and unit never moves.
 	if agent.is_navigation_finished():
 		if _repath_cooldown <= 0.0:
 			_apply_agent_target(final_target)
 			_repath_cooldown = 0.2
-		# Soft wait — no terminal status
 		owner.velocity = Vector3.ZERO
-		# Still count wall-clock stuck only if we never get a path and never move
 		var moved_f := owner.global_position.distance_to(_last_pos)
 		_last_pos = owner.global_position
 		if moved_f < 0.02:
@@ -175,6 +206,9 @@ func update(delta: float) -> void:
 			_no_progress_time = 0.0
 		if _no_progress_time >= block_timeout * 2.0:
 			_set_blocked()
+		if _diag_frames_left > 0:
+			_diag_frames_left -= 1
+			_diag_log("update_finished_branch")
 		return
 
 	var next := agent.get_next_path_position()
@@ -183,9 +217,7 @@ func update(delta: float) -> void:
 	to_next.y = 0.0
 	var next_len := to_next.length()
 
-	# Near next waypoint but not at final target: advance along path, do not BLOCK yet
 	if next_len < 0.05:
-		# Ask agent for a fresh next; if still near self, wait briefly
 		if _repath_cooldown <= 0.0:
 			_apply_agent_target(final_target)
 			_repath_cooldown = 0.1
@@ -197,6 +229,9 @@ func update(delta: float) -> void:
 			_no_progress_time = 0.0
 		if _no_progress_time >= block_timeout:
 			_set_blocked()
+		if _diag_frames_left > 0:
+			_diag_frames_left -= 1
+			_diag_log("update_next_near")
 		return
 
 	var direction := to_next.normalized()
@@ -222,6 +257,10 @@ func update(delta: float) -> void:
 	owner.velocity.x = direction.x * owner.move_speed
 	owner.velocity.z = direction.z * owner.move_speed
 	owner.move_and_slide()
+
+	if _diag_frames_left > 0:
+		_diag_frames_left -= 1
+		_diag_log("update_moving")
 
 
 func _direct_steer(_delta: float, final_target: Vector3) -> void:
