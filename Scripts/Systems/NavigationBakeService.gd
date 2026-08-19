@@ -18,6 +18,9 @@ var _baking: bool = false
 var _bake_generation: int = 0
 var _pending_after_bake: bool = false
 
+## Incremented when a mesh is successfully applied (Movement watches this)
+var bake_id: int = 0
+
 var _region: NavigationRegion3D = null
 
 
@@ -123,7 +126,6 @@ func _run_bake() -> void:
 func _on_bake_done(nav_mesh: NavigationMesh, gen: int) -> void:
 	_baking = false
 	if gen != _bake_generation:
-		# superseded
 		if _pending_after_bake:
 			_pending_after_bake = false
 			request_rebake()
@@ -132,7 +134,8 @@ func _on_bake_done(nav_mesh: NavigationMesh, gen: int) -> void:
 	_resolve_region()
 	if _region != null and is_instance_valid(_region):
 		_region.navigation_mesh = nav_mesh
-		print("NavigationBakeService: mesh applied, footprints=", _footprints.size())
+		bake_id += 1
+		print("NavigationBakeService: mesh applied, footprints=", _footprints.size(), " bake_id=", bake_id)
 
 	if _pending_after_bake:
 		_pending_after_bake = false
@@ -141,7 +144,6 @@ func _on_bake_done(nav_mesh: NavigationMesh, gen: int) -> void:
 
 func _add_ground_faces(source: NavigationMeshSourceGeometryData3D) -> void:
 	var s := MAP_HALF
-	# Two triangles covering the playable plane at y = 0
 	var faces := PackedVector3Array([
 		Vector3(-s, 0.0, -s), Vector3(s, 0.0, -s), Vector3(s, 0.0, s),
 		Vector3(-s, 0.0, -s), Vector3(s, 0.0, s), Vector3(-s, 0.0, s),
@@ -162,5 +164,4 @@ func _add_building_obstructions(source: NavigationMeshSourceGeometryData3D) -> v
 			Vector3(center.x + hx, 0.0, center.z + hz),
 			Vector3(center.x - hx, 0.0, center.z + hz),
 		])
-		# carve=true: cut hole regardless of agent_radius offset
 		source.add_projected_obstruction(outline, 0.0, 4.0, true)
