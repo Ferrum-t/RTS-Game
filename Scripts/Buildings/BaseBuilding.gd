@@ -4,11 +4,11 @@ class_name BaseBuilding
 
 @export var team_id: int = 0
 @export var max_health: int = 500
+## Half-extents of footprint used for NavMesh obstruction (XZ)
+@export var nav_half_extents: Vector3 = Vector3(2.2, 1.0, 2.2)
 
 var health: int = 500
 var is_destroyed: bool = false
-
-var _nav_obstacle: NavigationObstacle3D
 
 
 func _ready() -> void:
@@ -19,18 +19,19 @@ func _ready() -> void:
 	if bm:
 		bm.register_building(self)
 
-	_nav_obstacle = NavigationObstacle3D.new()
-	add_child(_nav_obstacle)
-	_nav_obstacle.radius = 2.8
-	_nav_obstacle.height = 3.0
-	_nav_obstacle.avoidance_enabled = true
-	_nav_obstacle.avoidance_layers = 1
+	var nav := get_node_or_null("/root/NavigationBakeService")
+	if nav:
+		nav.register_building(self, nav_half_extents)
 
 
 func _exit_tree() -> void:
 	var bm := get_node_or_null("/root/BuildingManager")
 	if bm:
 		bm.unregister_building(self)
+
+	var nav := get_node_or_null("/root/NavigationBakeService")
+	if nav:
+		nav.unregister_building(self)
 
 
 func damage(amount: int) -> void:
