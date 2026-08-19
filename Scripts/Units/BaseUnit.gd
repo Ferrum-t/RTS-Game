@@ -58,6 +58,7 @@ var inventory : InventoryComponent
 var harvest : HarvestComponent
 var combat : CombatComponent
 var health_bar: HealthBar3D = null
+var nav_agent: NavigationAgent3D = null
 
 var last_move_end_reason: String = ""
 var _building_attack_timer: float = 0.0
@@ -82,7 +83,11 @@ func _ready() -> void:
 
 	UnitManager.register_unit(self)
 
-	movement = MovementComponent.new(self)
+	nav_agent = NavigationAgent3D.new()
+	nav_agent.name = "NavigationAgent3D"
+	add_child(nav_agent)
+
+	movement = MovementComponent.new(self, nav_agent)
 	inventory = InventoryComponent.new(self)
 	harvest = HarvestComponent.new(self)
 	combat = CombatComponent.new(self)
@@ -216,7 +221,6 @@ func update_attacking_building(delta: float) -> void:
 	to_b.y = 0.0
 	var dist := to_b.length()
 
-	# Progress / stuck vs building collider
 	var moved := global_position.distance_to(_siege_last_pos)
 	_siege_last_pos = global_position
 	if moved < 0.03:
@@ -224,12 +228,10 @@ func update_attacking_building(delta: float) -> void:
 	else:
 		_siege_stuck_time = 0.0
 
-	# In range OR pressed against building wall near target
 	var in_range := dist <= building_attack_range
 	if not in_range and dist <= building_attack_range + 2.5 and _siege_stuck_time >= 0.35:
 		in_range = true
 
-	# Temporary M5 diagnostics (throttle)
 	_siege_debug_t -= delta
 	if _siege_debug_t <= 0.0:
 		_siege_debug_t = 0.5
@@ -247,7 +249,6 @@ func update_attacking_building(delta: float) -> void:
 		)
 
 	if not in_range:
-		# Stand-off outside box (~half-extent 2) — aim past collision surface
 		var stand := maxf(building_attack_range * 0.9, 5.0)
 		var approach := building.global_position
 		if to_b.length() > 0.1:
@@ -258,7 +259,6 @@ func update_attacking_building(delta: float) -> void:
 		movement.update(delta)
 		return
 
-	# Strike range: stop pathing so we do not push into collider forever
 	if movement:
 		movement.cancel()
 	velocity = Vector3.ZERO
