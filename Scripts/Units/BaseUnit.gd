@@ -14,13 +14,14 @@ enum UnitState
 	DEAD
 }
 
-## M3: player/AI intent — not unit_state, not component status
+## M3/M5: player/AI intent — not unit_state, not component status
 enum OrderType
 {
 	NONE,
 	MOVE,
 	HARVEST,
 	ATTACK,
+	ATTACK_BUILDING,
 	BUILD
 }
 
@@ -32,6 +33,7 @@ enum OrderType
 @export var attack_damage := 10
 @export var attack_range := 2.0
 @export var attack_cooldown := 1.0
+@export var building_attack_range := 4.0
 @export var health_bar_height := 1.6
 
 var health := 100
@@ -46,6 +48,7 @@ var move_target : Vector3
 var harvest_target : BaseResource = null
 var build_target : BaseBuilding = null
 var attack_target : BaseUnit = null
+var attack_building_target : BaseBuilding = null
 
 var return_target : Node3D = null
 
@@ -56,6 +59,7 @@ var combat : CombatComponent
 var health_bar: HealthBar3D = null
 
 var last_move_end_reason: String = ""
+var _building_attack_timer: float = 0.0
 
 const GRAVITY := 30.0
 const HEALTH_BAR_SCENE := preload("res://Scenes/UI/HealthBar3D.tscn")
@@ -173,8 +177,12 @@ func update_harvesting(delta: float) -> void:
 			pass
 
 
-## M2: Unit consumes Combat status
+## M2 unit combat + M5 building siege (separate paths)
 func update_attacking(delta: float) -> void:
+	if current_order == OrderType.ATTACK_BUILDING or attack_building_target != null:
+		update_attacking_building(delta)
+		return
+
 	combat.update(delta)
 
 	match combat.status:
@@ -190,6 +198,49 @@ func update_attacking(delta: float) -> void:
 			unit_state = UnitState.IDLE
 		_:
 			pass
+
+
+## M5: siege path — does not use CombatComponent
+func update_attacking_building(delta: float) -> void:
+	var building := attack_building_target
+
+	if building == null or not is_instance_valid(building) or building.is_destroyed or building.health <= 0:
+		_clear_building_attack()
+		return
+
+	var to_b := building.global_position - global_position
+	to_b.y = 0.0
+	var dist := to_b.length()
+
+	if dist > building_attack_range:
+		var approach := building.global_position
+		if to_b.length() > 0.1:
+			approach = building.global_position - to_b.normalized() * (building_attack_range * 0.85)
+		approach.y = 0.0
+		move_target = approach
+		movement.set_target(approach)
+		movement.update(delta)
+		return
+
+	velocity = Vector3.ZERO
+	_building_attack_timer -= delta
+	if _building_attack_timer > 0.0:
+		return
+	_building_attack_timer = attack_cooldown
+
+	print(name, " hits building ", building.name, " for ", attack_damage, " dmg (HP ", max(building.health - attack_damage, 0), "/", building.max_health, ")")
+	building.damage(attack_damage)
+
+	if not is_instance_valid(building) or building.is_destroyed or building.health <= 0:
+		_clear_building_attack()
+
+
+func _clear_building_attack() -> void:
+	attack_building_target = null
+	_building_attack_timer = 0.0
+	velocity = Vector3.ZERO
+	current_order = OrderType.NONE
+	unit_state = UnitState.IDLE
 
 
 func update_return(delta: float) -> void:
@@ -251,8 +302,7 @@ func update_build(_delta: float) -> void:
 
 
 # ---------------------------------------------------------------------------
-# M3: replace_order — sets current_order, then delegates to set_*
-# M4: attack path validates TeamRules before mutating order/state
+# M3/M5: replace_order
 # ---------------------------------------------------------------------------
 
 func replace_order_move(destination: Vector3) -> void:
@@ -270,11 +320,17 @@ func replace_order_harvest(resource: BaseResource) -> void:
 
 
 func replace_order_attack(enemy: BaseUnit) -> void:
-	# M4: invalid/friendly → no change to current_order or unit_state
 	if not TeamRules.can_attack(self, enemy):
 		return
 	current_order = OrderType.ATTACK
 	set_attack_target(enemy)
+
+
+func replace_order_attack_building(building: BaseBuilding) -> void:
+	if not TeamRules.can_attack_building(self, building):
+		return
+	current_order = OrderType.ATTACK_BUILDING
+	set_attack_building_target(building)
 
 
 func replace_order_build(building: BaseBuilding) -> void:
@@ -293,7 +349,9 @@ func set_move_target(target: Vector3) -> void:
 	unit_state = UnitState.MOVING
 	harvest_target = null
 	attack_target = null
+	attack_building_target = null
 	return_target = null
+	_building_attack_timer = 0.0
 	last_move_end_reason = ""
 	if harvest:
 		harvest.reset()
@@ -306,7 +364,9 @@ func set_move_target(target: Vector3) -> void:
 func set_harvest_target(resource: BaseResource) -> void:
 	harvest_target = resource
 	attack_target = null
+	attack_building_target = null
 	return_target = null
+	_building_attack_timer = 0.0
 	unit_state = UnitState.HARVESTING
 	if combat:
 		combat.reset()
@@ -317,22 +377,40 @@ func set_harvest_target(resource: BaseResource) -> void:
 func set_build_target(building: BaseBuilding) -> void:
 	build_target = building
 	attack_target = null
+	attack_building_target = null
 	unit_state = UnitState.BUILDING
 
 
 func set_attack_target(enemy: BaseUnit) -> void:
-	# M4 defensive: friendly / invalid never mutates state
 	if not TeamRules.can_attack(self, enemy):
 		return
 	attack_target = enemy
+	attack_building_target = null
 	harvest_target = null
 	return_target = null
+	_building_attack_timer = 0.0
 	unit_state = UnitState.ATTACKING
 	if harvest:
 		harvest.reset()
 	if combat:
 		combat.reset()
 	print(name, " -> attack ", enemy.name)
+
+
+func set_attack_building_target(building: BaseBuilding) -> void:
+	if not TeamRules.can_attack_building(self, building):
+		return
+	attack_building_target = building
+	attack_target = null
+	harvest_target = null
+	return_target = null
+	_building_attack_timer = 0.0
+	unit_state = UnitState.ATTACKING
+	if harvest:
+		harvest.reset()
+	if combat:
+		combat.reset()
+	print(name, " -> attack building ", building.name)
 
 
 func select() -> void:
@@ -363,6 +441,7 @@ func damage(amount: int) -> void:
 func die() -> void:
 	unit_state = UnitState.DEAD
 	current_order = OrderType.NONE
+	attack_building_target = null
 	if movement:
 		movement.cancel()
 	if harvest:
