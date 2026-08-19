@@ -2,11 +2,12 @@ extends RefCounted
 
 class_name MovementComponent
 
-## M6 Movement contract (M1 status preserved):
+## M6 Movement (M1 status contract):
 ## - Owns path execution + MovementStatus only
 ## - NEVER writes owner.unit_state
 ## - Backend: NavigationAgent3D path follow
-## - Works for any unit_state (MOVE, HARVEST, ATTACK, siege approach, ...)
+## - ARRIVED = distance to move_target only (M1)
+## - is_navigation_finished must NOT force FAILED while far from target
 
 enum Status {
 	IDLE,
@@ -29,7 +30,8 @@ var separation_strength: float = 1.2
 var _stuck_time: float = 0.0
 var _no_progress_time: float = 0.0
 var _last_pos: Vector3 = Vector3.ZERO
-var _path_fail_grace: float = 0.0
+var _repath_cooldown: float = 0.0
+var _last_bake_id: int = -1
 
 
 func _init(unit: BaseUnit, nav_agent: NavigationAgent3D = null) -> void:
@@ -53,7 +55,8 @@ func _configure_agent() -> void:
 	agent.radius = 0.4
 	agent.height = 1.2
 	agent.avoidance_enabled = false
-	agent.path_max_distance = 3.0
+	# Do not use a tight path_max_distance — it caused spurious path invalidation
+	agent.path_max_distance = 50.0
 
 
 func request_move(world_pos: Vector3) -> void:
@@ -66,18 +69,17 @@ func set_target(world_pos: Vector3) -> void:
 	owner.move_target = p
 	_stuck_time = 0.0
 	_no_progress_time = 0.0
-	_path_fail_grace = 0.25
-	status = Status.MOVING
+	_repath_cooldown = 0.0
 	_last_pos = owner.global_position
-	if agent:
-		agent.target_position = p
+	status = Status.MOVING
+	_apply_agent_target(p)
 
 
 func cancel() -> void:
 	owner.velocity = Vector3.ZERO
 	_stuck_time = 0.0
 	_no_progress_time = 0.0
-	_path_fail_grace = 0.0
+	_repath_cooldown = 0.0
 	status = Status.CANCELLED
 	if agent:
 		agent.target_position = owner.global_position
@@ -91,11 +93,36 @@ func get_target() -> Vector3:
 	return owner.move_target
 
 
+func _apply_agent_target(p: Vector3) -> void:
+	if agent == null:
+		return
+	agent.target_position = p
+
+
+func _refresh_path_if_bake_changed() -> void:
+	var nav = owner.get_node_or_null("/root/NavigationBakeService")
+	if nav == null:
+		return
+	if not ("bake_id" in nav):
+		return
+	var bid: int = nav.bake_id
+	if bid == _last_bake_id:
+		return
+	_last_bake_id = bid
+	if status == Status.MOVING and agent:
+		_apply_agent_target(owner.move_target)
+		_no_progress_time = 0.0
+		_stuck_time = 0.0
+		_repath_cooldown = 0.15
+
+
 func update(delta: float) -> void:
 	if status == Status.CANCELLED:
 		owner.velocity = Vector3.ZERO
 		return
 
+	# Terminal states: resume only if set_target already flipped to MOVING,
+	# or legacy wake when still far (kept for safety).
 	if status == Status.ARRIVED or status == Status.BLOCKED or status == Status.FAILED:
 		var wake := owner.move_target - owner.global_position
 		wake.y = 0.0
@@ -103,9 +130,8 @@ func update(delta: float) -> void:
 			status = Status.MOVING
 			_stuck_time = 0.0
 			_no_progress_time = 0.0
-			_path_fail_grace = 0.25
-			if agent:
-				agent.target_position = owner.move_target
+			_repath_cooldown = 0.0
+			_apply_agent_target(owner.move_target)
 		else:
 			owner.velocity = Vector3.ZERO
 			return
@@ -116,6 +142,7 @@ func update(delta: float) -> void:
 	to_final.y = 0.0
 	var dist_final := to_final.length()
 
+	# --- M1 ARRIVED: distance only ---
 	if dist_final <= arrival_distance:
 		_set_arrived()
 		return
@@ -123,28 +150,51 @@ func update(delta: float) -> void:
 	if status == Status.IDLE:
 		status = Status.MOVING
 
+	_refresh_path_if_bake_changed()
+
 	if agent == null:
 		_direct_steer(delta, final_target)
 		return
 
-	if _path_fail_grace > 0.0:
-		_path_fail_grace -= delta
+	if _repath_cooldown > 0.0:
+		_repath_cooldown -= delta
 
+	# Path not ready / finished while still far: keep MOVING, repath, do NOT FAILED
 	if agent.is_navigation_finished():
-		if dist_final <= arrival_distance * 1.5:
-			_set_arrived()
-			return
-		if _path_fail_grace <= 0.0:
-			_set_failed()
-			return
+		if _repath_cooldown <= 0.0:
+			_apply_agent_target(final_target)
+			_repath_cooldown = 0.2
+		# Soft wait — no terminal status
+		owner.velocity = Vector3.ZERO
+		# Still count wall-clock stuck only if we never get a path and never move
+		var moved_f := owner.global_position.distance_to(_last_pos)
+		_last_pos = owner.global_position
+		if moved_f < 0.02:
+			_no_progress_time += delta
+		else:
+			_no_progress_time = 0.0
+		if _no_progress_time >= block_timeout * 2.0:
+			_set_blocked()
+		return
 
 	var next := agent.get_next_path_position()
 	next.y = 0.0
 	var to_next := next - owner.global_position
 	to_next.y = 0.0
+	var next_len := to_next.length()
 
-	if to_next.length() < 0.02:
-		_no_progress_time += delta
+	# Near next waypoint but not at final target: advance along path, do not BLOCK yet
+	if next_len < 0.05:
+		# Ask agent for a fresh next; if still near self, wait briefly
+		if _repath_cooldown <= 0.0:
+			_apply_agent_target(final_target)
+			_repath_cooldown = 0.1
+		var moved_n := owner.global_position.distance_to(_last_pos)
+		_last_pos = owner.global_position
+		if moved_n < 0.02:
+			_no_progress_time += delta
+		else:
+			_no_progress_time = 0.0
 		if _no_progress_time >= block_timeout:
 			_set_blocked()
 		return
@@ -177,7 +227,7 @@ func update(delta: float) -> void:
 func _direct_steer(_delta: float, final_target: Vector3) -> void:
 	var to_seek := final_target - owner.global_position
 	to_seek.y = 0.0
-	if to_seek.length() < 0.01:
+	if to_seek.length() <= arrival_distance:
 		_set_arrived()
 		return
 	var direction := to_seek.normalized()
