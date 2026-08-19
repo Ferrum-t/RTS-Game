@@ -2,10 +2,11 @@ extends RefCounted
 
 class_name MovementComponent
 
-## M1 Movement contract:
+## M6 Movement contract (M1 status preserved):
 ## - Owns path execution + MovementStatus only
 ## - NEVER writes owner.unit_state
-## - Backend: SimpleDetour with validated side candidates
+## - Backend: NavigationAgent3D path follow
+## - Works for any unit_state (MOVE, HARVEST, ATTACK, siege approach, ...)
 
 enum Status {
 	IDLE,
@@ -18,28 +19,41 @@ enum Status {
 
 var owner: BaseUnit
 var status: Status = Status.IDLE
+var agent: NavigationAgent3D = null
 
-var arrival_distance: float = 0.5
-var building_clearance: float = 6.0
-var tree_clearance: float = 2.8
-var separation_radius: float = 1.1
-var separation_strength: float = 1.8
-
+var arrival_distance: float = 0.55
 var block_timeout: float = 1.75
-
-var _waypoints: Array[Vector3] = []
-var _wp_index: int = 0
+var separation_radius: float = 1.1
+var separation_strength: float = 1.2
 
 var _stuck_time: float = 0.0
 var _no_progress_time: float = 0.0
 var _last_pos: Vector3 = Vector3.ZERO
-var _detour_failed: bool = false
+var _path_fail_grace: float = 0.0
 
 
-func _init(unit: BaseUnit) -> void:
+func _init(unit: BaseUnit, nav_agent: NavigationAgent3D = null) -> void:
 	owner = unit
+	agent = nav_agent
 	_last_pos = unit.global_position
 	status = Status.IDLE
+	if agent:
+		_configure_agent()
+
+
+func set_agent(nav_agent: NavigationAgent3D) -> void:
+	agent = nav_agent
+	if agent:
+		_configure_agent()
+
+
+func _configure_agent() -> void:
+	agent.path_desired_distance = 0.5
+	agent.target_desired_distance = arrival_distance
+	agent.radius = 0.4
+	agent.height = 1.2
+	agent.avoidance_enabled = false
+	agent.path_max_distance = 3.0
 
 
 func request_move(world_pos: Vector3) -> void:
@@ -50,24 +64,23 @@ func set_target(world_pos: Vector3) -> void:
 	var p := world_pos
 	p.y = 0.0
 	owner.move_target = p
-	_waypoints.clear()
-	_wp_index = 0
 	_stuck_time = 0.0
 	_no_progress_time = 0.0
-	_detour_failed = false
+	_path_fail_grace = 0.25
 	status = Status.MOVING
-	if _can_use_detour():
-		_build_detour()
+	_last_pos = owner.global_position
+	if agent:
+		agent.target_position = p
 
 
 func cancel() -> void:
 	owner.velocity = Vector3.ZERO
-	_waypoints.clear()
-	_wp_index = 0
 	_stuck_time = 0.0
 	_no_progress_time = 0.0
-	_detour_failed = false
+	_path_fail_grace = 0.0
 	status = Status.CANCELLED
+	if agent:
+		agent.target_position = owner.global_position
 
 
 func get_status() -> Status:
@@ -90,16 +103,15 @@ func update(delta: float) -> void:
 			status = Status.MOVING
 			_stuck_time = 0.0
 			_no_progress_time = 0.0
-			_detour_failed = false
-			_waypoints.clear()
-			_wp_index = 0
+			_path_fail_grace = 0.25
+			if agent:
+				agent.target_position = owner.move_target
 		else:
 			owner.velocity = Vector3.ZERO
 			return
 
 	var final_target := owner.move_target
 	final_target.y = 0.0
-
 	var to_final := final_target - owner.global_position
 	to_final.y = 0.0
 	var dist_final := to_final.length()
@@ -111,41 +123,33 @@ func update(delta: float) -> void:
 	if status == Status.IDLE:
 		status = Status.MOVING
 
-	if _can_use_detour():
-		if _waypoints.is_empty() and not _detour_failed:
-			if _line_blocked(owner.global_position, final_target):
-				_build_detour()
-		# Do NOT clear waypoints just because a thin ray to goal is free —
-		# body can still be clipped on a corner while the ray misses the AABB.
-	else:
-		_waypoints.clear()
-		_wp_index = 0
+	if agent == null:
+		_direct_steer(delta, final_target)
+		return
 
-	var seek := final_target
-	if _wp_index < _waypoints.size():
-		var wp: Vector3 = _waypoints[_wp_index]
-		var to_wp := wp - owner.global_position
-		to_wp.y = 0.0
-		if to_wp.length() <= 0.85:
-			_wp_index += 1
-			if _wp_index < _waypoints.size():
-				seek = _waypoints[_wp_index]
-			else:
-				seek = final_target
-		else:
-			seek = wp
+	if _path_fail_grace > 0.0:
+		_path_fail_grace -= delta
 
-	var to_seek := seek - owner.global_position
-	to_seek.y = 0.0
-	if to_seek.length() < 0.01:
-		if _can_use_detour() and not _detour_failed:
-			_build_detour()
+	if agent.is_navigation_finished():
+		if dist_final <= arrival_distance * 1.5:
+			_set_arrived()
+			return
+		if _path_fail_grace <= 0.0:
+			_set_failed()
+			return
+
+	var next := agent.get_next_path_position()
+	next.y = 0.0
+	var to_next := next - owner.global_position
+	to_next.y = 0.0
+
+	if to_next.length() < 0.02:
 		_no_progress_time += delta
 		if _no_progress_time >= block_timeout:
 			_set_blocked()
 		return
 
-	var direction := to_seek.normalized()
+	var direction := to_next.normalized()
 
 	var moved := owner.global_position.distance_to(_last_pos)
 	_last_pos = owner.global_position
@@ -156,15 +160,6 @@ func update(delta: float) -> void:
 		_stuck_time = 0.0
 		_no_progress_time = 0.0
 
-	if _stuck_time > 0.2:
-		var side := Vector3(-direction.z, 0.0, direction.x)
-		if side.dot(to_final) < 0.0:
-			side = -side
-		direction = (direction * 0.25 + side).normalized()
-		if _stuck_time > 0.45 and _can_use_detour() and not _detour_failed:
-			_build_detour()
-			_stuck_time = 0.0
-
 	if _no_progress_time >= block_timeout:
 		_set_blocked()
 		return
@@ -174,146 +169,43 @@ func update(delta: float) -> void:
 		direction = (direction + sep * separation_strength).normalized()
 
 	status = Status.MOVING
-	owner.velocity = direction * owner.move_speed
+	owner.velocity.x = direction.x * owner.move_speed
+	owner.velocity.z = direction.z * owner.move_speed
+	owner.move_and_slide()
+
+
+func _direct_steer(_delta: float, final_target: Vector3) -> void:
+	var to_seek := final_target - owner.global_position
+	to_seek.y = 0.0
+	if to_seek.length() < 0.01:
+		_set_arrived()
+		return
+	var direction := to_seek.normalized()
+	status = Status.MOVING
+	owner.velocity.x = direction.x * owner.move_speed
+	owner.velocity.z = direction.z * owner.move_speed
 	owner.move_and_slide()
 
 
 func _set_arrived() -> void:
 	owner.velocity = Vector3.ZERO
-	_waypoints.clear()
-	_wp_index = 0
 	_stuck_time = 0.0
 	_no_progress_time = 0.0
-	_detour_failed = false
 	status = Status.ARRIVED
 
 
 func _set_blocked() -> void:
 	owner.velocity = Vector3.ZERO
-	_waypoints.clear()
-	_wp_index = 0
 	_stuck_time = 0.0
 	_no_progress_time = 0.0
 	status = Status.BLOCKED
 
 
-func _can_use_detour() -> bool:
-	return owner.unit_state == BaseUnit.UnitState.MOVING
-
-
-func _build_detour() -> void:
-	_waypoints.clear()
-	_wp_index = 0
-
-	var from: Vector3 = owner.global_position
-	from.y = 0.0
-	var final_t: Vector3 = owner.move_target
-	final_t.y = 0.0
-
-	if not _line_blocked(from, final_t):
-		return
-
-	var hit := _ray_to(from, final_t)
-	if hit.is_empty():
-		return
-
-	var collider = hit.get("collider")
-	if collider == null:
-		return
-
-	var clearance := tree_clearance
-	var past_amount := 2.2
-	var center := Vector3.ZERO
-
-	if collider is BaseBuilding:
-		clearance = building_clearance
-		past_amount = 4.0
-		center = (collider as BaseBuilding).global_position
-	elif collider is BaseResource:
-		center = (collider as BaseResource).global_position
-	elif collider is StaticBody3D:
-		center = (collider as StaticBody3D).global_position
-	else:
-		return
-
-	center.y = 0.0
-
-	var to_center := center - from
-	to_center.y = 0.0
-	if to_center.length() < 0.01:
-		return
-
-	var side := Vector3(-to_center.z, 0.0, to_center.x).normalized()
-	var toward_goal := final_t - center
-	toward_goal.y = 0.0
-	var past_dir := Vector3.ZERO
-	if toward_goal.length() > 0.1:
-		past_dir = toward_goal.normalized()
-
-	# Two side candidates; validate full corridor before committing
-	var candidates: Array = []
-	for s in [side, -side]:
-		var wp_side: Vector3 = center + s * clearance
-		wp_side.y = 0.0
-		var wp_past: Vector3 = center + s * clearance + past_dir * past_amount
-		wp_past.y = 0.0
-		var cost := from.distance_to(wp_side) + wp_side.distance_to(wp_past) + wp_past.distance_to(final_t)
-		candidates.append({"side": s, "wp_side": wp_side, "wp_past": wp_past, "cost": cost})
-
-	candidates.sort_custom(func(a, b): return a["cost"] < b["cost"])
-
-	for attempt_clearance in [clearance, clearance + 1.5]:
-		for c in candidates:
-			var s: Vector3 = c["side"]
-			var wp_side: Vector3 = center + s * attempt_clearance
-			wp_side.y = 0.0
-			var wp_past: Vector3 = center + s * attempt_clearance + past_dir * past_amount
-			wp_past.y = 0.0
-
-			if _corridor_clear(from, wp_side, wp_past, final_t):
-				_waypoints.append(wp_side)
-				_waypoints.append(wp_past)
-				_detour_failed = false
-				return
-
-	# No valid side — stop generating endless detours; progress timeout → BLOCKED
-	_detour_failed = true
-	_waypoints.clear()
-	_wp_index = 0
-
-
-func _corridor_clear(from: Vector3, wp_side: Vector3, wp_past: Vector3, final_t: Vector3) -> bool:
-	# Unit -> side, side -> past, past -> goal must not hit building/resource
-	if _line_blocked(from, wp_side):
-		return false
-	if _line_blocked(wp_side, wp_past):
-		return false
-	if _line_blocked(wp_past, final_t):
-		return false
-	return true
-
-
-func _line_blocked(from: Vector3, to: Vector3) -> bool:
-	var hit := _ray_to(from, to)
-	if hit.is_empty():
-		return false
-	var c = hit.get("collider")
-	return c is BaseBuilding or c is BaseResource
-
-
-func _ray_to(from: Vector3, to: Vector3) -> Dictionary:
-	var space := owner.get_world_3d().direct_space_state
-	if space == null:
-		return {}
-	var a := from + Vector3(0.0, 0.5, 0.0)
-	var b := to + Vector3(0.0, 0.5, 0.0)
-	var offset := b - a
-	if offset.length() < 0.2:
-		return {}
-	var query := PhysicsRayQueryParameters3D.create(a, a + offset)
-	query.collision_mask = 1
-	query.exclude = [owner.get_rid()]
-	return space.intersect_ray(query)
+func _set_failed() -> void:
+	owner.velocity = Vector3.ZERO
+	_stuck_time = 0.0
+	_no_progress_time = 0.0
+	status = Status.FAILED
 
 
 func _separation() -> Vector3:
