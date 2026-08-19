@@ -2,7 +2,7 @@ extends RefCounted
 
 class_name TeamRules
 
-## M4: pure team / ownership checks. Never mutates unit_state or orders.
+## M4/M5: pure team / ownership checks. Never mutates unit_state or orders.
 ## Intentionally untyped params — avoids parse cycle with BaseUnit class_name.
 
 ## Must match BaseUnit.UnitState.DEAD enum ordinal
@@ -33,6 +33,20 @@ static func can_attack(attacker, target) -> bool:
 	if int(target.unit_state) == UNIT_STATE_DEAD:
 		return false
 	return int(attacker.team_id) != int(target.team_id)
+
+
+static func can_attack_building(attacker, building) -> bool:
+	if attacker == null or not is_instance_valid(attacker):
+		return false
+	if building == null or not is_instance_valid(building):
+		return false
+	if int(attacker.unit_state) == UNIT_STATE_DEAD:
+		return false
+	if building.get("is_destroyed") == true:
+		return false
+	if building.get("health") != null and int(building.health) <= 0:
+		return false
+	return int(attacker.team_id) != int(building.team_id)
 
 
 static func can_harvest(_unit, resource) -> bool:
