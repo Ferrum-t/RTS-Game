@@ -7,7 +7,7 @@ class_name MovementComponent
 ## - NEVER writes owner.unit_state
 ## - Backend: NavigationAgent3D path follow
 ## - ARRIVED = distance to move_target only
-## - First path point often equals start pos — skip near waypoints on XZ
+## - M6.3: ensure_moving_to avoids every-frame path rebuild
 
 enum Status {
 	IDLE,
@@ -26,15 +26,14 @@ var arrival_distance: float = 0.55
 var block_timeout: float = 1.75
 var separation_radius: float = 1.1
 var separation_strength: float = 1.2
-## Horizontal distance under which a path point is treated as "already here"
 var waypoint_skip_distance: float = 0.4
+## Min horizontal shift of desired target before rebuilding path
+var default_retarget_distance: float = 0.85
 
 var _stuck_time: float = 0.0
 var _no_progress_time: float = 0.0
 var _last_pos: Vector3 = Vector3.ZERO
 var _last_bake_id: int = -1
-
-var _diag_frames_left: int = 0
 
 
 func _init(unit: BaseUnit, nav_agent: NavigationAgent3D = null) -> void:
@@ -75,7 +74,35 @@ func set_target(world_pos: Vector3) -> void:
 	status = Status.MOVING
 	if agent:
 		agent.target_position = p
-	_diag_frames_left = 6
+
+
+## M6.3: set path only if not already moving to roughly the same point,
+## or if movement is idle/cancelled/terminal. Prevents every-frame path reset.
+func ensure_moving_to(world_pos: Vector3, retarget_distance: float = -1.0) -> void:
+	var p := world_pos
+	p.y = 0.0
+	var thresh := retarget_distance
+	if thresh < 0.0:
+		thresh = default_retarget_distance
+
+	if status == Status.CANCELLED \
+		or status == Status.IDLE \
+		or status == Status.ARRIVED \
+		or status == Status.BLOCKED \
+		or status == Status.FAILED:
+		set_target(p)
+		return
+
+	var cur := owner.move_target
+	cur.y = 0.0
+	if cur.distance_to(p) > thresh:
+		set_target(p)
+		return
+
+	# Already MOVING toward similar point — keep path, sync logical target lightly
+	owner.move_target = p
+	if status != Status.MOVING:
+		status = Status.MOVING
 
 
 func cancel() -> void:
@@ -109,7 +136,6 @@ func _refresh_path_if_bake_changed() -> void:
 		_stuck_time = 0.0
 
 
-## Pick a path point that is meaningfully ahead on XZ (skip start-point == current pos).
 func _get_follow_point(final_target: Vector3) -> Vector3:
 	if agent == null:
 		return final_target
@@ -119,7 +145,6 @@ func _get_follow_point(final_target: Vector3) -> Vector3:
 	pos.y = 0.0
 
 	if path.is_empty():
-		# No path yet — aim at final; do not invent FAILED
 		return final_target
 
 	var start_i := 0
@@ -133,7 +158,6 @@ func _get_follow_point(final_target: Vector3) -> Vector3:
 		if pos.distance_to(p) > waypoint_skip_distance:
 			return p
 
-	# All remaining path points are at/near us — drive to final target
 	return final_target
 
 
@@ -161,7 +185,6 @@ func update(delta: float) -> void:
 	to_final.y = 0.0
 	var dist_final := to_final.length()
 
-	# M1 ARRIVED — distance to move_target only
 	if dist_final <= arrival_distance:
 		_set_arrived()
 		return
@@ -181,7 +204,6 @@ func update(delta: float) -> void:
 	to_follow.y = 0.0
 
 	if to_follow.length() < 0.001:
-		# Degenerate — still far from final only if path empty; count no-progress
 		var moved0 := owner.global_position.distance_to(_last_pos)
 		_last_pos = owner.global_position
 		if moved0 < 0.02:
@@ -216,20 +238,6 @@ func update(delta: float) -> void:
 	owner.velocity.x = direction.x * owner.move_speed
 	owner.velocity.z = direction.z * owner.move_speed
 	owner.move_and_slide()
-
-	if _diag_frames_left > 0:
-		_diag_frames_left -= 1
-		var finished := agent.is_navigation_finished()
-		var path_n := agent.get_current_navigation_path().size()
-		print(
-			"[NAV] ", owner.name,
-			" pos=", owner.global_position,
-			" next=", follow,
-			" path_n=", path_n,
-			" finished=", finished,
-			" dir=", direction,
-			" vel=", owner.velocity
-		)
 
 
 func _direct_steer(_delta: float, final_target: Vector3) -> void:
