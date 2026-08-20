@@ -33,7 +33,6 @@ enum OrderType
 @export var attack_damage := 10
 @export var attack_range := 2.0
 @export var attack_cooldown := 1.0
-## Must exceed building half-extent (~2) + unit radius so strike is possible while colliding with wall
 @export var building_attack_range := 6.5
 @export var health_bar_height := 1.6
 
@@ -68,6 +67,8 @@ var _siege_debug_t: float = 0.0
 
 const GRAVITY := 30.0
 const HEALTH_BAR_SCENE := preload("res://Scenes/UI/HealthBar3D.tscn")
+## M6.3: only rebuild path when approach point drifts this far
+const APPROACH_RETARGET_DIST := 0.9
 
 
 func _ready() -> void:
@@ -144,7 +145,6 @@ func update_idle(_delta: float) -> void:
 	move_and_slide()
 
 
-## M1: Unit consumes Movement status
 func update_moving(delta: float) -> void:
 	movement.update(delta)
 
@@ -169,7 +169,6 @@ func update_moving(delta: float) -> void:
 			pass
 
 
-## M2: Unit consumes Harvest status
 func update_harvesting(delta: float) -> void:
 	harvest.update(delta)
 
@@ -186,7 +185,6 @@ func update_harvesting(delta: float) -> void:
 			pass
 
 
-## M2 unit combat + M5 building siege (separate paths)
 func update_attacking(delta: float) -> void:
 	if current_order == OrderType.ATTACK_BUILDING or attack_building_target != null:
 		update_attacking_building(delta)
@@ -209,7 +207,6 @@ func update_attacking(delta: float) -> void:
 			pass
 
 
-## M5: siege path — does not use CombatComponent
 func update_attacking_building(delta: float) -> void:
 	var building := attack_building_target
 
@@ -254,8 +251,8 @@ func update_attacking_building(delta: float) -> void:
 		if to_b.length() > 0.1:
 			approach = building.global_position - to_b.normalized() * stand
 		approach.y = 0.0
-		move_target = approach
-		movement.set_target(approach)
+		# M6.3: do NOT set_target every frame — only when needed
+		movement.ensure_moving_to(approach, APPROACH_RETARGET_DIST)
 		movement.update(delta)
 		return
 
@@ -307,8 +304,8 @@ func update_return(delta: float) -> void:
 		if to_tc.length() > 0.1:
 			approach = return_target.global_position - to_tc.normalized() * 0.5
 		approach.y = 0.0
-		move_target = approach
-		movement.set_target(move_target)
+		# M6.3: path once / on significant drift — not every physics frame
+		movement.ensure_moving_to(approach, APPROACH_RETARGET_DIST)
 		movement.update(delta)
 		return
 
@@ -343,10 +340,6 @@ func update_return(delta: float) -> void:
 func update_build(_delta: float) -> void:
 	pass
 
-
-# ---------------------------------------------------------------------------
-# M3/M5: replace_order
-# ---------------------------------------------------------------------------
 
 func replace_order_move(destination: Vector3) -> void:
 	current_order = OrderType.MOVE
@@ -384,10 +377,6 @@ func replace_order_build(building: BaseBuilding) -> void:
 	current_order = OrderType.BUILD
 	set_build_target(building)
 
-
-# ---------------------------------------------------------------------------
-# Execution API
-# ---------------------------------------------------------------------------
 
 func set_move_target(target: Vector3) -> void:
 	move_target = target
