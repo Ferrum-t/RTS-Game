@@ -3,7 +3,8 @@ extends RefCounted
 class_name MovementComponent
 
 ## M6 Movement (M1 status contract)
-## M6.4: persistent monotonic waypoint index — no ping-pong
+## M6.4: monotonic waypoint index
+## DIAG: STUCK_DIAG only — no behavior change
 
 enum Status {
 	IDLE,
@@ -30,9 +31,9 @@ var _no_progress_time: float = 0.0
 var _last_pos: Vector3 = Vector3.ZERO
 var _last_bake_id: int = -1
 
-## M6.4: follow index advances only forward; never jumps back
 var _current_waypoint_index: int = 0
 var _last_path_size: int = 0
+var _stuck_diag_timer: float = 0.0
 
 
 func _init(unit: BaseUnit, nav_agent: NavigationAgent3D = null) -> void:
@@ -138,7 +139,6 @@ func _refresh_path_if_bake_changed() -> void:
 		_stuck_time = 0.0
 
 
-## M6.4: monotonic index. Advance only when within skip distance of current WP.
 func _get_follow_point(final_target: Vector3) -> Vector3:
 	if agent == null:
 		return final_target
@@ -152,16 +152,13 @@ func _get_follow_point(final_target: Vector3) -> Vector3:
 		_last_path_size = 0
 		return final_target
 
-	# New / replaced path → restart index
 	if path.size() != _last_path_size:
 		_current_waypoint_index = 0
 		_last_path_size = path.size()
 
-	# Clamp if path shortened
 	if _current_waypoint_index >= path.size():
 		_current_waypoint_index = maxi(path.size() - 1, 0)
 
-	# Advance past waypoints we have reached (hysteresis via sticky index)
 	while _current_waypoint_index < path.size():
 		var wp: Vector3 = path[_current_waypoint_index]
 		wp.y = 0.0
@@ -176,6 +173,49 @@ func _get_follow_point(final_target: Vector3) -> Vector3:
 	var follow: Vector3 = path[_current_waypoint_index]
 	follow.y = 0.0
 	return follow
+
+
+func _print_stuck_diag(follow: Vector3, direction: Vector3) -> void:
+	var path_n := 0
+	var agent_target := Vector3.ZERO
+	var agent_finished := false
+	var agent_radius := -1.0
+	var agent_height := -1.0
+	if agent:
+		path_n = agent.get_current_navigation_path().size()
+		agent_target = agent.target_position
+		agent_finished = agent.is_navigation_finished()
+		agent_radius = agent.radius
+		agent_height = agent.height
+
+	var to_f := follow - owner.global_position
+	to_f.y = 0.0
+
+	var collider_name := "none"
+	var slide_count := owner.get_slide_collision_count()
+	if slide_count > 0:
+		var col = owner.get_slide_collision(0)
+		if col and col.get_collider():
+			collider_name = str(col.get_collider().name)
+
+	print(
+		"[STUCK_DIAG] unit=", owner.name,
+		" position=", owner.global_position,
+		" target=", owner.move_target,
+		" velocity=", owner.velocity,
+		" path_n=", path_n,
+		" waypoint_index=", _current_waypoint_index,
+		" follow_point=", follow,
+		" distance_to_follow=", snapped(to_f.length(), 0.001),
+		" agent_target=", agent_target,
+		" agent_finished=", agent_finished,
+		" agent_radius=", agent_radius,
+		" agent_height=", agent_height,
+		" dir=", direction,
+		" no_progress=", snapped(_no_progress_time, 0.01),
+		" slide_count=", slide_count,
+		" collider=", collider_name
+	)
 
 
 func update(delta: float) -> void:
@@ -258,6 +298,12 @@ func update(delta: float) -> void:
 	owner.velocity.z = direction.z * owner.move_speed
 	owner.move_and_slide()
 
+	# Throttled STUCK_DIAG (~4/sec while moving)
+	_stuck_diag_timer -= delta
+	if _stuck_diag_timer <= 0.0:
+		_stuck_diag_timer = 0.25
+		_print_stuck_diag(follow, direction)
+
 
 func _direct_steer(_delta: float, final_target: Vector3) -> void:
 	var to_seek := final_target - owner.global_position
@@ -282,6 +328,14 @@ func _set_arrived() -> void:
 
 
 func _set_blocked() -> void:
+	print(
+		"[STUCK_DIAG] BLOCKED unit=", owner.name,
+		" position=", owner.global_position,
+		" target=", owner.move_target,
+		" path_n=", agent.get_current_navigation_path().size() if agent else -1,
+		" waypoint_index=", _current_waypoint_index,
+		" no_progress=", _no_progress_time
+	)
 	owner.velocity = Vector3.ZERO
 	_stuck_time = 0.0
 	_no_progress_time = 0.0
