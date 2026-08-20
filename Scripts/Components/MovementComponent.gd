@@ -2,8 +2,7 @@ extends RefCounted
 
 class_name MovementComponent
 
-## M6 Movement (M1 status contract)
-## DIAG: temporary PATH_DIAG / BLOCKED_DIAG only — no logic change
+## M6 Movement — DIAG only for empty path (path_n=0). No behavior change.
 
 enum Status {
 	IDLE,
@@ -29,7 +28,7 @@ var _stuck_time: float = 0.0
 var _no_progress_time: float = 0.0
 var _last_pos: Vector3 = Vector3.ZERO
 var _last_bake_id: int = -1
-var _path_diag_cooldown: float = 0.0
+var _path_diag_timer: float = 0.0
 
 
 func _init(unit: BaseUnit, nav_agent: NavigationAgent3D = null) -> void:
@@ -71,6 +70,7 @@ func set_target(world_pos: Vector3) -> void:
 	if agent:
 		agent.target_position = p
 	print("[MOVE_SET] ", owner.name, " set_target=", p, " pos=", owner.global_position)
+	_diag_agent_map("set_target")
 
 
 func ensure_moving_to(world_pos: Vector3, retarget_distance: float = -1.0) -> void:
@@ -116,6 +116,59 @@ func get_target() -> Vector3:
 	return owner.move_target
 
 
+func _diag_agent_map(tag: String) -> void:
+	if agent == null or owner == null:
+		print("[AGENT_MAP_DIAG] ", tag, " agent_or_owner_null")
+		return
+
+	var agent_in_tree := agent.is_inside_tree()
+	var owner_in_tree := owner.is_inside_tree()
+	var agent_map := RID()
+	var world_map := RID()
+	var region_map := RID()
+	var region_layers := -1
+	var agent_layers := -1
+	var map_ok := false
+	var region_rid := RID()
+
+	if agent_in_tree:
+		agent_map = agent.get_navigation_map()
+		agent_layers = agent.navigation_layers
+	if owner_in_tree:
+		world_map = owner.get_world_3d().get_navigation_map()
+		map_ok = agent_map == world_map and agent_map.is_valid()
+
+	var nav = owner.get_node_or_null("/root/NavigationBakeService")
+	if nav != null and owner_in_tree:
+		var scene := owner.get_tree().current_scene
+		if scene:
+			var region := scene.find_child("NavigationRegion3D", true, false) as NavigationRegion3D
+			if region:
+				region_rid = region.get_rid()
+				region_layers = region.navigation_layers
+				if region.is_inside_tree():
+					region_map = region.get_navigation_map()
+
+	var path_n := -1
+	if agent_in_tree:
+		path_n = agent.get_current_navigation_path().size()
+
+	print(
+		"[AGENT_MAP_DIAG] ", tag, " ", owner.name,
+		" agent_in_tree=", agent_in_tree,
+		" owner_in_tree=", owner_in_tree,
+		" agent_map_valid=", agent_map.is_valid(),
+		" world_map_valid=", world_map.is_valid(),
+		" maps_equal=", agent_map == world_map,
+		" region_map_valid=", region_map.is_valid(),
+		" agent_vs_region_map=", agent_map == region_map,
+		" agent_layers=", agent_layers,
+		" region_layers=", region_layers,
+		" path_n=", path_n,
+		" bake_id=", nav.bake_id if nav else -1
+	)
+
+
 func _refresh_path_if_bake_changed() -> void:
 	var nav = owner.get_node_or_null("/root/NavigationBakeService")
 	if nav == null or not ("bake_id" in nav):
@@ -138,16 +191,18 @@ func _get_follow_point(final_target: Vector3) -> Vector3:
 	var pos := owner.global_position
 	pos.y = 0.0
 
-	# Temporary PATH_DIAG (throttled in update via caller context — print here on every call would spam;
-	# print each time path is read for building-bypass test — throttle with owner tree time if needed)
-	print(
-		"[PATH_DIAG] ",
-		owner.name,
-		" path_n=", path.size(),
-		" pos=", owner.global_position,
-		" final=", final_target,
-		" next=", path[0] if path.size() > 0 else null
-	)
+	# Throttle PATH_DIAG ~4/sec to keep log readable
+	if _path_diag_timer <= 0.0:
+		_path_diag_timer = 0.25
+		print(
+			"[PATH_DIAG] ",
+			owner.name,
+			" path_n=", path.size(),
+			" pos=", owner.global_position,
+			" final=", final_target,
+			" next=", path[0] if path.size() > 0 else null,
+			" finished=", agent.is_navigation_finished()
+		)
 
 	if path.is_empty():
 		return final_target
@@ -167,6 +222,9 @@ func _get_follow_point(final_target: Vector3) -> Vector3:
 
 
 func update(delta: float) -> void:
+	if _path_diag_timer > 0.0:
+		_path_diag_timer -= delta
+
 	if status == Status.CANCELLED:
 		owner.velocity = Vector3.ZERO
 		return
@@ -266,6 +324,7 @@ func _set_arrived() -> void:
 
 
 func _set_blocked() -> void:
+	_diag_agent_map("blocked")
 	print(
 		"[BLOCKED_DIAG] ",
 		owner.name,
