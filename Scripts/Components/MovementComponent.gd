@@ -4,7 +4,7 @@ class_name MovementComponent
 
 ## M6 Movement (M1 status contract)
 ## M6.4: monotonic waypoint index
-## DIAG: STUCK_DIAG only — no behavior change
+## DIAG: map_iteration + empty-path get_next_path_position probe — no behavior change for movement
 
 enum Status {
 	IDLE,
@@ -34,6 +34,10 @@ var _last_bake_id: int = -1
 var _current_waypoint_index: int = 0
 var _last_path_size: int = 0
 var _stuck_diag_timer: float = 0.0
+
+## DIAG: after empty-path probe call to get_next_path_position, log path size once next frame
+var _diag_probe_pending: bool = false
+var _diag_probe_path_before: int = 0
 
 
 func _init(unit: BaseUnit, nav_agent: NavigationAgent3D = null) -> void:
@@ -73,9 +77,11 @@ func set_target(world_pos: Vector3) -> void:
 	_last_pos = owner.global_position
 	_current_waypoint_index = 0
 	_last_path_size = 0
+	_diag_probe_pending = false
 	status = Status.MOVING
 	if agent:
 		agent.target_position = p
+		_print_map_sync_diag("set_target")
 
 
 func ensure_moving_to(world_pos: Vector3, retarget_distance: float = -1.0) -> void:
@@ -110,6 +116,7 @@ func cancel() -> void:
 	_no_progress_time = 0.0
 	_current_waypoint_index = 0
 	_last_path_size = 0
+	_diag_probe_pending = false
 	status = Status.CANCELLED
 	if agent:
 		agent.target_position = owner.global_position
@@ -121,6 +128,23 @@ func get_status() -> Status:
 
 func get_target() -> Vector3:
 	return owner.move_target
+
+
+func _print_map_sync_diag(where: String) -> void:
+	if agent == null:
+		return
+	var map_rid: RID = agent.get_navigation_map()
+	var iter_id := 0
+	if map_rid.is_valid():
+		iter_id = NavigationServer3D.map_get_iteration_id(map_rid)
+	print(
+		"[MAP_SYNC_DIAG] ", owner.name,
+		" where=", where,
+		" map_iteration_id=", iter_id,
+		" map_rid=", map_rid,
+		" target_position=", agent.target_position,
+		" agent_pos=", owner.global_position
+	)
 
 
 func _refresh_path_if_bake_changed() -> void:
@@ -137,11 +161,23 @@ func _refresh_path_if_bake_changed() -> void:
 		agent.target_position = owner.move_target
 		_no_progress_time = 0.0
 		_stuck_time = 0.0
+		_print_map_sync_diag("after_bake_refresh")
 
 
 func _get_follow_point(final_target: Vector3) -> Vector3:
 	if agent == null:
 		return final_target
+
+	# DIAG: previous frame probed get_next_path_position — report if path appeared
+	if _diag_probe_pending:
+		_diag_probe_pending = false
+		var path_after: int = agent.get_current_navigation_path().size()
+		print(
+			"[PATH_PROBE_NEXT] ", owner.name,
+			" path_n_before=", _diag_probe_path_before,
+			" path_n_after=", path_after,
+			" changed=", path_after != _diag_probe_path_before
+		)
 
 	var path: PackedVector3Array = agent.get_current_navigation_path()
 	var pos := owner.global_position
@@ -150,6 +186,21 @@ func _get_follow_point(final_target: Vector3) -> Vector3:
 	if path.is_empty():
 		_current_waypoint_index = 0
 		_last_path_size = 0
+		# DIAG only: does get_next_path_position trigger path fill?
+		# Call once; movement still uses final_target this frame (no logic change).
+		_diag_probe_path_before = 0
+		var _probe: Vector3 = agent.get_next_path_position()
+		var path_now: int = agent.get_current_navigation_path().size()
+		_print_map_sync_diag("empty_path")
+		print(
+			"[PATH_PROBE] ", owner.name,
+			" after_get_next_path_position path_n=", path_now,
+			" next_pos=", _probe,
+			" reachable=", agent.is_target_reachable(),
+			" finished=", agent.is_navigation_finished(),
+			" final_pos=", agent.get_final_position()
+		)
+		_diag_probe_pending = true
 		return final_target
 
 	if path.size() != _last_path_size:
@@ -177,8 +228,24 @@ func _get_follow_point(final_target: Vector3) -> Vector3:
 
 func _print_stuck_diag(follow: Vector3, direction: Vector3) -> void:
 	var path_n := 0
+	var map_rid_str := "none"
+	var iter_id := -1
+	var reachable := false
+	var finished := false
+	var final_pos := Vector3.ZERO
+	var path_len := -1.0
+	var agent_layers := -1
 	if agent:
 		path_n = agent.get_current_navigation_path().size()
+		var map_rid: RID = agent.get_navigation_map()
+		map_rid_str = str(map_rid)
+		if map_rid.is_valid():
+			iter_id = NavigationServer3D.map_get_iteration_id(map_rid)
+		reachable = agent.is_target_reachable()
+		finished = agent.is_navigation_finished()
+		final_pos = agent.get_final_position()
+		path_len = agent.get_current_navigation_path().size() # path point count as length proxy
+		agent_layers = agent.navigation_layers
 
 	var to_f := follow - owner.global_position
 	to_f.y = 0.0
@@ -190,7 +257,6 @@ func _print_stuck_diag(follow: Vector3, direction: Vector3) -> void:
 		if col and col.get_collider():
 			collider_name = str(col.get_collider().name)
 
-	# TownCenter via existing BuildingManager autoload (not group "buildings")
 	var tc_pos := Vector3.ZERO
 	var tc_name := "none"
 	var expected_west := NAN
@@ -203,7 +269,6 @@ func _print_stuck_diag(follow: Vector3, direction: Vector3) -> void:
 		if tc != null and is_instance_valid(tc):
 			tc_pos = tc.global_position
 			tc_name = str(tc.name)
-			# BoxShape size 4 → half 2; Worker half XZ 0.25 → contact = TC.x - 2.25
 			expected_west = tc_pos.x - 2.25
 			delta_x = owner.global_position.x - expected_west
 			z_min = tc_pos.z - 2.25
@@ -229,7 +294,14 @@ func _print_stuck_diag(follow: Vector3, direction: Vector3) -> void:
 		" follow_point=", follow,
 		" target=", owner.move_target,
 		" dir=", direction,
-		" no_progress=", snapped(_no_progress_time, 0.01)
+		" no_progress=", snapped(_no_progress_time, 0.01),
+		" map_rid=", map_rid_str,
+		" map_iteration_id=", iter_id,
+		" reachable=", reachable,
+		" finished=", finished,
+		" final_pos=", final_pos,
+		" path_points=", path_len,
+		" agent_layers=", agent_layers
 	)
 
 
