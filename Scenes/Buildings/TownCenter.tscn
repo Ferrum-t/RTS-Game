@@ -14,6 +14,7 @@ size = Vector3(4, 2, 4)
 
 [node name="TownCenter" type="StaticBody3D" unique_id=1664174406]
 script = ExtResource("1_88qrv")
+team_id = 1
 
 [node name="MeshInstance3D" type="MeshInstance3D" parent="." unique_id=1229171708]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1, 0)
