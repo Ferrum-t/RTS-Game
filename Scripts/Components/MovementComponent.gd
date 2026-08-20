@@ -2,12 +2,8 @@ extends RefCounted
 
 class_name MovementComponent
 
-## M6 Movement (M1 status contract):
-## - Owns path execution + MovementStatus only
-## - NEVER writes owner.unit_state
-## - Backend: NavigationAgent3D path follow
-## - ARRIVED = distance to move_target only
-## - M6.3: ensure_moving_to avoids every-frame path rebuild
+## M6 Movement (M1 status contract)
+## DIAG: temporary PATH_DIAG / BLOCKED_DIAG only — no logic change
 
 enum Status {
 	IDLE,
@@ -27,13 +23,13 @@ var block_timeout: float = 1.75
 var separation_radius: float = 1.1
 var separation_strength: float = 1.2
 var waypoint_skip_distance: float = 0.4
-## Min horizontal shift of desired target before rebuilding path
 var default_retarget_distance: float = 0.85
 
 var _stuck_time: float = 0.0
 var _no_progress_time: float = 0.0
 var _last_pos: Vector3 = Vector3.ZERO
 var _last_bake_id: int = -1
+var _path_diag_cooldown: float = 0.0
 
 
 func _init(unit: BaseUnit, nav_agent: NavigationAgent3D = null) -> void:
@@ -74,10 +70,9 @@ func set_target(world_pos: Vector3) -> void:
 	status = Status.MOVING
 	if agent:
 		agent.target_position = p
+	print("[MOVE_SET] ", owner.name, " set_target=", p, " pos=", owner.global_position)
 
 
-## M6.3: set path only if not already moving to roughly the same point,
-## or if movement is idle/cancelled/terminal. Prevents every-frame path reset.
 func ensure_moving_to(world_pos: Vector3, retarget_distance: float = -1.0) -> void:
 	var p := world_pos
 	p.y = 0.0
@@ -99,7 +94,6 @@ func ensure_moving_to(world_pos: Vector3, retarget_distance: float = -1.0) -> vo
 		set_target(p)
 		return
 
-	# Already MOVING toward similar point — keep path, sync logical target lightly
 	owner.move_target = p
 	if status != Status.MOVING:
 		status = Status.MOVING
@@ -143,6 +137,17 @@ func _get_follow_point(final_target: Vector3) -> Vector3:
 	var path: PackedVector3Array = agent.get_current_navigation_path()
 	var pos := owner.global_position
 	pos.y = 0.0
+
+	# Temporary PATH_DIAG (throttled in update via caller context — print here on every call would spam;
+	# print each time path is read for building-bypass test — throttle with owner tree time if needed)
+	print(
+		"[PATH_DIAG] ",
+		owner.name,
+		" path_n=", path.size(),
+		" pos=", owner.global_position,
+		" final=", final_target,
+		" next=", path[0] if path.size() > 0 else null
+	)
 
 	if path.is_empty():
 		return final_target
@@ -261,6 +266,16 @@ func _set_arrived() -> void:
 
 
 func _set_blocked() -> void:
+	print(
+		"[BLOCKED_DIAG] ",
+		owner.name,
+		" pos=", owner.global_position,
+		" path_n=", agent.get_current_navigation_path().size() if agent else -1,
+		" finished=", agent.is_navigation_finished() if agent else null,
+		" target=", agent.target_position if agent else null,
+		" move_target=", owner.move_target,
+		" status=", status
+	)
 	owner.velocity = Vector3.ZERO
 	_stuck_time = 0.0
 	_no_progress_time = 0.0
