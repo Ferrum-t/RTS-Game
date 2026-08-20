@@ -3,6 +3,7 @@ extends RefCounted
 class_name CombatComponent
 
 ## M2: reports Status; BaseUnit owns unit_state transitions.
+## M6.3: chase must call ensure_moving_to / set_target — not only move_target + update.
 
 enum Status {
 	IDLE,
@@ -20,6 +21,9 @@ var attack_damage: int = 10
 var attack_range: float = 2.0
 var attack_cooldown: float = 1.0
 var attack_timer: float = 0.0
+
+## Retarget chase path when enemy moved this far from last path target
+var chase_retarget_distance: float = 1.0
 
 
 func _init(unit: BaseUnit) -> void:
@@ -52,9 +56,11 @@ func update(delta: float) -> void:
 
 	if distance > attack_range:
 		status = Status.CHASING
-		owner.move_target = target.global_position
+		var chase_pos := target.global_position
+		chase_pos.y = 0.0
+		# M6.3: must establish/refresh Agent path (handles CANCELLED + moving target)
+		owner.movement.ensure_moving_to(chase_pos, chase_retarget_distance)
 		owner.movement.update(delta)
-		# M1: Movement does not write unit_state; Unit keeps ATTACKING
 		return
 
 	status = Status.IN_RANGE
@@ -77,6 +83,5 @@ func _strike(target: BaseUnit) -> void:
 	print(owner.name, " hits ", target.name, " for ", attack_damage, " dmg (HP ", max(target.health - attack_damage, 0), "/", target.max_health, ")")
 	target.damage(attack_damage)
 
-	# Target may die / free during damage
 	if not is_instance_valid(target) or target.unit_state == BaseUnit.UnitState.DEAD:
 		status = Status.TARGET_DEAD
