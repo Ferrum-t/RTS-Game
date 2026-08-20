@@ -2,7 +2,8 @@ extends RefCounted
 
 class_name MovementComponent
 
-## M6 Movement — DIAG only. No behavior change.
+## M6 Movement (M1 status contract)
+## M6.4: persistent monotonic waypoint index — no ping-pong
 
 enum Status {
 	IDLE,
@@ -28,7 +29,10 @@ var _stuck_time: float = 0.0
 var _no_progress_time: float = 0.0
 var _last_pos: Vector3 = Vector3.ZERO
 var _last_bake_id: int = -1
-var _path_diag_timer: float = 0.0
+
+## M6.4: follow index advances only forward; never jumps back
+var _current_waypoint_index: int = 0
+var _last_path_size: int = 0
 
 
 func _init(unit: BaseUnit, nav_agent: NavigationAgent3D = null) -> void:
@@ -66,11 +70,11 @@ func set_target(world_pos: Vector3) -> void:
 	_stuck_time = 0.0
 	_no_progress_time = 0.0
 	_last_pos = owner.global_position
+	_current_waypoint_index = 0
+	_last_path_size = 0
 	status = Status.MOVING
 	if agent:
 		agent.target_position = p
-	print("[MOVE_SET] ", owner.name, " set_target=", p, " pos=", owner.global_position)
-	_diag_agent_map("set_target")
 
 
 func ensure_moving_to(world_pos: Vector3, retarget_distance: float = -1.0) -> void:
@@ -103,6 +107,8 @@ func cancel() -> void:
 	owner.velocity = Vector3.ZERO
 	_stuck_time = 0.0
 	_no_progress_time = 0.0
+	_current_waypoint_index = 0
+	_last_path_size = 0
 	status = Status.CANCELLED
 	if agent:
 		agent.target_position = owner.global_position
@@ -116,55 +122,6 @@ func get_target() -> Vector3:
 	return owner.move_target
 
 
-func _diag_agent_map(tag: String) -> void:
-	if agent == null or owner == null:
-		print("[AGENT_MAP_DIAG] ", tag, " agent_or_owner_null")
-		return
-
-	var agent_in_tree := agent.is_inside_tree()
-	var owner_in_tree := owner.is_inside_tree()
-	var agent_map := RID()
-	var world_map := RID()
-	var region_map := RID()
-	var region_layers := -1
-	var agent_layers := -1
-
-	if agent_in_tree:
-		agent_map = agent.get_navigation_map()
-		agent_layers = agent.navigation_layers
-	if owner_in_tree:
-		world_map = owner.get_world_3d().get_navigation_map()
-
-	var nav = owner.get_node_or_null("/root/NavigationBakeService")
-	if nav != null and owner_in_tree:
-		var scene := owner.get_tree().current_scene
-		if scene:
-			var region := scene.find_child("NavigationRegion3D", true, false) as NavigationRegion3D
-			if region:
-				region_layers = region.navigation_layers
-				if region.is_inside_tree():
-					region_map = region.get_navigation_map()
-
-	var path_n := -1
-	if agent_in_tree:
-		path_n = agent.get_current_navigation_path().size()
-
-	print(
-		"[AGENT_MAP_DIAG] ", tag, " ", owner.name,
-		" agent_in_tree=", agent_in_tree,
-		" owner_in_tree=", owner_in_tree,
-		" agent_map_valid=", agent_map.is_valid(),
-		" world_map_valid=", world_map.is_valid(),
-		" maps_equal=", agent_map == world_map,
-		" region_map_valid=", region_map.is_valid(),
-		" agent_vs_region_map=", agent_map == region_map,
-		" agent_layers=", agent_layers,
-		" region_layers=", region_layers,
-		" path_n=", path_n,
-		" bake_id=", nav.bake_id if nav else -1
-	)
-
-
 func _refresh_path_if_bake_changed() -> void:
 	var nav = owner.get_node_or_null("/root/NavigationBakeService")
 	if nav == null or not ("bake_id" in nav):
@@ -174,11 +131,14 @@ func _refresh_path_if_bake_changed() -> void:
 		return
 	_last_bake_id = bid
 	if status == Status.MOVING and agent:
+		_current_waypoint_index = 0
+		_last_path_size = 0
 		agent.target_position = owner.move_target
 		_no_progress_time = 0.0
 		_stuck_time = 0.0
 
 
+## M6.4: monotonic index. Advance only when within skip distance of current WP.
 func _get_follow_point(final_target: Vector3) -> Vector3:
 	if agent == null:
 		return final_target
@@ -187,39 +147,38 @@ func _get_follow_point(final_target: Vector3) -> Vector3:
 	var pos := owner.global_position
 	pos.y = 0.0
 
-	if _path_diag_timer <= 0.0:
-		_path_diag_timer = 0.25
-		print(
-			"[PATH_DIAG] ",
-			owner.name,
-			" path_n=", path.size(),
-			" pos=", owner.global_position,
-			" final=", final_target,
-			" next=", path[0] if path.size() > 0 else null,
-			" finished=", agent.is_navigation_finished()
-		)
-
 	if path.is_empty():
+		_current_waypoint_index = 0
+		_last_path_size = 0
 		return final_target
 
-	var start_i := 0
-	if agent.has_method("get_current_navigation_path_index"):
-		start_i = int(agent.get_current_navigation_path_index())
-		start_i = clampi(start_i, 0, path.size() - 1)
+	# New / replaced path → restart index
+	if path.size() != _last_path_size:
+		_current_waypoint_index = 0
+		_last_path_size = path.size()
 
-	for i in range(start_i, path.size()):
-		var p: Vector3 = path[i]
-		p.y = 0.0
-		if pos.distance_to(p) > waypoint_skip_distance:
-			return p
+	# Clamp if path shortened
+	if _current_waypoint_index >= path.size():
+		_current_waypoint_index = maxi(path.size() - 1, 0)
 
-	return final_target
+	# Advance past waypoints we have reached (hysteresis via sticky index)
+	while _current_waypoint_index < path.size():
+		var wp: Vector3 = path[_current_waypoint_index]
+		wp.y = 0.0
+		if pos.distance_to(wp) <= waypoint_skip_distance:
+			_current_waypoint_index += 1
+			continue
+		break
+
+	if _current_waypoint_index >= path.size():
+		return final_target
+
+	var follow: Vector3 = path[_current_waypoint_index]
+	follow.y = 0.0
+	return follow
 
 
 func update(delta: float) -> void:
-	if _path_diag_timer > 0.0:
-		_path_diag_timer -= delta
-
 	if status == Status.CANCELLED:
 		owner.velocity = Vector3.ZERO
 		return
@@ -231,6 +190,8 @@ func update(delta: float) -> void:
 			status = Status.MOVING
 			_stuck_time = 0.0
 			_no_progress_time = 0.0
+			_current_waypoint_index = 0
+			_last_path_size = 0
 			if agent:
 				agent.target_position = owner.move_target
 		else:
@@ -297,18 +258,6 @@ func update(delta: float) -> void:
 	owner.velocity.z = direction.z * owner.move_speed
 	owner.move_and_slide()
 
-	var collider_name := "none"
-	if owner.get_slide_collision_count() > 0:
-		var col = owner.get_slide_collision(0)
-		if col and col.get_collider():
-			collider_name = str(col.get_collider().name)
-	print("[EXEC_DIAG] ", owner.name,
-		" dir=", direction,
-		" vel=", owner.velocity,
-		" real_pos=", owner.global_position,
-		" slide_count=", owner.get_slide_collision_count(),
-		" collider=", collider_name)
-
 
 func _direct_steer(_delta: float, final_target: Vector3) -> void:
 	var to_seek := final_target - owner.global_position
@@ -327,21 +276,12 @@ func _set_arrived() -> void:
 	owner.velocity = Vector3.ZERO
 	_stuck_time = 0.0
 	_no_progress_time = 0.0
+	_current_waypoint_index = 0
+	_last_path_size = 0
 	status = Status.ARRIVED
 
 
 func _set_blocked() -> void:
-	_diag_agent_map("blocked")
-	print(
-		"[BLOCKED_DIAG] ",
-		owner.name,
-		" pos=", owner.global_position,
-		" path_n=", agent.get_current_navigation_path().size() if agent else -1,
-		" finished=", agent.is_navigation_finished() if agent else null,
-		" target=", agent.target_position if agent else null,
-		" move_target=", owner.move_target,
-		" status=", status
-	)
 	owner.velocity = Vector3.ZERO
 	_stuck_time = 0.0
 	_no_progress_time = 0.0
