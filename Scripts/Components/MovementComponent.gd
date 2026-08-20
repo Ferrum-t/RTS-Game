@@ -177,44 +177,59 @@ func _get_follow_point(final_target: Vector3) -> Vector3:
 
 func _print_stuck_diag(follow: Vector3, direction: Vector3) -> void:
 	var path_n := 0
-	var agent_target := Vector3.ZERO
-	var agent_finished := false
-	var agent_radius := -1.0
-	var agent_height := -1.0
 	if agent:
 		path_n = agent.get_current_navigation_path().size()
-		agent_target = agent.target_position
-		agent_finished = agent.is_navigation_finished()
-		agent_radius = agent.radius
-		agent_height = agent.height
 
 	var to_f := follow - owner.global_position
 	to_f.y = 0.0
 
-	var collider_name := "none"
 	var slide_count := owner.get_slide_collision_count()
+	var collider_name := "none"
 	if slide_count > 0:
 		var col = owner.get_slide_collision(0)
 		if col and col.get_collider():
 			collider_name = str(col.get_collider().name)
 
+	# TownCenter via existing BuildingManager autoload (not group "buildings")
+	var tc_pos := Vector3.ZERO
+	var tc_name := "none"
+	var expected_west := NAN
+	var delta_x := NAN
+	var z_min := NAN
+	var z_max := NAN
+	var bm = owner.get_node_or_null("/root/BuildingManager")
+	if bm != null and bm.has_method("get_nearest_town_center"):
+		var tc = bm.get_nearest_town_center(owner.global_position)
+		if tc != null and is_instance_valid(tc):
+			tc_pos = tc.global_position
+			tc_name = str(tc.name)
+			# BoxShape size 4 → half 2; Worker half XZ 0.25 → contact = TC.x - 2.25
+			expected_west = tc_pos.x - 2.25
+			delta_x = owner.global_position.x - expected_west
+			z_min = tc_pos.z - 2.25
+			z_max = tc_pos.z + 2.25
+
 	print(
 		"[STUCK_DIAG] unit=", owner.name,
 		" position=", owner.global_position,
-		" target=", owner.move_target,
 		" velocity=", owner.velocity,
+		" is_on_wall=", owner.is_on_wall(),
+		" is_on_floor=", owner.is_on_floor(),
+		" slide_count=", slide_count,
+		" collider=", collider_name,
+		" tc=", tc_name,
+		" tc_pos=", tc_pos,
+		" expected_west_contact_x=", expected_west,
+		" delta_x=", delta_x,
+		" z=", owner.global_position.z,
+		" expected_z_min=", z_min,
+		" expected_z_max=", z_max,
 		" path_n=", path_n,
 		" waypoint_index=", _current_waypoint_index,
 		" follow_point=", follow,
-		" distance_to_follow=", snapped(to_f.length(), 0.001),
-		" agent_target=", agent_target,
-		" agent_finished=", agent_finished,
-		" agent_radius=", agent_radius,
-		" agent_height=", agent_height,
+		" target=", owner.move_target,
 		" dir=", direction,
-		" no_progress=", snapped(_no_progress_time, 0.01),
-		" slide_count=", slide_count,
-		" collider=", collider_name
+		" no_progress=", snapped(_no_progress_time, 0.01)
 	)
 
 
@@ -298,7 +313,6 @@ func update(delta: float) -> void:
 	owner.velocity.z = direction.z * owner.move_speed
 	owner.move_and_slide()
 
-	# Throttled STUCK_DIAG (~4/sec while moving)
 	_stuck_diag_timer -= delta
 	if _stuck_diag_timer <= 0.0:
 		_stuck_diag_timer = 0.25
