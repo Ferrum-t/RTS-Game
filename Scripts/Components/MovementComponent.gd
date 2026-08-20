@@ -2,7 +2,7 @@ extends RefCounted
 
 class_name MovementComponent
 
-## M6 Movement — DIAG only for empty path (path_n=0). No behavior change.
+## M6 Movement — DIAG only. No behavior change.
 
 enum Status {
 	IDLE,
@@ -128,15 +128,12 @@ func _diag_agent_map(tag: String) -> void:
 	var region_map := RID()
 	var region_layers := -1
 	var agent_layers := -1
-	var map_ok := false
-	var region_rid := RID()
 
 	if agent_in_tree:
 		agent_map = agent.get_navigation_map()
 		agent_layers = agent.navigation_layers
 	if owner_in_tree:
 		world_map = owner.get_world_3d().get_navigation_map()
-		map_ok = agent_map == world_map and agent_map.is_valid()
 
 	var nav = owner.get_node_or_null("/root/NavigationBakeService")
 	if nav != null and owner_in_tree:
@@ -144,7 +141,6 @@ func _diag_agent_map(tag: String) -> void:
 		if scene:
 			var region := scene.find_child("NavigationRegion3D", true, false) as NavigationRegion3D
 			if region:
-				region_rid = region.get_rid()
 				region_layers = region.navigation_layers
 				if region.is_inside_tree():
 					region_map = region.get_navigation_map()
@@ -191,7 +187,6 @@ func _get_follow_point(final_target: Vector3) -> Vector3:
 	var pos := owner.global_position
 	pos.y = 0.0
 
-	# Throttle PATH_DIAG ~4/sec to keep log readable
 	if _path_diag_timer <= 0.0:
 		_path_diag_timer = 0.25
 		print(
@@ -301,6 +296,18 @@ func update(delta: float) -> void:
 	owner.velocity.x = direction.x * owner.move_speed
 	owner.velocity.z = direction.z * owner.move_speed
 	owner.move_and_slide()
+
+	var collider_name := "none"
+	if owner.get_slide_collision_count() > 0:
+		var col = owner.get_slide_collision(0)
+		if col and col.get_collider():
+			collider_name = str(col.get_collider().name)
+	print("[EXEC_DIAG] ", owner.name,
+		" dir=", direction,
+		" vel=", owner.velocity,
+		" real_pos=", owner.global_position,
+		" slide_count=", owner.get_slide_collision_count(),
+		" collider=", collider_name)
 
 
 func _direct_steer(_delta: float, final_target: Vector3) -> void:
