@@ -2,7 +2,9 @@ extends RefCounted
 
 class_name HarvestComponent
 
-## M2: reports Status; BaseUnit owns unit_state transitions.
+## M2 + harvest-approach fix: reports Status only.
+## Does NOT drive velocity / move_and_slide / NavigationAgent.
+## BaseUnit + MovementComponent handle HOW to reach the resource.
 
 enum Status {
 	IDLE,
@@ -22,6 +24,9 @@ var harvest_interval: float = 0.7
 var _timer: float = 0.0
 var _stuck_near: float = 0.0
 
+## Last computed stand position (for BaseUnit → Movement)
+var approach_pos: Vector3 = Vector3.ZERO
+
 
 func _init(unit: BaseUnit) -> void:
 	owner = unit
@@ -30,6 +35,7 @@ func _init(unit: BaseUnit) -> void:
 func reset() -> void:
 	_timer = 0.0
 	_stuck_near = 0.0
+	approach_pos = Vector3.ZERO
 	status = Status.IDLE
 
 
@@ -37,23 +43,37 @@ func get_status() -> Status:
 	return status
 
 
+## Stand point near resource (same formula as before: ~2.125 from center).
+func get_approach_position(resource: BaseResource) -> Vector3:
+	if resource == null or not is_instance_valid(resource):
+		return owner.global_position
+	var to_res: Vector3 = resource.global_position - owner.global_position
+	to_res.y = 0.0
+	var dist := to_res.length()
+	var stand: Vector3 = resource.global_position
+	if dist > 0.01:
+		stand = resource.global_position - to_res.normalized() * (approach_distance * 0.85)
+	stand.y = 0.0
+	return stand
+
+
 func update(delta: float) -> void:
 	if owner.inventory != null and owner.inventory.is_full():
 		print(owner.name, " inventory full, returning to Town Center")
-		owner.velocity = Vector3.ZERO
 		_stuck_near = 0.0
 		status = Status.BAG_FULL
 		return
 
 	var resource: BaseResource = owner.harvest_target
 	if resource == null or not is_instance_valid(resource):
-		owner.velocity = Vector3.ZERO
 		status = Status.RESOURCE_GONE
 		return
 
 	var to_res: Vector3 = resource.global_position - owner.global_position
 	to_res.y = 0.0
 	var dist := to_res.length()
+
+	approach_pos = get_approach_position(resource)
 
 	var in_range := dist <= approach_distance
 	if not in_range and dist <= approach_distance + 1.0:
@@ -64,24 +84,16 @@ func update(delta: float) -> void:
 		_stuck_near = 0.0
 
 	if not in_range:
+		# BaseUnit drives Movement toward approach_pos
+		if status != Status.MOVING_TO_RESOURCE:
+			print("[HARVEST] ", owner.name, " approach target=", resource.name, " stand_pos=", approach_pos)
 		status = Status.MOVING_TO_RESOURCE
-		var stand_pos: Vector3 = resource.global_position
-		if dist > 0.01:
-			stand_pos = resource.global_position - to_res.normalized() * (approach_distance * 0.85)
-		stand_pos.y = 0.0
-		owner.move_target = stand_pos
-		var step := stand_pos - owner.global_position
-		step.y = 0.0
-		if step.length() > 0.05:
-			owner.velocity = step.normalized() * owner.move_speed
-			owner.move_and_slide()
-		else:
-			owner.velocity = Vector3.ZERO
 		return
 
-	# Gather
+	# Gather — no locomotion here
+	if status != Status.GATHERING:
+		print("[HARVEST] ", owner.name, " GATHERING at ", resource.name)
 	status = Status.GATHERING
-	owner.velocity = Vector3.ZERO
 	_timer -= delta
 	if _timer > 0.0:
 		return
