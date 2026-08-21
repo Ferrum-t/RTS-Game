@@ -51,12 +51,27 @@ func confirm_build() -> void:
 		return
 
 	var building = data.building_scene.instantiate()
+
+	# M6.8 A: set transform BEFORE add_child so BaseBuilding._ready / nav register
+	# see the real placement position (World root is identity → position == global).
+	building.position = position
 	get_tree().current_scene.add_child(building)
-	building.global_position = position
+
+	# M6.8 B: defensive footprint sync after node is in tree (live global_position).
+	var nav := get_node_or_null("/root/NavigationBakeService")
+	if nav != null and nav.has_method("update_building_position"):
+		nav.update_building_position(building)
+	elif nav != null and nav.has_method("register_building"):
+		# Fallback if building was not registered in _ready for any reason
+		var he := Vector3.ZERO
+		if "nav_half_extents" in building:
+			he = building.nav_half_extents
+		nav.register_building(building, he)
 
 	current_ghost.queue_free()
 	current_ghost = null
 	current_building_data = null
 
 	print("Building placed: ", data.building_name,
-		" (cost W:", data.wood, " S:", data.stone, ")")
+		" (cost W:", data.wood, " S:", data.stone, ")",
+		" at ", building.global_position)
