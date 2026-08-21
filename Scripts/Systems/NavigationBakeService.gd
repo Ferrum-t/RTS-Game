@@ -5,7 +5,8 @@ extends Node
 
 const DEBOUNCE_SEC := 0.08
 const MAP_HALF := 50.0
-const AGENT_RADIUS := 0.55
+## DIAG TEMP: was 0.55 — doubled to 1.1 to measure actual clearance change
+const AGENT_RADIUS := 1.1
 const AGENT_HEIGHT := 1.5
 const DEFAULT_BUILDING_HALF := 2.2
 const FOOTPRINT_MARGIN := 0.7
@@ -135,7 +136,7 @@ func _on_bake_done(nav_mesh: NavigationMesh, gen: int) -> void:
 	if _region != null and is_instance_valid(_region):
 		_region.navigation_mesh = nav_mesh
 		bake_id += 1
-		print("NavigationBakeService: mesh applied, footprints=", _footprints.size(), " bake_id=", bake_id)
+		print("NavigationBakeService: mesh applied, footprints=", _footprints.size(), " bake_id=", bake_id, " agent_radius=", AGENT_RADIUS)
 
 	if _pending_after_bake:
 		_pending_after_bake = false
