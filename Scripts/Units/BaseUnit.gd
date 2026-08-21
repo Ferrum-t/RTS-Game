@@ -174,13 +174,28 @@ func update_harvesting(delta: float) -> void:
 
 	match harvest.status:
 		HarvestComponent.Status.BAG_FULL:
+			if movement:
+				movement.cancel()
 			return_target = null
 			unit_state = UnitState.RETURNING
 		HarvestComponent.Status.RESOURCE_GONE:
+			if movement:
+				movement.cancel()
 			harvest_target = null
 			current_order = OrderType.NONE
 			velocity = Vector3.ZERO
 			unit_state = UnitState.IDLE
+		HarvestComponent.Status.MOVING_TO_RESOURCE:
+			# HOW: same Movement/NavAgent pipeline as MOVE / RETURN
+			var stand: Vector3 = harvest.approach_pos
+			if stand == Vector3.ZERO and harvest_target != null:
+				stand = harvest.get_approach_position(harvest_target)
+			movement.ensure_moving_to(stand, APPROACH_RETARGET_DIST)
+			movement.update(delta)
+		HarvestComponent.Status.GATHERING:
+			if movement and movement.status == MovementComponent.Status.MOVING:
+				movement.cancel()
+			velocity = Vector3.ZERO
 		_:
 			pass
 
@@ -251,7 +266,6 @@ func update_attacking_building(delta: float) -> void:
 		if to_b.length() > 0.1:
 			approach = building.global_position - to_b.normalized() * stand
 		approach.y = 0.0
-		# M6.3: do NOT set_target every frame — only when needed
 		movement.ensure_moving_to(approach, APPROACH_RETARGET_DIST)
 		movement.update(delta)
 		return
@@ -304,7 +318,6 @@ func update_return(delta: float) -> void:
 		if to_tc.length() > 0.1:
 			approach = return_target.global_position - to_tc.normalized() * 0.5
 		approach.y = 0.0
-		# M6.3: path once / on significant drift — not every physics frame
 		movement.ensure_moving_to(approach, APPROACH_RETARGET_DIST)
 		movement.update(delta)
 		return
@@ -331,6 +344,8 @@ func update_return(delta: float) -> void:
 	if harvest_target != null and is_instance_valid(harvest_target):
 		if harvest:
 			harvest.reset()
+		if movement:
+			movement.cancel()
 		unit_state = UnitState.HARVESTING
 	else:
 		current_order = OrderType.NONE
@@ -407,6 +422,8 @@ func set_harvest_target(resource: BaseResource) -> void:
 		combat.reset()
 	if harvest:
 		harvest.reset()
+	if movement:
+		movement.cancel()
 
 
 func set_build_target(building: BaseBuilding) -> void:
