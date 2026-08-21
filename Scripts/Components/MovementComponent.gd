@@ -5,7 +5,8 @@ class_name MovementComponent
 ## M6 Movement (M1 status contract)
 ## M6.4: monotonic waypoint index
 ## M6.5: get_next_path_position() wakes NavigationAgent path query before reading path
-## DIAG: NAV_DIAG / OBSTACLE_DIAG only — no movement logic change
+## M6.6: path exhausted → last path point / ARRIVED (never raw final_target)
+## DIAG: NAV_DIAG includes moved for Observation-2 retest
 
 enum Status {
 	IDLE,
@@ -36,6 +37,7 @@ var _current_waypoint_index: int = 0
 var _last_path_size: int = 0
 var _nav_diag_timer: float = 0.0
 var _obstacle_diag_done: bool = false
+var _last_moved: float = 0.0
 
 
 func _init(unit: BaseUnit, nav_agent: NavigationAgent3D = null) -> void:
@@ -73,6 +75,7 @@ func set_target(world_pos: Vector3) -> void:
 	_stuck_time = 0.0
 	_no_progress_time = 0.0
 	_last_pos = owner.global_position
+	_last_moved = 0.0
 	_current_waypoint_index = 0
 	_last_path_size = 0
 	_obstacle_diag_done = false
@@ -174,12 +177,24 @@ func _get_follow_point(final_target: Vector3) -> Vector3:
 			continue
 		break
 
+	# M6.6: path exhausted → last path point, NEVER raw final_target
 	if _current_waypoint_index >= path.size():
-		return final_target
+		var last: Vector3 = path[path.size() - 1]
+		last.y = 0.0
+		return last
 
 	var follow: Vector3 = path[_current_waypoint_index]
 	follow.y = 0.0
 	return follow
+
+
+func _path_exhausted() -> bool:
+	if agent == null:
+		return false
+	var path: PackedVector3Array = agent.get_current_navigation_path()
+	if path.is_empty():
+		return false
+	return _current_waypoint_index >= path.size()
 
 
 func _print_nav_diag(follow: Vector3, path_n: int) -> void:
@@ -204,6 +219,8 @@ func _print_nav_diag(follow: Vector3, path_n: int) -> void:
 		" waypoint_index=", _current_waypoint_index,
 		" follow_point=", follow,
 		" distance_to_follow=", to_f.length(),
+		" moved=", _last_moved,
+		" path_exhausted=", _path_exhausted(),
 		" agent_finished=", finished,
 		" agent_target=", agent_tgt,
 		" is_on_wall=", owner.is_on_wall(),
@@ -220,14 +237,12 @@ func _print_obstacle_diag_once() -> void:
 	_obstacle_diag_done = true
 	var obstacle: Node3D = null
 	var half := Vector3.ZERO
-	# Prefer nearest TownCenter via BuildingManager
 	var bm = owner.get_node_or_null("/root/BuildingManager")
 	if bm != null and bm.has_method("get_nearest_town_center"):
 		var tc = bm.get_nearest_town_center(owner.global_position)
 		if tc != null and is_instance_valid(tc):
 			obstacle = tc
 	if obstacle == null and owner.get_tree():
-		# Fallback: nearest StaticBody3D under current scene
 		var best_d := INF
 		var root := owner.get_tree().current_scene
 		if root:
@@ -243,14 +258,13 @@ func _print_obstacle_diag_once() -> void:
 	if obstacle == null:
 		print("[OBSTACLE_DIAG] target_obstacle=none")
 		return
-	# Read BoxShape3D half-extents if present
 	for c in obstacle.get_children():
 		if c is CollisionShape3D and c.shape is BoxShape3D:
 			var box: BoxShape3D = c.shape
 			half = box.size * 0.5
 			break
 	if half == Vector3.ZERO:
-		half = Vector3(2.0, 1.0, 2.0) # TownCenter default from scene if shape not found
+		half = Vector3(2.0, 1.0, 2.0)
 	print(
 		"[OBSTACLE_DIAG] target_obstacle=", obstacle.name,
 		" obstacle_pos=", obstacle.global_position,
@@ -306,11 +320,20 @@ func update(delta: float) -> void:
 		if path_n > 0 and not _obstacle_diag_done:
 			_print_obstacle_diag_once()
 
+	# M6.6: reached last path point after path exhausted → ARRIVED (nav edge)
+	if path_n > 0 and _current_waypoint_index >= path_n:
+		var to_edge := follow - owner.global_position
+		to_edge.y = 0.0
+		if to_edge.length() <= arrival_distance:
+			_set_arrived()
+			return
+
 	var to_follow := follow - owner.global_position
 	to_follow.y = 0.0
 
 	if to_follow.length() < 0.001:
 		var moved0 := owner.global_position.distance_to(_last_pos)
+		_last_moved = moved0
 		_last_pos = owner.global_position
 		if moved0 < 0.02:
 			_no_progress_time += delta
@@ -325,6 +348,7 @@ func update(delta: float) -> void:
 	var direction := to_follow.normalized()
 
 	var moved := owner.global_position.distance_to(_last_pos)
+	_last_moved = moved
 	_last_pos = owner.global_position
 	if moved < 0.02:
 		_stuck_time += delta
@@ -347,7 +371,6 @@ func update(delta: float) -> void:
 	owner.velocity.z = direction.z * owner.move_speed
 	owner.move_and_slide()
 
-	# ~4 Hz NAV_DIAG while moving
 	_nav_diag_timer -= delta
 	if _nav_diag_timer <= 0.0:
 		_nav_diag_timer = 0.25
