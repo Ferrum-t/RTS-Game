@@ -14,17 +14,6 @@ enum UnitState
 	DEAD
 }
 
-## M3/M5: player/AI intent — not unit_state, not component status
-enum OrderType
-{
-	NONE,
-	MOVE,
-	HARVEST,
-	ATTACK,
-	ATTACK_BUILDING,
-	BUILD
-}
-
 
 @export var team_id: int = 0
 @export var move_speed := 4.0
@@ -41,7 +30,8 @@ var health := 100
 var selected := false
 
 var unit_state : UnitState = UnitState.IDLE
-var current_order: OrderType = OrderType.NONE
+## M8.1: intent as Order object (execution still uses target fields below)
+var current_order: Order = Order.none()
 
 var move_target : Vector3
 
@@ -151,19 +141,19 @@ func update_moving(delta: float) -> void:
 	match movement.status:
 		MovementComponent.Status.ARRIVED:
 			last_move_end_reason = "ARRIVED"
-			current_order = OrderType.NONE
+			current_order = Order.none()
 			unit_state = UnitState.IDLE
 		MovementComponent.Status.BLOCKED:
 			last_move_end_reason = "BLOCKED"
-			current_order = OrderType.NONE
+			current_order = Order.none()
 			unit_state = UnitState.IDLE
 		MovementComponent.Status.FAILED:
 			last_move_end_reason = "FAILED"
-			current_order = OrderType.NONE
+			current_order = Order.none()
 			unit_state = UnitState.IDLE
 		MovementComponent.Status.CANCELLED:
 			last_move_end_reason = "CANCELLED"
-			current_order = OrderType.NONE
+			current_order = Order.none()
 			unit_state = UnitState.IDLE
 		_:
 			pass
@@ -182,7 +172,7 @@ func update_harvesting(delta: float) -> void:
 			if movement:
 				movement.cancel()
 			harvest_target = null
-			current_order = OrderType.NONE
+			current_order = Order.none()
 			velocity = Vector3.ZERO
 			unit_state = UnitState.IDLE
 		HarvestComponent.Status.MOVING_TO_RESOURCE:
@@ -201,7 +191,7 @@ func update_harvesting(delta: float) -> void:
 
 
 func update_attacking(delta: float) -> void:
-	if current_order == OrderType.ATTACK_BUILDING or attack_building_target != null:
+	if current_order.type == Order.Type.ATTACK_BUILDING or attack_building_target != null:
 		update_attacking_building(delta)
 		return
 
@@ -210,12 +200,12 @@ func update_attacking(delta: float) -> void:
 	match combat.status:
 		CombatComponent.Status.TARGET_LOST:
 			attack_target = null
-			current_order = OrderType.NONE
+			current_order = Order.none()
 			velocity = Vector3.ZERO
 			unit_state = UnitState.IDLE
 		CombatComponent.Status.TARGET_DEAD:
 			attack_target = null
-			current_order = OrderType.NONE
+			current_order = Order.none()
 			velocity = Vector3.ZERO
 			unit_state = UnitState.IDLE
 		_:
@@ -249,7 +239,7 @@ func update_attacking_building(delta: float) -> void:
 		_siege_debug_t = 0.5
 		print(
 			"[SIEGE] ", name,
-			" order=", current_order,
+			" order=", current_order.type_name(),
 			" state=", unit_state,
 			" tgt=", building.name,
 			" tgt_team=", building.team_id,
@@ -293,7 +283,7 @@ func _clear_building_attack() -> void:
 	_siege_stuck_time = 0.0
 	_siege_debug_t = 0.0
 	velocity = Vector3.ZERO
-	current_order = OrderType.NONE
+	current_order = Order.none()
 	unit_state = UnitState.IDLE
 
 
@@ -348,7 +338,7 @@ func update_return(delta: float) -> void:
 			movement.cancel()
 		unit_state = UnitState.HARVESTING
 	else:
-		current_order = OrderType.NONE
+		current_order = Order.none()
 		unit_state = UnitState.IDLE
 
 
@@ -356,41 +346,69 @@ func update_build(_delta: float) -> void:
 	pass
 
 
+## M8.1 — single dispatch entry for player/AI intent.
+## Does not remove target fields; routes to existing set_*_target.
+func replace_order(order: Order) -> void:
+	if order == null:
+		order = Order.none()
+
+	match order.type:
+		Order.Type.NONE:
+			current_order = Order.none()
+			# Do not force IDLE here — callers use set_* / completion paths.
+		Order.Type.MOVE:
+			var dest: Vector3 = order.target as Vector3
+			current_order = order
+			set_move_target(dest)
+		Order.Type.HARVEST:
+			var resource: BaseResource = order.target as BaseResource
+			if resource == null or not is_instance_valid(resource):
+				return
+			if not TeamRules.can_harvest(self, resource):
+				return
+			current_order = order
+			set_harvest_target(resource)
+		Order.Type.ATTACK:
+			var enemy: BaseUnit = order.target as BaseUnit
+			if not TeamRules.can_attack(self, enemy):
+				return
+			current_order = order
+			set_attack_target(enemy)
+		Order.Type.ATTACK_BUILDING:
+			var building: BaseBuilding = order.target as BaseBuilding
+			var ok := TeamRules.can_attack_building(self, building)
+			print("[SIEGE] replace_order ATTACK_BUILDING can=", ok, " building=", building)
+			if not ok:
+				return
+			current_order = order
+			set_attack_building_target(building)
+		Order.Type.BUILD:
+			var b: BaseBuilding = order.target as BaseBuilding
+			if b == null or not is_instance_valid(b):
+				return
+			current_order = order
+			set_build_target(b)
+
+
+## Compatibility wrappers — create Order and dispatch via replace_order.
 func replace_order_move(destination: Vector3) -> void:
-	current_order = OrderType.MOVE
-	set_move_target(destination)
+	replace_order(Order.new(Order.Type.MOVE, destination))
 
 
 func replace_order_harvest(resource: BaseResource) -> void:
-	if resource == null or not is_instance_valid(resource):
-		return
-	if not TeamRules.can_harvest(self, resource):
-		return
-	current_order = OrderType.HARVEST
-	set_harvest_target(resource)
+	replace_order(Order.new(Order.Type.HARVEST, resource))
 
 
 func replace_order_attack(enemy: BaseUnit) -> void:
-	if not TeamRules.can_attack(self, enemy):
-		return
-	current_order = OrderType.ATTACK
-	set_attack_target(enemy)
+	replace_order(Order.new(Order.Type.ATTACK, enemy))
 
 
 func replace_order_attack_building(building: BaseBuilding) -> void:
-	var ok := TeamRules.can_attack_building(self, building)
-	print("[SIEGE] replace_order_attack_building can=", ok, " building=", building)
-	if not ok:
-		return
-	current_order = OrderType.ATTACK_BUILDING
-	set_attack_building_target(building)
+	replace_order(Order.new(Order.Type.ATTACK_BUILDING, building))
 
 
 func replace_order_build(building: BaseBuilding) -> void:
-	if building == null or not is_instance_valid(building):
-		return
-	current_order = OrderType.BUILD
-	set_build_target(building)
+	replace_order(Order.new(Order.Type.BUILD, building))
 
 
 func set_move_target(target: Vector3) -> void:
@@ -461,14 +479,16 @@ func set_attack_building_target(building: BaseBuilding) -> void:
 	_siege_stuck_time = 0.0
 	_siege_last_pos = global_position
 	unit_state = UnitState.ATTACKING
-	current_order = OrderType.ATTACK_BUILDING
+	# Keep order in sync when called via set_* path
+	if current_order == null or current_order.type != Order.Type.ATTACK_BUILDING:
+		current_order = Order.new(Order.Type.ATTACK_BUILDING, building)
 	if harvest:
 		harvest.reset()
 	if combat:
 		combat.reset()
 	if movement:
 		movement.cancel()
-	print(name, " -> attack building ", building.name, " (team ", building.team_id, ") order=", current_order)
+	print(name, " -> attack building ", building.name, " (team ", building.team_id, ") order=", current_order.type_name())
 
 
 func select() -> void:
@@ -498,7 +518,7 @@ func damage(amount: int) -> void:
 
 func die() -> void:
 	unit_state = UnitState.DEAD
-	current_order = OrderType.NONE
+	current_order = Order.none()
 	attack_building_target = null
 	if movement:
 		movement.cancel()
