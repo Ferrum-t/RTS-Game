@@ -12,14 +12,14 @@ size = Vector3(4, 2, 4)
 [sub_resource type="BoxShape3D" id="BoxShape3D_f2orf"]
 size = Vector3(4, 2, 4)
 
-[node name="TownCenter" type="StaticBody3D" unique_id=1664174406]
+[node name="TownCenter" type="StaticBody3D"]
 script = ExtResource("1_88qrv")
-team_id = 1
+team_id = 0
 
-[node name="MeshInstance3D" type="MeshInstance3D" parent="." unique_id=1229171708]
+[node name="MeshInstance3D" type="MeshInstance3D" parent="."]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1, 0)
 mesh = SubResource("BoxMesh_f2orf")
 
-[node name="CollisionShape3D" type="CollisionShape3D" parent="." unique_id=1796750194]
+[node name="CollisionShape3D" type="CollisionShape3D" parent="."]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1, 0)
 shape = SubResource("BoxShape3D_f2orf")
