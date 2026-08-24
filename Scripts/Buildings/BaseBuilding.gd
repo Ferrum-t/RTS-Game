@@ -7,11 +7,31 @@ class_name BaseBuilding
 ## Half-extents of footprint used for NavMesh obstruction (XZ)
 @export var nav_half_extents: Vector3 = Vector3(2.2, 1.0, 2.2)
 
+@export var tier: int = 1 # 1..3
+## tier_modifiers[tier-1] -> Dictionary{stat_name: String -> multiplier: float}
+## Пример: [{}, {"max_health": 1.5}, {"max_health": 2.0}]
+@export var tier_modifiers: Array[Dictionary] = [{}, {}, {}]
+## deployment_overrides[DeploymentState.State] -> Dictionary{stat_name -> multiplier}
+## Пустой по умолчанию — переходы между состояниями появятся в фазе 4.
+@export var deployment_overrides: Dictionary = {}
+
+var deployment_state: int = DeploymentState.State.DEPLOYED
+
 var health: int = 500
 var is_destroyed: bool = false
 
 
+func get_current_stat(stat_name: String, base_value: float) -> float:
+	var value := base_value
+	if tier >= 1 and tier <= tier_modifiers.size():
+		value *= float(tier_modifiers[tier - 1].get(stat_name, 1.0))
+	var overrides: Dictionary = deployment_overrides.get(deployment_state, {})
+	value *= float(overrides.get(stat_name, 1.0))
+	return value
+
+
 func _ready() -> void:
+	max_health = int(get_current_stat("max_health", float(max_health)))
 	health = max_health
 	is_destroyed = false
 
