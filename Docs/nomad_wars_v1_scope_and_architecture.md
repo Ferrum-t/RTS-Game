@@ -7,46 +7,59 @@
 
 ---
 
-## 0. CURRENT STATUS (черновик — проверить/поправить факты перед использованием)
+## 0. CURRENT STATUS (обновлено 2026-08-25, ветка `nomads-wars-grok`)
 
-**Подтверждено в этом чате (Claude), без независимой проверки кода на 100%:**
-- Movement contract: `Status.IDLE/MOVING/ARRIVED/BLOCKED/FAILED/CANCELLED` — реализован,
-  пункт 1 из Definition of Done закрыт.
-- Harvest (Tree, Stone) → Inventory → Return → Deposit → Stockpile — рабочий цикл,
-  включая обход зданий по навмешу.
-- Siege (ATTACK_BUILDING) — юниты доходят, бьют здание, здание разрушается.
-- `team_id` используется в TeamRules (can_attack/can_attack_building/can_harvest).
-- Order dispatch (M8 Increment 1): **НЕ реализован в репозитории.** Код обсуждался
-  и был написан в чате, но аудит фактического содержимого `nomads-wars-grok`
-  (Grok, прямое чтение файлов) показал: `Order.gd` не существует, `current_order`
-  всё ещё `OrderType` (enum в BaseUnit), диспетчеризация всё ещё через отдельные
-  `replace_order_move/harvest/attack/...`. Реальный baseline сейчас — M3-уровень.
-  План (Вариант A): добавить `Order.gd` + `replace_order(Order)`, оставить все
-  target-поля и `set_*_target()` нетронутыми, обёртки вызывают новый метод.
-  Компоненты (Movement/Harvest/Combat) не трогать — подтверждена прямая связь:
-  `MovementComponent` пишет `owner.move_target`, `HarvestComponent` читает
-  `owner.harvest_target`, `CombatComponent` читает `owner.attack_target` И
-  пишет `owner.velocity` напрямую (учесть при будущих мобильных башнях, Phase 9).
-  **Урок процесса:** код, показанный/одобренный в чате — не факт репозитория,
-  пока не подтверждён прямым чтением файлов после коммита.
+**Ветка:** `Ferrum-t/RTS-Game` → `nomads-wars-grok`  
+**Движок:** Godot 4.7 stable
 
-**Известный технический долг:**
-- `NavigationBakeService.AGENT_RADIUS = 1.1` — рабочее эмпирическое значение,
-  подтверждено на acceptance-тестах (1–2 здания). НЕ изолировано от других M6.x
-  фиксов. Пересмотреть при плотной застройке (риск разрыва узких проходов).
-- Freeze-сценарий (exhausted-path → raw final_target) — закрыт фиксом M6.6,
-  причинно-следственная связь прослежена до конца.
-- Диагностические print'ы (`NAV_DIAG`/`STUCK_DIAG`/`OBSTACLE_DIAG`/`SIEGE`) —
-  активно используются как regression-инструмент, НЕ убирать до стабилизации
-  физического спайка Mobile TC (см. раздел 4).
-- Production в TownCenter — single-slot (`is_training`/`_pending_scene`),
-  без очереди. Не блокер для v1.0 по нынешнему скоупу.
-- Нужно проверить: нет ли в SelectionManager/InteractionManager/UI прямых
-  обращений к `BaseUnit.OrderType` или прямых вызовов `set_*_target()` в обход
-  `replace_order()` — после переноса enum в `Order.Type`.
+### Милестоуны (приняты после F5)
 
-> Эта секция — черновик, собранный из истории обсуждения в чате Claude.
-> Автор проекта должен свериться с реальным кодом/git-историей и поправить.
+| ID | Содержание | Статус |
+|----|------------|--------|
+| M1–M6.9 | Movement (NavAgent + bake), Harvest-through-Movement, Siege path | **ACCEPTED** |
+| M7 | Stone harvest + stockpile parity с Wood | **ACCEPTED** |
+| M8.1 | Order data-object + `replace_order(Order)` dispatcher | **ACCEPTED** |
+| M8.2 | Audit ownership target-полей (без Increment 2) | **ACCEPTED** |
+| M8.x | Cleanup diagnostic logs (`NAV_DIAG` / `STUCK_DIAG` / `OBSTACLE_DIAG` / spam SIEGE) | **ACCEPTED** |
+| M9 | Playable Match Loop (start setup, Win/Lose, command gate) | **ACCEPTED** |
+
+### Подтверждено в репозитории и F5
+
+- **Movement:** `Status.IDLE / MOVING / ARRIVED / BLOCKED / FAILED / CANCELLED`.  
+  `MovementComponent` — единственный HOW (NavigationAgent3D, path, velocity, `move_and_slide`).  
+  Не пишет `owner.unit_state`. Обход зданий по NavMesh (M6.8 footprint = runtime position).
+- **Harvest:** Tree + Stone → bag → RETURNING → deposit → stockpile; подход через Movement (не direct steer).
+- **Combat / Siege:** unit-vs-unit; `ATTACK_BUILDING`; destroy → unregister + free.
+- **Team:** `team_id` 0 = player, 1 = enemy; `TeamRules` (select / attack / attack_building / harvest / command).
+- **Order (M8.1):** `Scripts/Systems/Order.gd` (`class_name Order`, `Type`, `none()`).  
+  `BaseUnit.current_order: Order`; `replace_order(order)`; wrappers `replace_order_*` → `set_*_target`.  
+  Target-поля и компоненты **не** консолидированы (Increment 2 не делали намеренно).
+- **Match (M9):** Autoload `MatchManager` — spawn player TC (team 0) + enemy TC/Soldier (team 1);  
+  Win = все здания team 1 уничтожены; Lose = все здания team 0 уничтожены;  
+  `MATCH: VICTORY` / `MATCH: DEFEAT` + Label; `CommandManager` гейтит новые приказы после конца матча.
+- **Production / Construction:** train Worker/Soldier; build TC/Barracks; single-slot production.
+
+### Известный технический долг (не блокер текущего playable loop)
+
+- `NavigationBakeService.AGENT_RADIUS = 1.1` — эмпирика; пересмотреть при плотной застройке.
+- `MovementComponent.set_target()` пишет `owner.move_target` (небольшой dual-write; не трогать без нужды).
+- Target-поля (`move_target`, `harvest_target`, …) живут рядом с `Order` — M8.2 audit: компоненты Harvest/Combat **не** пишут их; внешний path только через `replace_order_*`.
+- `CombatComponent` задаёт `owner.velocity` в chase — учесть при Mobile Tower / entity-agnostic movement (фаза 3–4, §3.4).
+- Production — single-slot, без очереди (ок для v1.0).
+- `get_nearest_town_center` не фильтрует по `team_id` (deposit может выбрать ближайший TC любого team).
+- Runtime смена `team_id` в Inspector может мгновенно триггерить Win/Lose (тест-артефакт M9).
+
+### Следующий шаг по roadmap (§4)
+
+Фаза **1 (Order)** — закрыта.  
+Cleanup диагностов — уже сделан раньше плана §4 п.6.  
+**Следующие по документу:**  
+2. Стат-резолвер base × tier × deployment  
+3. Спайк физики DEPLOYED ↔ MOBILE  
+4. DeploymentComponent + NavBake register/unregister  
+5. Мобильный Town Center  
+
+> Урок процесса: код из чата ≠ факт репозитория, пока не подтверждён чтением файлов после коммита и F5.
 
 ---
 
@@ -142,6 +155,9 @@ Raid — это по сути ATTACK-приказ с побочным loot-эф�
 - Очередь длины 1 на первом этапе (без приоритетов/прерываний).
 Этого достаточно для MOVE/ATTACK/HARVEST/RAID на старте.
 
+> **Статус:** минимальный контракт Order data-object + `replace_order` реализован (M8.1).
+> Полный `execute_order()` / очередь / RAID type — ещё нет; наращивать по мере фаз 5–8.
+
 ### 3.2 DeploymentState — общий компонент, не bespoke-FSM на здание
 ```
 enum DeploymentState { DEPLOYED, PACKING, MOBILE, UNPACKING }
@@ -202,23 +218,17 @@ Movement+Combat одновременно. Нужно:
 
 ## 4. Обновлённый порядок фаз (с учётом v1.0-скоупа)
 
-> Cleanup сознательно НЕ первым шагом: диагностические print'ы (NAV_DIAG/STUCK_DIAG/
-> SIEGE и т.п.) — рабочий regression-инструмент именно для шагов 2–5 ниже (снова
-> движение/навигация). Убирать его перед этим — терять сигнал в момент наибольшего
-> риска. Стоимость отложенного cleanup минимальна, стоимость потери диагностики
-> во время физического спайка — нет.
+> Примечание (2026-08-25): диагностический cleanup уже выполнен (M8.x).
+> При спайке Mobile TC при необходимости можно временно вернуть точечные print'ы.
 
-1. **Order abstraction** (см. 3.1) — разблокирует Raid и мобильные здания разом.
-   M8 Increment 1 (консолидация диспетчеризации, без переноса 5 полей-целей)
-   уже написан — см. раздел 0, требует F5-регрессии перед принятием.
+1. **Order abstraction** (см. 3.1) — **DONE (M8.1)**. Разблокирует Raid и мобильные здания.
 2. **Стат-резолвер base×tier×deployment** (см. 3.3) — до реализации мобильных
-   зданий, иначе характеристики придётся переписывать.
+   зданий, иначе характеристики придётся переписывать. **← СЛЕДУЮЩИЙ**
 3. **Спайк: физика DEPLOYED↔MOBILE в Godot** (см. 3.4) — маленький изолированный
    прототип на одном здании, прежде чем фиксировать контракт компонентов.
 4. **DeploymentComponent + NavigationBakeService register/unregister** (3.2, 3.5).
 5. **Мобильный Town Center** — первая полная реализация фичи на основе 1–4.
-6. **Cleanup** — убрать диагностические print'ы, dead code. Делаем здесь, когда
-   риск в движении/навигации уже позади, а не раньше.
+6. **Cleanup** — диагностические print'ы уже убраны; dead code по мере появления.
 7. **Horses как ресурс + гейт кавалерии** (3.6).
 8. **Raid/Loot (числовой вариант)** (3.7).
 9. **Мобильные башни** — после Town Center, переиспользуя тот же
