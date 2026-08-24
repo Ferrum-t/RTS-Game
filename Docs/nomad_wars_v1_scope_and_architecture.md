@@ -16,10 +16,19 @@
   включая обход зданий по навмешу.
 - Siege (ATTACK_BUILDING) — юниты доходят, бьют здание, здание разрушается.
 - `team_id` используется в TeamRules (can_attack/can_attack_building/can_harvest).
-- Order dispatch: M8 Increment 1 — единая точка входа `BaseUnit.replace_order(Order)`,
-  пять полей-целей (`move_target` и т.п.) и `set_*_target()` НЕ тронуты сознательно
-  (найдена связь: `MovementComponent.set_target()` пишет `owner.move_target` напрямую).
-  **Статус: код написан, F5-регрессия не подтверждена** (см. раздел 4, шаг перед M8).
+- Order dispatch (M8 Increment 1): **НЕ реализован в репозитории.** Код обсуждался
+  и был написан в чате, но аудит фактического содержимого `nomads-wars-grok`
+  (Grok, прямое чтение файлов) показал: `Order.gd` не существует, `current_order`
+  всё ещё `OrderType` (enum в BaseUnit), диспетчеризация всё ещё через отдельные
+  `replace_order_move/harvest/attack/...`. Реальный baseline сейчас — M3-уровень.
+  План (Вариант A): добавить `Order.gd` + `replace_order(Order)`, оставить все
+  target-поля и `set_*_target()` нетронутыми, обёртки вызывают новый метод.
+  Компоненты (Movement/Harvest/Combat) не трогать — подтверждена прямая связь:
+  `MovementComponent` пишет `owner.move_target`, `HarvestComponent` читает
+  `owner.harvest_target`, `CombatComponent` читает `owner.attack_target` И
+  пишет `owner.velocity` напрямую (учесть при будущих мобильных башнях, Phase 9).
+  **Урок процесса:** код, показанный/одобренный в чате — не факт репозитория,
+  пока не подтверждён прямым чтением файлов после коммита.
 
 **Известный технический долг:**
 - `NavigationBakeService.AGENT_RADIUS = 1.1` — рабочее эмпирическое значение,
