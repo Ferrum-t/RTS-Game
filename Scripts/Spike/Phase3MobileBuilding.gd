@@ -18,7 +18,6 @@ var last_move_status: String = "IDLE"
 
 func _ready() -> void:
 	name = "SpikeMobileBuilding"
-	# TownCenter.tscn does not set layer/mask → Godot defaults (1 / 1)
 	collision_layer = 1
 	collision_mask = 1
 	floor_stop_on_slope = true
@@ -63,7 +62,7 @@ func unregister_nav() -> void:
 	var nav := get_node_or_null("/root/NavigationBakeService")
 	if nav:
 		nav.unregister_building(self)
-		print("[SPIKE] unregister_building (was at footprint tracked by instance id)")
+		print("[SPIKE] unregister_building")
 
 
 func update_nav_position() -> void:
@@ -73,7 +72,7 @@ func update_nav_position() -> void:
 		print("[SPIKE] update_building_position → ", global_position)
 
 
-## Test-only mover (NOT production MovementComponent — see SPIKE report).
+## Test-only mover (NOT production MovementComponent).
 func request_move_to(world_pos: Vector3) -> void:
 	_move_target = world_pos
 	_move_target.y = 0.0
@@ -82,6 +81,12 @@ func request_move_to(world_pos: Vector3) -> void:
 	if nav_agent:
 		nav_agent.target_position = _move_target
 	print("[SPIKE] building request_move_to ", _move_target)
+
+
+func stop_move() -> void:
+	_moving = false
+	velocity = Vector3.ZERO
+	last_move_status = "IDLE"
 
 
 func _physics_process(_delta: float) -> void:

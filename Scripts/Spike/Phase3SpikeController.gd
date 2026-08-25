@@ -1,6 +1,7 @@
 extends Node3D
 
 ## Phase 3 SPIKE controller — automated sequence. Does not modify production systems.
+## v2: physics-only probe (no nav path) + unregister before building move.
 
 const WORKER_SCENE := preload("res://Scenes/Units/worker.tscn")
 const BUILDING_SCRIPT := preload("res://Scripts/Spike/Phase3MobileBuilding.gd")
@@ -8,7 +9,6 @@ const BUILDING_SCRIPT := preload("res://Scripts/Spike/Phase3MobileBuilding.gd")
 const OLD_POS := Vector3(0.0, 0.0, 5.0)
 const NEW_POS := Vector3(12.0, 0.0, 5.0)
 const WORKER_START := Vector3(-10.0, 0.0, 5.0)
-const TARGET_THROUGH := Vector3(10.0, 0.0, 5.0)
 const TARGET_BEHIND_OLD := Vector3(10.0, 0.0, 5.0)
 
 var _building: Phase3MobileBuilding = null
@@ -17,25 +17,26 @@ var _results: Dictionary = {}
 
 
 func _ready() -> void:
-	print("========== PHASE 3 SPIKE START ==========")
-	print("[SPIKE] FACTS from production scenes:")
-	print("[SPIKE]   TownCenter: StaticBody3D, collision_layer DEFAULT=1, mask DEFAULT=1, Box 4x2x4")
-	print("[SPIKE]   Worker: CharacterBody3D, collision_layer=2, mask DEFAULT=1 (BaseUnit forces mask=1 in _ready)")
-	print("[SPIKE]   NavBake: register_building / unregister_building / update_building_position by instance_id")
-	print("[SPIKE]   MovementComponent: requires owner: BaseUnit — cannot attach to plain CharacterBody3D")
-	print("[SPIKE]   → Test2 uses test-only NavAgent mover on building (same physics body type)")
+	print("========== PHASE 3 SPIKE START (v2) ==========")
+	print("[SPIKE] FACTS: TC L1/M1 Box4; Worker L2/M1; NavBake by instance_id")
+	print("[SPIKE] MovementComponent requires BaseUnit — building uses test-only mover")
+	print("[SPIKE] v2: physics probe = direct velocity (no NavAgent path)")
+	print("[SPIKE] v2: building move = unregister → move → register")
 	call_deferred("_start_sequence")
 
 
 func _start_sequence() -> void:
 	await get_tree().create_timer(0.5).timeout
 	_spawn_building(OLD_POS)
-	_building.register_nav()
-	await get_tree().create_timer(0.4).timeout
+	# Physics probe BEFORE register (no carve → Worker can drive into collider)
 	await _spawn_worker()
-	await get_tree().create_timer(0.2).timeout
-	await _test1_physics_and_nav()
-	await _test2_building_moves()
+	await get_tree().create_timer(0.15).timeout
+	await _test1a_physics_only()
+	# Then register for nav tests
+	_building.register_nav()
+	await get_tree().create_timer(0.5).timeout
+	await _test1b_nav_avoids()
+	await _test2_building_moves_unregistered()
 	await _test3_reregister()
 	_print_summary()
 
@@ -81,47 +82,67 @@ func _spawn_worker() -> void:
 		" pos=", _worker.global_position)
 
 
-func _test1_physics_and_nav() -> void:
-	print("---------- TEST 1: stationary CharacterBody as building ----------")
-	_worker.replace_order_move(TARGET_THROUGH)
+## Drive Worker into building with raw velocity — no MovementComponent / no NavAgent path.
+func _test1a_physics_only() -> void:
+	print("---------- TEST 1A: physics-only (direct velocity, no nav path) ----------")
+	_worker.global_position = Vector3(-6.0, 0.0, 5.0)
+	_worker.velocity = Vector3.ZERO
+	# Cancel any order / freeze unit AI so movement component does not steer
+	_worker.unit_state = BaseUnit.UnitState.IDLE
+	_worker.current_order = Order.none()
+	if _worker.movement:
+		_worker.movement.cancel()
+	await get_tree().physics_frame
+
 	var hit_building: bool = false
-	var blocked_or_stopped: bool = false
+	var max_x: float = _worker.global_position.x
 	var t0: int = Time.get_ticks_msec()
-	while Time.get_ticks_msec() - t0 < 5000:
+	while Time.get_ticks_msec() - t0 < 3000:
+		# Force unit_state IDLE every frame so BaseUnit.update_idle only does move_and_slide with our velocity
+		_worker.unit_state = BaseUnit.UnitState.IDLE
+		_worker.velocity = Vector3(6.0, 0.0, 0.0)
+		# BaseUnit._physics_process will also call move_and_slide in IDLE — set velocity before it runs
 		await get_tree().physics_frame
+		max_x = maxf(max_x, _worker.global_position.x)
 		if _worker.get_slide_collision_count() > 0:
 			var col := _worker.get_slide_collision(0)
 			if col and col.get_collider() == _building:
 				hit_building = true
-				print("[SPIKE] TEST1-A physics: Worker is_on_wall=", _worker.is_on_wall(),
+				print("[SPIKE] TEST1A physics HIT: is_on_wall=", _worker.is_on_wall(),
 					" slide_count=", _worker.get_slide_collision_count(),
-					" collider=", col.get_collider().name)
+					" collider=", col.get_collider().name,
+					" worker_pos=", _worker.global_position)
 				break
-		if _worker.unit_state == BaseUnit.UnitState.IDLE and _worker.global_position.distance_to(WORKER_START) > 1.0:
-			if _worker.global_position.x < OLD_POS.x + 2.0:
-				blocked_or_stopped = true
-				break
+		if _worker.is_on_wall():
+			print("[SPIKE] TEST1A is_on_wall=true pos=", _worker.global_position,
+				" slide=", _worker.get_slide_collision_count())
 
-	var reached_far: bool = _worker.global_position.x > OLD_POS.x + 3.0
-	_results["T1_physics_blocks"] = hit_building or (blocked_or_stopped and not reached_far)
-	print("[SPIKE] TEST1-A result hit_building=", hit_building,
-		" blocked_or_stopped=", blocked_or_stopped,
-		" reached_far_side=", reached_far,
-		" worker_pos=", _worker.global_position)
+	# Building center x=0, half-extent 2 → wall at x≈-2. Worker half 0.25 → stop near x≈-2.25
+	var stopped_before_center: bool = max_x < 0.5 and _worker.global_position.x < 1.0
+	_results["T1_physics_blocks"] = hit_building or (stopped_before_center and _worker.global_position.x > -4.0)
+	print("[SPIKE] TEST1A result hit_building=", hit_building,
+		" max_x=", max_x,
+		" final_pos=", _worker.global_position,
+		" stopped_before_center=", stopped_before_center)
 
 	_worker.velocity = Vector3.ZERO
-	_worker.global_position = WORKER_START
-	await get_tree().physics_frame
 
+
+func _test1b_nav_avoids() -> void:
+	print("---------- TEST 1B: nav path around registered building ----------")
+	_worker.global_position = WORKER_START
+	_worker.velocity = Vector3.ZERO
+	await get_tree().physics_frame
 	_worker.replace_order_move(TARGET_BEHIND_OLD)
-	await get_tree().create_timer(0.3).timeout
+	await get_tree().create_timer(0.35).timeout
+
 	var path_n: int = 0
 	if _worker.nav_agent:
 		_worker.nav_agent.get_next_path_position()
 		path_n = _worker.nav_agent.get_current_navigation_path().size()
-	print("[SPIKE] TEST1-B nav path_n=", path_n, " bake footprints expect >=1")
+	print("[SPIKE] TEST1B nav path_n=", path_n)
 
-	t0 = Time.get_ticks_msec()
+	var t0: int = Time.get_ticks_msec()
 	var went_around: bool = false
 	while Time.get_ticks_msec() - t0 < 8000:
 		await get_tree().physics_frame
@@ -135,20 +156,26 @@ func _test1_physics_and_nav() -> void:
 			break
 
 	_results["T1_nav_avoids"] = path_n > 1 or went_around
-	print("[SPIKE] TEST1-B result path_n=", path_n, " went_around_or_arrived=", went_around,
+	print("[SPIKE] TEST1B result path_n=", path_n, " went_around_or_arrived=", went_around,
 		" worker_pos=", _worker.global_position)
 
 
-func _test2_building_moves() -> void:
-	print("---------- TEST 2: CharacterBody can move ----------")
+func _test2_building_moves_unregistered() -> void:
+	print("---------- TEST 2: building moves AFTER unregister ----------")
 	_worker.velocity = Vector3.ZERO
-	_worker.replace_order_move(WORKER_START)
-	await get_tree().create_timer(0.2).timeout
+	_worker.unit_state = BaseUnit.UnitState.IDLE
+	if _worker.movement:
+		_worker.movement.cancel()
+	_worker.global_position = Vector3(-15.0, 0.0, 5.0)
+
+	# Critical: remove footprint before moving so building is not carved into its own obstacle
+	_building.unregister_nav()
+	await get_tree().create_timer(0.4).timeout
 
 	var start: Vector3 = _building.global_position
 	_building.request_move_to(NEW_POS)
 	var t0: int = Time.get_ticks_msec()
-	while Time.get_ticks_msec() - t0 < 10000:
+	while Time.get_ticks_msec() - t0 < 12000:
 		await get_tree().physics_frame
 		if _building.last_move_status == "ARRIVED":
 			break
@@ -159,90 +186,102 @@ func _test2_building_moves() -> void:
 	_results["T2_arrived"] = arrived
 	print("[SPIKE] TEST2 result moved=", moved, " arrived=", arrived,
 		" pos=", _building.global_position, " status=", _building.last_move_status)
-	print("[SPIKE] TEST2 NOTE: production MovementComponent not used (typed to BaseUnit)")
 
+	# Snap if still not there (should not be needed if PASS)
+	if not arrived:
+		_building.stop_move()
+		_building.global_position = NEW_POS
+		print("[SPIKE] TEST2 FAIL fallback teleport to NEW_POS for TEST3")
 
-func _test3_reregister() -> void:
-	print("---------- TEST 3: unregister old + register new obstruction ----------")
-	var old_p: Vector3 = OLD_POS
-
-	_building.global_position = NEW_POS
-	_building.unregister_nav()
-	await get_tree().create_timer(0.15).timeout
 	_building.register_nav()
 	await get_tree().create_timer(0.5).timeout
 
-	print("[SPIKE] TEST3 footprints should be at NEW only. old=", old_p, " new=", NEW_POS)
 
-	_worker.global_position = Vector3(NEW_POS.x - 10.0, 0.0, NEW_POS.z)
+func _test3_reregister() -> void:
+	print("---------- TEST 3: NEW blocked (physics+nav), OLD free ----------")
+	# Ensure at NEW and registered
+	if _building.global_position.distance_to(NEW_POS) > 0.5:
+		_building.global_position = NEW_POS
+		_building.unregister_nav()
+		await get_tree().create_timer(0.15).timeout
+		_building.register_nav()
+		await get_tree().create_timer(0.5).timeout
+
+	print("[SPIKE] TEST3 building at ", _building.global_position, " old was ", OLD_POS)
+
+	# 3A physics-only into NEW building
+	_worker.global_position = Vector3(NEW_POS.x - 6.0, 0.0, NEW_POS.z)
 	_worker.velocity = Vector3.ZERO
+	_worker.unit_state = BaseUnit.UnitState.IDLE
+	if _worker.movement:
+		_worker.movement.cancel()
 	await get_tree().physics_frame
-	_worker.replace_order_move(Vector3(NEW_POS.x + 10.0, 0.0, NEW_POS.z))
+
 	var hit_new: bool = false
 	var t0: int = Time.get_ticks_msec()
-	while Time.get_ticks_msec() - t0 < 5000:
+	while Time.get_ticks_msec() - t0 < 3000:
+		_worker.unit_state = BaseUnit.UnitState.IDLE
+		_worker.velocity = Vector3(6.0, 0.0, 0.0)
 		await get_tree().physics_frame
 		if _worker.get_slide_collision_count() > 0:
 			var col := _worker.get_slide_collision(0)
 			if col and col.get_collider() == _building:
 				hit_new = true
-				print("[SPIKE] TEST3-A physics hit NEW building collider=", col.get_collider().name)
+				print("[SPIKE] TEST3A physics HIT NEW collider=", col.get_collider().name,
+					" pos=", _worker.global_position)
 				break
 	_results["T3_new_blocks_physics"] = hit_new
-	print("[SPIKE] TEST3-A new_blocks_physics=", hit_new, " worker_pos=", _worker.global_position)
+	print("[SPIKE] TEST3A new_blocks_physics=", hit_new, " worker_pos=", _worker.global_position)
+	_worker.velocity = Vector3.ZERO
 
+	# 3A nav around NEW
 	_worker.global_position = Vector3(NEW_POS.x - 10.0, 0.0, NEW_POS.z)
 	await get_tree().physics_frame
 	_worker.replace_order_move(Vector3(NEW_POS.x + 10.0, 0.0, NEW_POS.z))
-	await get_tree().create_timer(0.3).timeout
+	await get_tree().create_timer(0.35).timeout
 	var path_new: int = 0
 	if _worker.nav_agent:
 		_worker.nav_agent.get_next_path_position()
 		path_new = _worker.nav_agent.get_current_navigation_path().size()
 	_results["T3_new_nav_path"] = path_new
-	print("[SPIKE] TEST3-A nav path_n around NEW=", path_new)
+	print("[SPIKE] TEST3A nav path_n around NEW=", path_new)
 
-	_worker.global_position = Vector3(OLD_POS.x - 8.0, 0.0, OLD_POS.z)
+	# 3B physics-only through OLD (should be free — no collider there)
+	_worker.global_position = Vector3(OLD_POS.x - 6.0, 0.0, OLD_POS.z)
 	_worker.velocity = Vector3.ZERO
+	_worker.unit_state = BaseUnit.UnitState.IDLE
+	if _worker.movement:
+		_worker.movement.cancel()
 	await get_tree().physics_frame
-	_worker.replace_order_move(Vector3(OLD_POS.x + 8.0, 0.0, OLD_POS.z))
-	var t1: int = Time.get_ticks_msec()
+
 	var crossed_old: bool = false
 	var hit_ghost: bool = false
-	while Time.get_ticks_msec() - t1 < 6000:
+	var t1: int = Time.get_ticks_msec()
+	while Time.get_ticks_msec() - t1 < 3000:
+		_worker.unit_state = BaseUnit.UnitState.IDLE
+		_worker.velocity = Vector3(6.0, 0.0, 0.0)
 		await get_tree().physics_frame
 		if _worker.get_slide_collision_count() > 0:
 			var col2 := _worker.get_slide_collision(0)
 			if col2 and col2.get_collider() == _building:
 				hit_ghost = true
-		if _worker.global_position.x > OLD_POS.x + 3.0:
+		if _worker.global_position.x > OLD_POS.x + 2.0:
 			crossed_old = true
-			break
-		if _worker.unit_state == BaseUnit.UnitState.IDLE and _worker.global_position.distance_to(Vector3(OLD_POS.x - 8.0, 0.0, OLD_POS.z)) > 5.0:
-			if _worker.global_position.x > OLD_POS.x:
-				crossed_old = true
 			break
 
 	_results["T3_old_free_physics"] = crossed_old and not hit_ghost
-	print("[SPIKE] TEST3-B old_free crossed=", crossed_old, " hit_building_at_old=", hit_ghost,
+	print("[SPIKE] TEST3B old_free crossed=", crossed_old, " hit_ghost=", hit_ghost,
 		" worker_pos=", _worker.global_position)
-
-	await get_tree().create_timer(0.2).timeout
-	if _worker.nav_agent:
-		_worker.nav_agent.get_next_path_position()
-		var path_old: int = _worker.nav_agent.get_current_navigation_path().size()
-		print("[SPIKE] TEST3-B path_n for route through OLD area (may still be mid-move)=", path_old)
+	_worker.velocity = Vector3.ZERO
 
 
 func _print_summary() -> void:
-	print("========== PHASE 3 SPIKE SUMMARY ==========")
-	print("[SPIKE] T1 physics blocks Worker: ", _results.get("T1_physics_blocks", false))
-	print("[SPIKE] T1 nav avoids building: ", _results.get("T1_nav_avoids", false))
-	print("[SPIKE] T2 building moves: ", _results.get("T2_moves", false))
+	print("========== PHASE 3 SPIKE SUMMARY (v2) ==========")
+	print("[SPIKE] T1A physics blocks Worker: ", _results.get("T1_physics_blocks", false))
+	print("[SPIKE] T1B nav avoids building: ", _results.get("T1_nav_avoids", false))
+	print("[SPIKE] T2 building moves (after unregister): ", _results.get("T2_moves", false))
 	print("[SPIKE] T2 building ARRIVED: ", _results.get("T2_arrived", false))
 	print("[SPIKE] T3 NEW blocks physics: ", _results.get("T3_new_blocks_physics", false))
 	print("[SPIKE] T3 NEW nav path_n: ", _results.get("T3_new_nav_path", 0))
 	print("[SPIKE] T3 OLD free physics: ", _results.get("T3_old_free_physics", false))
-	print("[SPIKE] Collision: building L1/M1, worker L2/M1 — same pairing as TownCenter↔Worker")
-	print("[SPIKE] Production MovementComponent requires BaseUnit — spike used test-only mover")
 	print("========== PHASE 3 SPIKE END — paste full log ==========")
