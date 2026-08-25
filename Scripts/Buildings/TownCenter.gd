@@ -21,6 +21,8 @@ func _ready() -> void:
 	if worker_scene == null:
 		worker_scene = load("res://Scenes/Units/worker.tscn") as PackedScene
 	print("TownCenter ready at: ", global_position, " deployment=", deployment_state)
+	if OS.is_debug_build() and team_id == 0:
+		print("TownCenter debug keys: P=pack  M=move(8,0,5)  U=unpack")
 
 
 func _process(delta: float) -> void:
@@ -29,6 +31,29 @@ func _process(delta: float) -> void:
 	train_timer -= delta
 	if train_timer <= 0.0:
 		_finish_training()
+
+
+func _unhandled_input(event: InputEvent) -> void:
+	if not OS.is_debug_build():
+		return
+	# Only player TC (team 0) reacts — avoid enemy TC packing on same key
+	if team_id != 0:
+		return
+	if is_destroyed:
+		return
+	if not (event is InputEventKey and event.pressed and not event.echo):
+		return
+	var key := event as InputEventKey
+	match key.keycode:
+		KEY_P:
+			debug_pack()
+			get_viewport().set_input_as_handled()
+		KEY_M:
+			debug_move(Vector3(8.0, 0.0, 5.0))
+			get_viewport().set_input_as_handled()
+		KEY_U:
+			debug_unpack()
+			get_viewport().set_input_as_handled()
 
 
 func try_train_worker() -> bool:
