@@ -1,0 +1,38 @@
+[gd_scene format=3 uid="uid://spike_phase3_mobile"]
+
+[ext_resource type="Script" path="res://Scripts/Spike/Phase3SpikeController.gd" id="1_ctrl"]
+
+[sub_resource type="PlaneMesh" id="PlaneMesh_ground"]
+size = Vector2(100, 100)
+
+[sub_resource type="BoxShape3D" id="BoxShape_ground"]
+size = Vector3(100, 2, 100)
+
+[sub_resource type="NavigationMesh" id="NavigationMesh_map"]
+vertices = PackedVector3Array(-50, 0, -50, 50, 0, -50, 50, 0, 50, -50, 0, 50)
+polygons = [PackedInt32Array(3, 0, 1, 2), PackedInt32Array(3, 0, 2, 3)]
+agent_radius = 0.5
+agent_height = 1.5
+agent_max_climb = 0.3
+agent_max_slope = 45.0
+
+[node name="Phase3Spike" type="Node3D"]
+script = ExtResource("1_ctrl")
+
+[node name="Ground" type="StaticBody3D" parent="."]
+collision_layer = 1
+collision_mask = 0
+
+[node name="MeshInstance3D" type="MeshInstance3D" parent="Ground"]
+mesh = SubResource("PlaneMesh_ground")
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="Ground"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -1, 0)
+shape = SubResource("BoxShape_ground")
+
+[node name="NavigationRegion3D" type="NavigationRegion3D" parent="."]
+navigation_mesh = SubResource("NavigationMesh_map")
+
+[node name="Camera3D" type="Camera3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 0.573576, 0.819152, 0, -0.819152, 0.573576, 5, 28, 28)
+current = true
