@@ -22,57 +22,52 @@
 | M8.2 | Audit ownership target-полей (без Increment 2) | **ACCEPTED** |
 | M8.x | Cleanup diagnostic logs | **ACCEPTED** |
 | M9 | Playable Match Loop (start setup, Win/Lose, command gate) | **ACCEPTED** |
-| **Phase 2** | **Stat resolver: `get_current_stat` + tier_modifiers on BaseBuilding** | **ACCEPTED** |
+| Phase 2 | Stat resolver: `get_current_stat` + tier_modifiers on BaseBuilding | **ACCEPTED** |
+| Phase 3 | SPIKE: CharacterBody3D mobile building (physics + nav + move) | **ACCEPTED** |
+| **Phase 4** | **DeploymentComponent + Mobile TC (pack/move/unpack + NavBake)** | **ACCEPTED** |
 
 ### Подтверждено в репозитории и F5
 
-- **Movement / Harvest / Combat / Siege / Order / Match** — как в предыдущем статусе (M1–M9).
-- **Phase 2 (tier-часть резолвера):**
-  - `Scripts/Systems/DeploymentState.gd` — только `enum State` (DEPLOYED/PACKING/MOBILE/UNPACKING).
-  - `BaseBuilding.get_current_stat(stat_name, base_value)` = base × tier_modifiers[tier-1] × deployment_overrides[state].
-  - `_ready()`: `max_health = int(get_current_stat(...))` затем `health = max_health` (резолв **только при спавне**).
-  - Дефолты `tier_modifiers`: `[{}, {"max_health": 1.5}, {"max_health": 2.0}]` → tier1=500, tier2=750, tier3=1000 при base 500.
-  - F5: построенный TC tier=1 → `HP …/500`; тот же тип с tier=2 до `_ready` → `HP …/750`. Словари не шарятся между инстансами.
-  - `deployment_overrides` / смена `deployment_state` в рантайме **не** пересчитывают статы — это требование фазы 4.
-
-### «Set tier» в Output — НЕ наш код
-
-В репозитории **нет** `print("Set tier")` и нет кастомного setter для `tier`.  
-Строка `Set tier` / `Set team_id` появляется, когда в **Remote Inspector** во время F5 меняют `@export`-свойство — это лог редактора Godot, не игровой print.  
-Смена `tier` на уже живом здании **не** вызывает повторный `get_current_stat` (ожидаемо до фазы 4).
+- **Movement / Harvest / Combat / Siege / Order / Match** — M1–M9 без регрессии.
+- **Phase 2:** tier resolve при спавне (500 / 750 / 1000).
+- **Phase 3 SPIKE:** CharacterBody3D как building; FLOATING + mask=0 в MOBILE; unregister → move → register.
+- **Phase 4 (F5 2026-08-25):**
+  - `BaseBuilding` = `CharacterBody3D` (тип-совместимость siege/CommandManager; Barracks не двигается).
+  - `MobileBuilding` + `DeploymentComponent` + `TownCenter extends MobileBuilding`.
+  - Цикл: PACKING (2s) → MOBILE + footprint cleared (bake) → move ARRIVED → UNPACKING (2s) → DEPLOYED + footprint на новой позиции.
+  - Train Worker только в DEPLOYED; spawn/deposit у новых координат TC.
+  - Siege enemy TC → MATCH: VICTORY.
+  - Debug keys (debug build, team 0): **P** pack, **M** move(8,0,5), **U** unpack.
+  - `recompute_stats()` при смене deployment_state.
 
 ### MatchManager Win/Lose (факт кода)
 
-Считает **только** `team_id == 0` (player) и `team_id == 1` (enemy):
-
-- **VICTORY:** когда-то был ≥1 building team 1 **и** сейчас `enemy_alive == 0`.
-- **DEFEAT:** когда-то был ≥1 building team 0 **и** сейчас `player_alive == 0`.
-
-Любой другой `team_id` (2, 3, …) **игнорируется** в подсчёте. Поэтому:
-
-- смена **последнего** enemy TC с `1` → `2` → сразу **VICTORY** (team 1 «исчез» без destroy);
-- тестовое здание с `team_id = 3` не влияет на Win/Lose, пока живы team 0 и team 1.
-
-Для тестов фазы 3: держать player=0, enemy=1; не менять team_id enemy TC в Inspector.
+Считает **только** `team_id == 0` и `team_id == 1`.  
+`team_id >= 2` — тестовые объекты, не влияют на Win/Lose.
 
 ### Известный технический долг
 
 - `NavigationBakeService.AGENT_RADIUS = 1.1` — эмпирика.
 - `MovementComponent.set_target()` пишет `owner.move_target`.
-- `CombatComponent` → `owner.velocity` в chase (entity-agnostic movement — фазы 3–4).
 - Production single-slot.
 - `get_nearest_town_center` без фильтра по `team_id`.
-- **MatchManager жёстко team 0/1** — runtime смена team_id в Inspector ломает тесты (зафиксировано F5).
-- Enemy TC от MatchManager получает автоимя `@StaticBody3D@N` (не задан `.name`).
-- Phase 2: runtime смена tier/deployment **не** резолвит статы заново (нужно в фазе 4).
+- MatchManager жёстко team 0/1.
+- Нет Order.Type.PACK / UI кнопок pack-move-unpack (только debug keys).
+- TC mobile path — прямой move_and_slide, без NavigationAgent (как в Phase 4 spec).
+- Debug hotkeys P/M/U — убрать или спрятать перед релизом.
 
 ### Следующий шаг по roadmap (§4)
 
 1. Order — **DONE**  
 2. Стат-резолвер (tier) — **DONE**  
-3. **← СЛЕДУЮЩИЙ:** спайк физики DEPLOYED ↔ MOBILE  
-4. DeploymentComponent + NavBake register/unregister (+ runtime re-resolve stats)  
-5. Мобильный Town Center  
+3. Спайк физики DEPLOYED ↔ MOBILE — **DONE**  
+4. DeploymentComponent + NavBake — **DONE**  
+5. Мобильный Town Center — **DONE** (входит в Phase 4)  
+6. Cleanup (debug keys / dead code по мере)  
+7. **← СЛЕДУЮЩИЙ кандидат v1.0:** Horses как ресурс + гейт кавалерии  
+8. Raid/Loot (числовой)  
+9. Мобильные башни  
+10. Environment Zones (базовая версия)
 
 > Урок процесса: код из чата ≠ факт репозитория, пока не подтверждён чтением файлов после коммита и F5.
 
@@ -176,40 +171,40 @@ enum DeploymentState { DEPLOYED, PACKING, MOBILE, UNPACKING }
 - Отдельный `DeploymentComponent` (фаза 4).
 - Сигнал `state_changed(old, new)`.
 
-> **Статус:** enum вынесен в `DeploymentState.gd` (Phase 2). Компонент и переходы — фаза 4.
+> **Статус:** **DONE (Phase 4).** Enum + DeploymentComponent + MobileBuilding + TownCenter.
 
 ### 3.3 Стат-резолюшн: base × tier × deployment
 Единая функция `get_current_stat` резолвит: base × tier_modifier × deployment_override.
 
-> **Статус Phase 2:** реализовано **на BaseBuilding** (не через BuildingData — подключение Data отложено).
-> Tier-часть проверена F5. Deployment overrides + **runtime re-resolve** при смене state — фаза 4.
+> **Статус:** Phase 2 (tier) + Phase 4 (`recompute_stats` при смене deployment_state).
 
 ### 3.4 Movement/Combat компоненты должны быть entity-agnostic
-Открытый вопрос: StaticBody3D (DEPLOYED) ↔ CharacterBody3D (MOBILE) — **фаза 3 спайк**.
+> **Статус Phase 3/4:** мобильные здания = CharacterBody3D с нуля; StaticBody↔CharacterBody
+> runtime swap **не нужен**. Barracks тоже CharacterBody3D (неподвижный).
+> Unit MovementComponent по-прежнему typed to BaseUnit — TC использует свой mover в DeploymentComponent.
 
 ### 3.5 NavigationBakeService: динамическая регистрация препятствий
-register/unregister при DEPLOYED ↔ MOBILE — фаза 4. Ребейк во время движения юнита уже проверен (M6.x).
+> **Статус Phase 4:** unregister при выходе в MOBILE; register при UNPACKING. API NavBake не менялся.
 
 ### 3.6 Horses как отдельный тип ресурса/сущности
-Узел добычи + гейт кавалерии — после Mobile TC (фаза 7).
+Узел добычи + гейт кавалерии — **следующий крупный v1.0 блок** после Mobile TC.
 
 ### 3.7 Damage → Loot как отдельный хук
-Не на Destroy, а на hit — фаза 8.
+Не на Destroy, а на hit — после Horses / вместе с Raid.
 
 ---
 
 ## 4. Обновлённый порядок фаз (с учётом v1.0-скоупа)
 
-> Примечание (2026-08-25): diagnostic cleanup и Phase 2 (tier resolver) выполнены.
+> Примечание (2026-08-25): Phase 2–4 и diagnostic cleanup выполнены.
 
 1. **Order abstraction** — **DONE (M8.1)**.
-2. **Стат-резолвер base×tier×deployment** — **DONE (Phase 2, tier-часть)**.  
-   Runtime re-resolve при deployment — вместе с фазой 4.
-3. **Спайк: физика DEPLOYED↔MOBILE в Godot** (см. 3.4) — **← СЛЕДУЮЩИЙ**.
-4. **DeploymentComponent + NavigationBakeService register/unregister** (+ re-resolve stats).
-5. **Мобильный Town Center**.
-6. **Cleanup** — диагносты уже убраны; dead code по мере появления.
-7. **Horses как ресурс + гейт кавалерии**.
+2. **Стат-резолвер base×tier×deployment** — **DONE (Phase 2 + 4 re-resolve)**.
+3. **Спайк: физика DEPLOYED↔MOBILE** — **DONE (Phase 3)**.
+4. **DeploymentComponent + NavigationBakeService register/unregister** — **DONE (Phase 4)**.
+5. **Мобильный Town Center** — **DONE (Phase 4)**.
+6. **Cleanup** — debug keys P/M/U убрать перед релизом; dead code по мере.
+7. **Horses как ресурс + гейт кавалерии** — **← следующий крупный блок**.
 8. **Raid/Loot (числовой вариант)**.
 9. **Мобильные башни**.
 10. **Базовая версия Environment Zones**.
