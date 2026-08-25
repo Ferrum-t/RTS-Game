@@ -1,8 +1,9 @@
-extends BaseBuilding
+extends MobileBuilding
 
 class_name TownCenter
 
-## Economy hub. Trains Workers only. Soldiers come from Barracks.
+## Economy hub. Trains Workers only while DEPLOYED.
+## Phase 4: pack / move / unpack via DeploymentComponent.
 
 @export var worker_scene: PackedScene
 @export var worker_cost_wood: int = 50
@@ -19,7 +20,7 @@ func _ready() -> void:
 	add_to_group("Obstacle")
 	if worker_scene == null:
 		worker_scene = load("res://Scenes/Units/worker.tscn") as PackedScene
-	print("TownCenter ready at: ", global_position)
+	print("TownCenter ready at: ", global_position, " deployment=", deployment_state)
 
 
 func _process(delta: float) -> void:
@@ -31,6 +32,10 @@ func _process(delta: float) -> void:
 
 
 func try_train_worker() -> bool:
+	if not is_deployed():
+		print("TownCenter: train only while DEPLOYED (state=", deployment_state, ")")
+		return false
+
 	if is_training:
 		print("TownCenter: already training Worker")
 		return false
@@ -71,3 +76,16 @@ func _finish_training() -> void:
 
 	print("TownCenter: Worker trained at ", unit.global_position)
 	_pending_scene = null
+
+
+## Debug / Phase 4 manual API (no Order.Type.PACK yet)
+func debug_pack() -> void:
+	request_pack()
+
+
+func debug_move(world_pos: Vector3) -> void:
+	request_move_to(world_pos)
+
+
+func debug_unpack() -> void:
+	request_unpack()
