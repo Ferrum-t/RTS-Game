@@ -1,4 +1,4 @@
-[gd_scene format=3 uid="uid://cavalryunit001"]
+[gd_scene format=3 uid="uid://c6csq08dwe441"]
 
 [ext_resource type="Script" path="res://Scripts/Units/Cavalry.gd" id="1_cavalry"]
 
