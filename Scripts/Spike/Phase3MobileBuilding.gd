@@ -3,7 +3,8 @@ extends CharacterBody3D
 class_name Phase3MobileBuilding
 
 ## SPIKE ONLY — not production. CharacterBody3D stand-in for a mobile building.
-## Collision matches TownCenter defaults: layer 1, mask 1, BoxShape 4x2x4.
+## Deployed: layer 1, mask 1 (blocks Worker like TownCenter).
+## Mobile: FLOATING + mask 0 so move_and_slide is not stuck on Ground (layer 1).
 
 const NAV_HALF := Vector3(2.2, 1.0, 2.2)
 const MOVE_SPEED := 4.0
@@ -20,6 +21,7 @@ func _ready() -> void:
 	name = "SpikeMobileBuilding"
 	collision_layer = 1
 	collision_mask = 1
+	motion_mode = CharacterBody3D.MOTION_MODE_GROUNDED
 	floor_stop_on_slope = true
 
 	nav_agent = NavigationAgent3D.new()
@@ -46,6 +48,7 @@ func _print_collision_diag() -> void:
 			shape_info = str(cs.shape.get_class())
 	print("[SPIKE] building collision_layer=", collision_layer,
 		" collision_mask=", collision_mask,
+		" motion_mode=", motion_mode,
 		" shape=", shape_info,
 		" pos=", global_position,
 		" team_id=", team_id)
@@ -72,21 +75,31 @@ func update_nav_position() -> void:
 		print("[SPIKE] update_building_position → ", global_position)
 
 
-## Test-only mover (NOT production MovementComponent).
 func request_move_to(world_pos: Vector3) -> void:
 	_move_target = world_pos
 	_move_target.y = 0.0
 	_moving = true
 	last_move_status = "MOVING"
+	# MOBILE: do not stick on Ground (layer 1) or other static geometry
+	motion_mode = CharacterBody3D.MOTION_MODE_FLOATING
+	collision_mask = 0
 	if nav_agent:
 		nav_agent.target_position = _move_target
-	print("[SPIKE] building request_move_to ", _move_target)
+	print("[SPIKE] building request_move_to ", _move_target,
+		" (FLOATING, mask=0)")
 
 
 func stop_move() -> void:
 	_moving = false
 	velocity = Vector3.ZERO
 	last_move_status = "IDLE"
+	_set_deployed_collision()
+
+
+func _set_deployed_collision() -> void:
+	motion_mode = CharacterBody3D.MOTION_MODE_GROUNDED
+	collision_layer = 1
+	collision_mask = 1
 
 
 func _physics_process(_delta: float) -> void:
@@ -100,34 +113,23 @@ func _physics_process(_delta: float) -> void:
 		velocity = Vector3.ZERO
 		_moving = false
 		last_move_status = "ARRIVED"
-		print("[SPIKE] building ARRIVED at ", global_position)
+		_set_deployed_collision()
+		print("[SPIKE] building ARRIVED at ", global_position,
+			" (restored GROUNDED mask=1)")
 		return
 
-	var follow := _move_target
-	if nav_agent:
-		nav_agent.get_next_path_position()
-		var path := nav_agent.get_current_navigation_path()
-		if path.size() > 0:
-			for i in range(path.size()):
-				var p: Vector3 = path[i]
-				p.y = 0.0
-				if global_position.distance_to(p) > 0.4:
-					follow = p
-					break
-
-	follow.y = 0.0
-	var to_f := follow - global_position
-	to_f.y = 0.0
-	if to_f.length() < 0.001:
-		velocity = Vector3.ZERO
-		return
-
-	var dir := to_f.normalized()
+	# Prefer direct horizontal move while unregistered (nav optional)
+	var dir := to_final.normalized()
 	velocity.x = dir.x * MOVE_SPEED
 	velocity.z = dir.z * MOVE_SPEED
 	velocity.y = 0.0
 	move_and_slide()
 
+	# If still not progressing (safety), kinematic fallback
+	if get_slide_collision_count() > 0 or global_position.distance_to(_move_target) > to_final.length() - 0.01:
+		pass
+
 	if Engine.get_physics_frames() % 30 == 0:
 		print("[SPIKE] building moving pos=", global_position,
-			" vel=", velocity, " status=", last_move_status, " target=", _move_target)
+			" vel=", velocity, " status=", last_move_status,
+			" mask=", collision_mask, " target=", _move_target)

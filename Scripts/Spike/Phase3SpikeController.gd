@@ -1,7 +1,8 @@
 extends Node3D
 
-## Phase 3 SPIKE controller — automated sequence. Does not modify production systems.
-## v2.1: physics probe disables worker _physics_process (BaseUnit.update_idle zeros velocity).
+## Phase 3 SPIKE v2.2
+## - building MOBILE: FLOATING + collision_mask=0 (no ground stick)
+## - TEST3B: only probe OLD zone (stop before NEW building at x=12)
 
 const WORKER_SCENE := preload("res://Scenes/Units/worker.tscn")
 const BUILDING_SCRIPT := preload("res://Scripts/Spike/Phase3MobileBuilding.gd")
@@ -17,10 +18,9 @@ var _results: Dictionary = {}
 
 
 func _ready() -> void:
-	print("========== PHASE 3 SPIKE START (v2.1) ==========")
-	print("[SPIKE] FACTS: TC L1/M1 Box4; Worker L2/M1; NavBake by instance_id")
-	print("[SPIKE] v2.1: physics = set_physics_process(false) + manual move_and_slide")
-	print("[SPIKE] v2.1: building move = unregister → move → register")
+	print("========== PHASE 3 SPIKE START (v2.2) ==========")
+	print("[SPIKE] v2.2: building MOBILE = FLOATING + mask 0")
+	print("[SPIKE] v2.2: TEST3B stops at OLD zone (x < 4), not through to NEW")
 	call_deferred("_start_sequence")
 
 
@@ -93,12 +93,13 @@ func _worker_ai_on() -> void:
 	_worker.set_physics_process(true)
 
 
-## Manual drive into collider — BaseUnit.update_idle zeros velocity, so AI must be off.
-func _drive_worker_x(speed: float, duration_msec: int) -> Dictionary:
+func _drive_worker_x(speed: float, duration_msec: int, stop_x: float = 9999.0) -> Dictionary:
 	var hit: bool = false
 	var max_x: float = _worker.global_position.x
 	var t0: int = Time.get_ticks_msec()
 	while Time.get_ticks_msec() - t0 < duration_msec:
+		if _worker.global_position.x >= stop_x:
+			break
 		_worker.velocity = Vector3(speed, 0.0, 0.0)
 		_worker.move_and_slide()
 		max_x = maxf(max_x, _worker.global_position.x)
@@ -169,7 +170,7 @@ func _test1b_nav_avoids() -> void:
 
 
 func _test2_building_moves_unregistered() -> void:
-	print("---------- TEST 2: building moves AFTER unregister ----------")
+	print("---------- TEST 2: building moves AFTER unregister (FLOATING, mask=0) ----------")
 	_worker_ai_on()
 	_worker.velocity = Vector3.ZERO
 	_worker.unit_state = BaseUnit.UnitState.IDLE
@@ -237,21 +238,25 @@ func _test3_reregister() -> void:
 	_results["T3_new_nav_path"] = path_new
 	print("[SPIKE] TEST3A nav path_n around NEW=", path_new)
 
-	# 3B physics through OLD — should be free
+	# 3B: probe ONLY OLD zone — stop at x=4 (halfway OLD→NEW), never reach NEW at x=12
 	_worker.global_position = Vector3(OLD_POS.x - 6.0, 0.0, OLD_POS.z)
 	_worker_ai_off()
 	await get_tree().physics_frame
-	var r_old: Dictionary = await _drive_worker_x(6.0, 3000)
-	var crossed_old: bool = (r_old["pos"] as Vector3).x > OLD_POS.x + 2.0
+	var r_old: Dictionary = await _drive_worker_x(6.0, 3000, 4.0)
+	var pos_old: Vector3 = r_old["pos"]
+	var crossed_old: bool = pos_old.x > OLD_POS.x + 1.5
 	var hit_ghost: bool = r_old["hit"]
+	# Ghost only counts if hit happened while still in OLD neighborhood (x < 6)
+	if hit_ghost and pos_old.x >= 6.0:
+		hit_ghost = false
 	_results["T3_old_free_physics"] = crossed_old and not hit_ghost
 	print("[SPIKE] TEST3B old_free crossed=", crossed_old, " hit_ghost=", hit_ghost,
-		" worker_pos=", r_old["pos"])
+		" worker_pos=", pos_old, " (stop_x=4)")
 	_worker_ai_on()
 
 
 func _print_summary() -> void:
-	print("========== PHASE 3 SPIKE SUMMARY (v2.1) ==========")
+	print("========== PHASE 3 SPIKE SUMMARY (v2.2) ==========")
 	print("[SPIKE] T1A physics blocks Worker: ", _results.get("T1_physics_blocks", false))
 	print("[SPIKE] T1B nav avoids building: ", _results.get("T1_nav_avoids", false))
 	print("[SPIKE] T2 building moves (after unregister): ", _results.get("T2_moves", false))
