@@ -24,52 +24,46 @@
 | M9 | Playable Match Loop (start setup, Win/Lose, command gate) | **ACCEPTED** |
 | Phase 2 | Stat resolver: `get_current_stat` + tier_modifiers on BaseBuilding | **ACCEPTED** |
 | Phase 3 | SPIKE: CharacterBody3D mobile building (physics + nav + move) | **ACCEPTED** |
-| **Phase 4** | **DeploymentComponent + Mobile TC (pack/move/unpack + NavBake)** | **ACCEPTED** |
+| Phase 4 | DeploymentComponent + Mobile TC (pack/move/unpack + NavBake) | **ACCEPTED** |
+| **Phase 5** | **Horses resource + Cavalry gate (Barracks)** | **ACCEPTED** |
 
 ### Подтверждено в репозитории и F5
 
-- **Movement / Harvest / Combat / Siege / Order / Match** — M1–M9 без регрессии.
-- **Phase 2:** tier resolve при спавне (500 / 750 / 1000).
-- **Phase 3 SPIKE:** CharacterBody3D как building; FLOATING + mask=0 в MOBILE; unregister → move → register.
-- **Phase 4 (F5 2026-08-25):**
-  - `BaseBuilding` = `CharacterBody3D` (тип-совместимость siege/CommandManager; Barracks не двигается).
-  - `MobileBuilding` + `DeploymentComponent` + `TownCenter extends MobileBuilding`.
-  - Цикл: PACKING (2s) → MOBILE + footprint cleared (bake) → move ARRIVED → UNPACKING (2s) → DEPLOYED + footprint на новой позиции.
-  - Train Worker только в DEPLOYED; spawn/deposit у новых координат TC.
-  - Siege enemy TC → MATCH: VICTORY.
-  - Debug keys (debug build, team 0): **P** pack, **M** move(8,0,5), **U** unpack.
-  - `recompute_stats()` при смене deployment_state.
+- **Movement / Harvest / Combat / Siege / Order / Match / Mobile TC** — без регрессии.
+- **Phase 5 (F5 2026-08-25):**
+  - `BaseResource.Type.HORSES = 4`; HorseHerd ×2 на World; amount 200.
+  - Harvest → bag `Horses:` → deposit `Stockpile Horses:` / `deposited … H:`.
+  - Herd depletion → queue_free.
+  - Barracks `try_train_cavalry` (100 wood + 1 horse, 6s); debug **C**.
+  - Cavalry: HP 180, atk 25, select; siege damage 25; `can_gather=false`.
+  - Gate: spend horses (50→49 style via train cost); second cavalry train OK.
+  - Soldier train + Tree/Stone + MATCH: VICTORY без регрессии.
+  - UI: нет кнопки Cavalry / нет label Horses (сознательно out of scope Phase 5).
 
-### MatchManager Win/Lose (факт кода)
+### MatchManager Win/Lose
 
-Считает **только** `team_id == 0` и `team_id == 1`.  
-`team_id >= 2` — тестовые объекты, не влияют на Win/Lose.
+Только `team_id == 0` и `team_id == 1`. `team_id >= 2` игнорируется.
 
 ### Известный технический долг
 
+- UI: нет Horses в HUD; нет кнопки Train Cavalry; кнопки Train Worker/Soldier перекрываются.
+- Debug keys P/M/U/C — убрать или спрятать перед релизом.
+- `spend()` позиционные args — при 6-м ресурсе → data-driven costs.
 - `NavigationBakeService.AGENT_RADIUS = 1.1` — эмпирика.
-- `MovementComponent.set_target()` пишет `owner.move_target`.
-- Production single-slot.
-- `get_nearest_town_center` без фильтра по `team_id`.
-- MatchManager жёстко team 0/1.
-- Нет Order.Type.PACK / UI кнопок pack-move-unpack (только debug keys).
-- TC mobile path — прямой move_and_slide, без NavigationAgent (как в Phase 4 spec).
-- Debug hotkeys P/M/U — убрать или спрятать перед релизом.
+- Production single-slot; `get_nearest_town_center` без team filter.
+- TC mobile path без NavigationAgent.
 
 ### Следующий шаг по roadmap (§4)
 
-1. Order — **DONE**  
-2. Стат-резолвер (tier) — **DONE**  
-3. Спайк физики DEPLOYED ↔ MOBILE — **DONE**  
-4. DeploymentComponent + NavBake — **DONE**  
-5. Мобильный Town Center — **DONE** (входит в Phase 4)  
-6. Cleanup (debug keys / dead code по мере)  
-7. **← СЛЕДУЮЩИЙ кандидат v1.0:** Horses как ресурс + гейт кавалерии  
-8. Raid/Loot (числовой)  
+1–5. Order … Mobile TC — **DONE**  
+6. Cleanup / UI polish (Horses label, Cavalry button, layout) — кандидат  
+7. Horses + Cavalry — **DONE (Phase 5)**  
+8. **← СЛЕДУЮЩИЙ крупный блок:** Raid/Loot (числовой gold на hit)  
 9. Мобильные башни  
-10. Environment Zones (базовая версия)
+10. Environment Zones  
+11. Полировка расы / баланс / Steam-ready
 
-> Урок процесса: код из чата ≠ факт репозитория, пока не подтверждён чтением файлов после коммита и F5.
+> Урок процесса: код из чата ≠ факт репозитория, пока не подтверждён F5-логом.
 
 ---
 
@@ -93,6 +87,8 @@
   - полноценная симуляция табунов, дикие лошади с поведением "убегать/бродить",
     приручение живых особей — **бэклог**.
 
+> **Статус:** Phase 5 **DONE** (узел + stockpile + cavalry gate). UI label — долг.
+
 ### 1.3 Grab / Raid (Orc-style из Warcraft 3)
 - Атака вражеского здания → шанс/гарантированный дроп золота при уроне.
 - Атака вражеской конюшни/аналога → шанс получить ресурс "Horses" (числовой лут,
@@ -100,121 +96,76 @@
 - Полноценный Capture/Steal (визуальный угон живых юнитов-животных) — **бэклог**.
 
 ### 1.4 Мобильные поселения (главная фича v1.0)
-- Town Center (аналог Ancient/Tree of Life у NE): два состояния —
-  DEPLOYED / MOBILE (плюс переходные PACKING/UNPACKING).
-- DEPLOYED: полная экономика, производство, высокая защита/урон (для башен).
-- MOBILE: может двигаться, часть функций отключена, стата ниже.
-- Команды: "Поднять кочевье" (только TC), "Поднять весь аул" (все мобильные
-  здания разом), "Развернуть лагерь" (обратно).
-- Частичный переезд (не всё поселение, только выбранные здания) — входит в v1.0
-  как минимум на уровне возможности выбрать здания вручную.
-- Тиры построек (T1/T2/T3) влияют не только на визуал, но и на характеристики,
-  **включая скорость упаковки/разворачивания**.
+- Town Center: DEPLOYED / PACKING / MOBILE / UNPACKING — **Phase 4 DONE**.
+- Команды UI pack/move/unpack — ещё debug keys only.
 
 ### 1.5 Мобильные башни
-- Могут перемещаться; DEPLOYED = высокий урон/защита/дальность, MOBILE = ниже
-  все боевые характеристики, но может двигаться и вести огонь на ходу
-  (со штрафом).
-- Варианты (обычная/лёгкая/тяжёлая/магическая) — можно ограничить v1.0 одним-двумя
-  вариантами, остальное в бэклог.
+- После Raid или параллельно с UI polish.
 
 ### 1.6 Меняющаяся среда (Environment Zones)
-- Базовая версия: зоны на карте, которые смещаются со временем и влияют минимум
-  на доступность/скорость добычи ресурсов (без сложных модификаторов на бой/
-  здоровье/видимость — это можно добавить позже через тот же Modifier-механизм).
-- Именно она создаёт игровое давление, ради которого нужна механика кочевья —
-  без неё "поднять лагерь" не имеет geplay-смысла. Поэтому базовая версия входит
-  в v1.0, а не в бэклог.
+- Базовая версия в v1.0 после мобильных башен / Raid.
 
 ### 1.7 Боевые юниты
-- Базовый набор ролей (melee/ranged/siege) для одной расы, включая кавалерию,
-  зависящую от ресурса Horses.
-- Тяжёлые/лёгкие/средние — через данные (armor/speed/damage), не через
-  подклассы.
+- Worker, Soldier, **Cavalry (Phase 5 DONE)**.
 
 ---
 
 ## 2. BACKLOG — что сознательно откладывается после v1.0
 
 - Остальные 3 фракции.
-- Полноценная система героев (XP, abilities, аура, инвентарь, артефакты).
-- Живые угоняемые/приручаемые животные с AI (флиться, табуны, дикое поведение).
-- Полный Capture/Steal pipeline (визуальный угон юнитов/животных).
-- Полная климатическая система (сезоны, модификаторы на бой/здоровье/
-  производство/видимость).
-- Летающие юниты, магия как отдельный полноценный слой.
-- Осадные машины как отдельный класс юнитов (если не входят в v1.0 минимально).
-- Кампания, hero maps, tower defense, arena, MOBA-режимы.
-- Мультиплеер/netcode.
-- Полная data-driven генерализация ресурсной системы под произвольные будущие
-  типы (сейчас реализовать ровно под wood/stone/gold/horses).
+- Полноценная система героев.
+- Живые угоняемые/приручаемые животные с AI.
+- Полный Capture/Steal pipeline.
+- Полная климатическая система.
+- Летающие юниты, магия как слой.
+- Кампания, multiplayer.
+- Полная data-driven генерализация ресурсов.
 
 ---
 
-## 3. Архитектурные контракты, которые нужно заложить СЕЙЧАС
-
-Эти пункты нужны именно потому, что без них v1.0-фичи (не бэклог!) лягут как хаки.
+## 3. Архитектурные контракты
 
 ### 3.1 Order abstraction
-Raid — это по сути ATTACK-приказ с побочным loot-эффектом. Минимальный контракт:
-- `Order` как data-объект (type, target, params).
-- `Unit.current_order` + `execute_order()`.
-- Очередь длины 1 на первом этапе.
+> **DONE (M8.1).** RAID type — ещё нет.
 
-> **Статус:** минимальный контракт Order data-object + `replace_order` реализован (M8.1).
-> Полный `execute_order()` / очередь / RAID type — ещё нет.
+### 3.2 DeploymentState
+> **DONE (Phase 4).**
 
-### 3.2 DeploymentState — общий компонент, не bespoke-FSM на здание
-```
-enum DeploymentState { DEPLOYED, PACKING, MOBILE, UNPACKING }
-```
-- Отдельный `DeploymentComponent` (фаза 4).
-- Сигнал `state_changed(old, new)`.
+### 3.3 Стат-резолюшн base × tier × deployment
+> **DONE (Phase 2 + 4).**
 
-> **Статус:** **DONE (Phase 4).** Enum + DeploymentComponent + MobileBuilding + TownCenter.
+### 3.4 Entity-agnostic movement for buildings
+> **DONE (Phase 3/4):** CharacterBody3D; TC mover in DeploymentComponent.
 
-### 3.3 Стат-резолюшн: base × tier × deployment
-Единая функция `get_current_stat` резолвит: base × tier_modifier × deployment_override.
+### 3.5 NavigationBakeService dynamic obstacles
+> **DONE (Phase 4).**
 
-> **Статус:** Phase 2 (tier) + Phase 4 (`recompute_stats` при смене deployment_state).
+### 3.6 Horses
+> **DONE (Phase 5):** Type.HORSES, HorseHerd, stockpile, cavalry gate.
 
-### 3.4 Movement/Combat компоненты должны быть entity-agnostic
-> **Статус Phase 3/4:** мобильные здания = CharacterBody3D с нуля; StaticBody↔CharacterBody
-> runtime swap **не нужен**. Barracks тоже CharacterBody3D (неподвижный).
-> Unit MovementComponent по-прежнему typed to BaseUnit — TC использует свой mover в DeploymentComponent.
-
-### 3.5 NavigationBakeService: динамическая регистрация препятствий
-> **Статус Phase 4:** unregister при выходе в MOBILE; register при UNPACKING. API NavBake не менялся.
-
-### 3.6 Horses как отдельный тип ресурса/сущности
-Узел добычи + гейт кавалерии — **следующий крупный v1.0 блок** после Mobile TC.
-
-### 3.7 Damage → Loot как отдельный хук
-Не на Destroy, а на hit — после Horses / вместе с Raid.
+### 3.7 Damage → Loot
+> **Следующий крупный блок** (Raid/Loot).
 
 ---
 
-## 4. Обновлённый порядок фаз (с учётом v1.0-скоупа)
+## 4. Порядок фаз
 
-> Примечание (2026-08-25): Phase 2–4 и diagnostic cleanup выполнены.
-
-1. **Order abstraction** — **DONE (M8.1)**.
-2. **Стат-резолвер base×tier×deployment** — **DONE (Phase 2 + 4 re-resolve)**.
-3. **Спайк: физика DEPLOYED↔MOBILE** — **DONE (Phase 3)**.
-4. **DeploymentComponent + NavigationBakeService register/unregister** — **DONE (Phase 4)**.
-5. **Мобильный Town Center** — **DONE (Phase 4)**.
-6. **Cleanup** — debug keys P/M/U убрать перед релизом; dead code по мере.
-7. **Horses как ресурс + гейт кавалерии** — **← следующий крупный блок**.
-8. **Raid/Loot (числовой вариант)**.
-9. **Мобильные башни**.
-10. **Базовая версия Environment Zones**.
-11. Полировка одной расы, баланс, UI/UX — до релизного состояния v1.0.
+1. Order — **DONE**  
+2. Стат-резолвер — **DONE**  
+3. Спайк физики — **DONE**  
+4. DeploymentComponent — **DONE**  
+5. Мобильный TC — **DONE**  
+6. Cleanup / UI (Horses HUD, Cavalry button, layout)  
+7. Horses + Cavalry — **DONE (Phase 5)**  
+8. **Raid/Loot** — **← следующий**  
+9. Мобильные башни  
+10. Environment Zones  
+11. Полировка v1.0
 
 ---
 
 ## 5. Как использовать этот документ
 
-- Хранить как единственный источник правды по scope и архитектурным решениям.
-- В начале новой сессии с любой моделью — прикладывать этот файл + короткий снапшот статуса.
-- Не смешивать с оперативными логами/дебагом.
+- Единственный источник правды по scope.
+- В начале сессии — этот файл + F5-факт.
 - Обновлять §0 и §4 по мере продвижения.
