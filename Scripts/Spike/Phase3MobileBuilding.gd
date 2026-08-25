@@ -1,5 +1,7 @@
 extends CharacterBody3D
 
+class_name Phase3MobileBuilding
+
 ## SPIKE ONLY — not production. CharacterBody3D stand-in for a mobile building.
 ## Collision matches TownCenter defaults: layer 1, mask 1, BoxShape 4x2x4.
 
@@ -82,7 +84,7 @@ func request_move_to(world_pos: Vector3) -> void:
 	print("[SPIKE] building request_move_to ", _move_target)
 
 
-func _physics_process(delta: float) -> void:
+func _physics_process(_delta: float) -> void:
 	if not _moving:
 		velocity = Vector3.ZERO
 		return
@@ -101,8 +103,6 @@ func _physics_process(delta: float) -> void:
 		nav_agent.get_next_path_position()
 		var path := nav_agent.get_current_navigation_path()
 		if path.size() > 0:
-			follow = path[mini(1, path.size() - 1)] if path.size() > 1 else path[0]
-			# Prefer first non-near waypoint
 			for i in range(path.size()):
 				var p: Vector3 = path[i]
 				p.y = 0.0
