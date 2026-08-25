@@ -9,8 +9,12 @@ class_name BaseBuilding
 
 @export var tier: int = 1 # 1..3
 ## tier_modifiers[tier-1] -> Dictionary{stat_name: String -> multiplier: float}
-## Пример: [{}, {"max_health": 1.5}, {"max_health": 2.0}]
-@export var tier_modifiers: Array[Dictionary] = [{}, {}, {}]
+## Defaults for F5: tier1=1.0x, tier2=1.5x, tier3=2.0x on max_health
+@export var tier_modifiers: Array[Dictionary] = [
+	{},
+	{"max_health": 1.5},
+	{"max_health": 2.0},
+]
 ## deployment_overrides[DeploymentState.State] -> Dictionary{stat_name -> multiplier}
 ## Пустой по умолчанию — переходы между состояниями появятся в фазе 4.
 @export var deployment_overrides: Dictionary = {}
