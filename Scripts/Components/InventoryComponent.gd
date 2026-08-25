@@ -8,6 +8,7 @@ var wood := 0
 var stone := 0
 var gold := 0
 var food := 0
+var horses := 0
 
 var capacity := 50
 
@@ -25,6 +26,7 @@ func clear() -> void:
 	stone = 0
 	gold = 0
 	food = 0
+	horses = 0
 
 
 func add_wood(amount: int) -> void:
@@ -35,9 +37,13 @@ func add_stone(amount: int) -> void:
 	stone = clampi(stone + amount, 0, capacity)
 
 
+func add_horses(amount: int) -> void:
+	horses = clampi(horses + amount, 0, capacity)
+
+
 func has_resources() -> bool:
-	return wood > 0 or stone > 0 or gold > 0 or food > 0
+	return wood > 0 or stone > 0 or gold > 0 or food > 0 or horses > 0
 
 
 func get_total() -> int:
-	return wood + stone + gold + food
+	return wood + stone + gold + food + horses

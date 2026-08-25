@@ -2,8 +2,8 @@ extends StaticBody3D
 
 class_name BaseResource
 
-## 0=wood, 1=stone, 2=gold, 3=food
-enum Type { WOOD = 0, STONE = 1, GOLD = 2, FOOD = 3 }
+## 0=wood, 1=stone, 2=gold, 3=food, 4=horses
+enum Type { WOOD = 0, STONE = 1, GOLD = 2, FOOD = 3, HORSES = 4 }
 
 @export var resource_type: Type = Type.WOOD
 @export var resource_amount: int = 500
