@@ -9,11 +9,12 @@ var wood: int = 100
 var stone: int = 0
 var gold: int = 0
 var food: int = 0
+var horses: int = 0
 
 
 func _ready() -> void:
 	resources_changed.emit()
-	print("ResourceManager ready. Wood: ", wood)
+	print("ResourceManager ready. Wood: ", wood, " Horses: ", horses)
 
 
 func add_wood(amount: int) -> void:
@@ -45,16 +46,43 @@ func add_food(amount: int) -> void:
 	resources_changed.emit()
 
 
-func can_afford(wood_cost: int = 0, stone_cost: int = 0, gold_cost: int = 0, food_cost: int = 0) -> bool:
-	return wood >= wood_cost and stone >= stone_cost and gold >= gold_cost and food >= food_cost
+func add_horses(amount: int) -> void:
+	if amount <= 0:
+		return
+	horses += amount
+	resources_changed.emit()
+	print("Stockpile Horses: ", horses)
 
 
-func spend(wood_cost: int = 0, stone_cost: int = 0, gold_cost: int = 0, food_cost: int = 0) -> bool:
-	if not can_afford(wood_cost, stone_cost, gold_cost, food_cost):
+func can_afford(
+	wood_cost: int = 0,
+	stone_cost: int = 0,
+	gold_cost: int = 0,
+	food_cost: int = 0,
+	horses_cost: int = 0
+) -> bool:
+	return (
+		wood >= wood_cost
+		and stone >= stone_cost
+		and gold >= gold_cost
+		and food >= food_cost
+		and horses >= horses_cost
+	)
+
+
+func spend(
+	wood_cost: int = 0,
+	stone_cost: int = 0,
+	gold_cost: int = 0,
+	food_cost: int = 0,
+	horses_cost: int = 0
+) -> bool:
+	if not can_afford(wood_cost, stone_cost, gold_cost, food_cost, horses_cost):
 		return false
 	wood -= wood_cost
 	stone -= stone_cost
 	gold -= gold_cost
 	food -= food_cost
+	horses -= horses_cost
 	resources_changed.emit()
 	return true

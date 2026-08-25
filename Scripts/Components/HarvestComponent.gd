@@ -84,13 +84,11 @@ func update(delta: float) -> void:
 		_stuck_near = 0.0
 
 	if not in_range:
-		# BaseUnit drives Movement toward approach_pos
 		if status != Status.MOVING_TO_RESOURCE:
 			print("[HARVEST] ", owner.name, " approach target=", resource.name, " stand_pos=", approach_pos)
 		status = Status.MOVING_TO_RESOURCE
 		return
 
-	# Gather — no locomotion here
 	if status != Status.GATHERING:
 		print("[HARVEST] ", owner.name, " GATHERING at ", resource.name)
 	status = Status.GATHERING
@@ -133,6 +131,9 @@ func _add_to_inventory(resource: BaseResource, amount: int) -> void:
 		3:
 			owner.inventory.food = mini(owner.inventory.food + amount, owner.inventory.capacity)
 			print(owner.name, " Food: ", owner.inventory.food)
+		4:
+			owner.inventory.add_horses(amount)
+			print(owner.name, " Horses: ", owner.inventory.horses, " (bag ", owner.inventory.get_total(), "/", owner.inventory.capacity, ")")
 		_:
 			owner.inventory.add_wood(amount)
 			print(owner.name, " Wood: ", owner.inventory.wood, " (bag ", owner.inventory.get_total(), "/", owner.inventory.capacity, ")")

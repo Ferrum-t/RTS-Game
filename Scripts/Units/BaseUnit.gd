@@ -24,6 +24,8 @@ enum UnitState
 @export var attack_cooldown := 1.0
 @export var building_attack_range := 6.5
 @export var health_bar_height := 1.6
+## Phase 5: Cavalry sets false — cannot take HARVEST orders
+@export var can_gather: bool = true
 
 var health := 100
 
@@ -175,7 +177,6 @@ func update_harvesting(delta: float) -> void:
 			velocity = Vector3.ZERO
 			unit_state = UnitState.IDLE
 		HarvestComponent.Status.MOVING_TO_RESOURCE:
-			# HOW: same Movement/NavAgent pipeline as MOVE / RETURN
 			var stand: Vector3 = harvest.approach_pos
 			if stand == Vector3.ZERO and harvest_target != null:
 				stand = harvest.get_approach_position(harvest_target)
@@ -299,6 +300,7 @@ func update_return(delta: float) -> void:
 	var deposited_stone: int = inventory.stone
 	var deposited_gold: int = inventory.gold
 	var deposited_food: int = inventory.food
+	var deposited_horses: int = inventory.horses
 
 	inventory.clear()
 
@@ -308,8 +310,15 @@ func update_return(delta: float) -> void:
 		rm.add_stone(deposited_stone)
 		rm.add_gold(deposited_gold)
 		rm.add_food(deposited_food)
+		rm.add_horses(deposited_horses)
 
-	print(name, " deposited W:", deposited_wood, " S:", deposited_stone, " at ", return_target.name)
+	print(
+		name,
+		" deposited W:", deposited_wood,
+		" S:", deposited_stone,
+		" H:", deposited_horses,
+		" at ", return_target.name
+	)
 
 	return_target = null
 
@@ -329,7 +338,6 @@ func update_build(_delta: float) -> void:
 
 
 ## M8.1 — single dispatch entry for player/AI intent.
-## Does not remove target fields; routes to existing set_*_target.
 func replace_order(order: Order) -> void:
 	if order == null:
 		order = Order.none()
@@ -337,7 +345,6 @@ func replace_order(order: Order) -> void:
 	match order.type:
 		Order.Type.NONE:
 			current_order = Order.none()
-			# Do not force IDLE here — callers use set_* / completion paths.
 		Order.Type.MOVE:
 			var dest: Vector3 = order.target as Vector3
 			current_order = order
@@ -345,6 +352,8 @@ func replace_order(order: Order) -> void:
 		Order.Type.HARVEST:
 			var resource: BaseResource = order.target as BaseResource
 			if resource == null or not is_instance_valid(resource):
+				return
+			if not can_gather:
 				return
 			if not TeamRules.can_harvest(self, resource):
 				return
@@ -371,7 +380,6 @@ func replace_order(order: Order) -> void:
 			set_build_target(b)
 
 
-## Compatibility wrappers — create Order and dispatch via replace_order.
 func replace_order_move(destination: Vector3) -> void:
 	replace_order(Order.new(Order.Type.MOVE, destination))
 
@@ -411,6 +419,8 @@ func set_move_target(target: Vector3) -> void:
 
 
 func set_harvest_target(resource: BaseResource) -> void:
+	if not can_gather:
+		return
 	harvest_target = resource
 	attack_target = null
 	attack_building_target = null
@@ -459,7 +469,6 @@ func set_attack_building_target(building: BaseBuilding) -> void:
 	_siege_stuck_time = 0.0
 	_siege_last_pos = global_position
 	unit_state = UnitState.ATTACKING
-	# Keep order in sync when called via set_* path
 	if current_order == null or current_order.type != Order.Type.ATTACK_BUILDING:
 		current_order = Order.new(Order.Type.ATTACK_BUILDING, building)
 	if harvest:
