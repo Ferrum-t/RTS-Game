@@ -1,7 +1,7 @@
 extends Node3D
 
 ## Phase 3 SPIKE controller — automated sequence. Does not modify production systems.
-## v2: physics-only probe (no nav path) + unregister before building move.
+## v2.1: physics probe disables worker _physics_process (BaseUnit.update_idle zeros velocity).
 
 const WORKER_SCENE := preload("res://Scenes/Units/worker.tscn")
 const BUILDING_SCRIPT := preload("res://Scripts/Spike/Phase3MobileBuilding.gd")
@@ -17,22 +17,19 @@ var _results: Dictionary = {}
 
 
 func _ready() -> void:
-	print("========== PHASE 3 SPIKE START (v2) ==========")
+	print("========== PHASE 3 SPIKE START (v2.1) ==========")
 	print("[SPIKE] FACTS: TC L1/M1 Box4; Worker L2/M1; NavBake by instance_id")
-	print("[SPIKE] MovementComponent requires BaseUnit — building uses test-only mover")
-	print("[SPIKE] v2: physics probe = direct velocity (no NavAgent path)")
-	print("[SPIKE] v2: building move = unregister → move → register")
+	print("[SPIKE] v2.1: physics = set_physics_process(false) + manual move_and_slide")
+	print("[SPIKE] v2.1: building move = unregister → move → register")
 	call_deferred("_start_sequence")
 
 
 func _start_sequence() -> void:
 	await get_tree().create_timer(0.5).timeout
 	_spawn_building(OLD_POS)
-	# Physics probe BEFORE register (no carve → Worker can drive into collider)
 	await _spawn_worker()
 	await get_tree().create_timer(0.15).timeout
 	await _test1a_physics_only()
-	# Then register for nav tests
 	_building.register_nav()
 	await get_tree().create_timer(0.5).timeout
 	await _test1b_nav_avoids()
@@ -82,54 +79,65 @@ func _spawn_worker() -> void:
 		" pos=", _worker.global_position)
 
 
-## Drive Worker into building with raw velocity — no MovementComponent / no NavAgent path.
-func _test1a_physics_only() -> void:
-	print("---------- TEST 1A: physics-only (direct velocity, no nav path) ----------")
-	_worker.global_position = Vector3(-6.0, 0.0, 5.0)
-	_worker.velocity = Vector3.ZERO
-	# Cancel any order / freeze unit AI so movement component does not steer
+func _worker_ai_off() -> void:
+	_worker.set_physics_process(false)
 	_worker.unit_state = BaseUnit.UnitState.IDLE
 	_worker.current_order = Order.none()
 	if _worker.movement:
 		_worker.movement.cancel()
-	await get_tree().physics_frame
+	_worker.velocity = Vector3.ZERO
 
-	var hit_building: bool = false
+
+func _worker_ai_on() -> void:
+	_worker.velocity = Vector3.ZERO
+	_worker.set_physics_process(true)
+
+
+## Manual drive into collider — BaseUnit.update_idle zeros velocity, so AI must be off.
+func _drive_worker_x(speed: float, duration_msec: int) -> Dictionary:
+	var hit: bool = false
 	var max_x: float = _worker.global_position.x
 	var t0: int = Time.get_ticks_msec()
-	while Time.get_ticks_msec() - t0 < 3000:
-		# Force unit_state IDLE every frame so BaseUnit.update_idle only does move_and_slide with our velocity
-		_worker.unit_state = BaseUnit.UnitState.IDLE
-		_worker.velocity = Vector3(6.0, 0.0, 0.0)
-		# BaseUnit._physics_process will also call move_and_slide in IDLE — set velocity before it runs
-		await get_tree().physics_frame
+	while Time.get_ticks_msec() - t0 < duration_msec:
+		_worker.velocity = Vector3(speed, 0.0, 0.0)
+		_worker.move_and_slide()
 		max_x = maxf(max_x, _worker.global_position.x)
 		if _worker.get_slide_collision_count() > 0:
 			var col := _worker.get_slide_collision(0)
 			if col and col.get_collider() == _building:
-				hit_building = true
-				print("[SPIKE] TEST1A physics HIT: is_on_wall=", _worker.is_on_wall(),
-					" slide_count=", _worker.get_slide_collision_count(),
-					" collider=", col.get_collider().name,
-					" worker_pos=", _worker.global_position)
+				hit = true
+				print("[SPIKE] physics HIT collider=", col.get_collider().name,
+					" is_on_wall=", _worker.is_on_wall(),
+					" slide=", _worker.get_slide_collision_count(),
+					" pos=", _worker.global_position)
 				break
-		if _worker.is_on_wall():
-			print("[SPIKE] TEST1A is_on_wall=true pos=", _worker.global_position,
-				" slide=", _worker.get_slide_collision_count())
+		await get_tree().physics_frame
+	_worker.velocity = Vector3.ZERO
+	return {"hit": hit, "max_x": max_x, "pos": _worker.global_position}
 
-	# Building center x=0, half-extent 2 → wall at x≈-2. Worker half 0.25 → stop near x≈-2.25
-	var stopped_before_center: bool = max_x < 0.5 and _worker.global_position.x < 1.0
-	_results["T1_physics_blocks"] = hit_building or (stopped_before_center and _worker.global_position.x > -4.0)
+
+func _test1a_physics_only() -> void:
+	print("---------- TEST 1A: physics-only (manual move_and_slide, AI off) ----------")
+	_worker.global_position = Vector3(-6.0, 0.0, 5.0)
+	_worker_ai_off()
+	await get_tree().physics_frame
+
+	var r: Dictionary = await _drive_worker_x(6.0, 3000)
+	var hit_building: bool = r["hit"]
+	var max_x: float = r["max_x"]
+	var final_pos: Vector3 = r["pos"]
+	var stopped_before_center: bool = max_x < 0.5 and final_pos.x < 1.0
+	_results["T1_physics_blocks"] = hit_building or (stopped_before_center and final_pos.x > -4.0)
 	print("[SPIKE] TEST1A result hit_building=", hit_building,
 		" max_x=", max_x,
-		" final_pos=", _worker.global_position,
+		" final_pos=", final_pos,
 		" stopped_before_center=", stopped_before_center)
-
-	_worker.velocity = Vector3.ZERO
+	_worker_ai_on()
 
 
 func _test1b_nav_avoids() -> void:
 	print("---------- TEST 1B: nav path around registered building ----------")
+	_worker_ai_on()
 	_worker.global_position = WORKER_START
 	_worker.velocity = Vector3.ZERO
 	await get_tree().physics_frame
@@ -162,13 +170,13 @@ func _test1b_nav_avoids() -> void:
 
 func _test2_building_moves_unregistered() -> void:
 	print("---------- TEST 2: building moves AFTER unregister ----------")
+	_worker_ai_on()
 	_worker.velocity = Vector3.ZERO
 	_worker.unit_state = BaseUnit.UnitState.IDLE
 	if _worker.movement:
 		_worker.movement.cancel()
 	_worker.global_position = Vector3(-15.0, 0.0, 5.0)
 
-	# Critical: remove footprint before moving so building is not carved into its own obstacle
 	_building.unregister_nav()
 	await get_tree().create_timer(0.4).timeout
 
@@ -187,7 +195,6 @@ func _test2_building_moves_unregistered() -> void:
 	print("[SPIKE] TEST2 result moved=", moved, " arrived=", arrived,
 		" pos=", _building.global_position, " status=", _building.last_move_status)
 
-	# Snap if still not there (should not be needed if PASS)
 	if not arrived:
 		_building.stop_move()
 		_building.global_position = NEW_POS
@@ -199,7 +206,6 @@ func _test2_building_moves_unregistered() -> void:
 
 func _test3_reregister() -> void:
 	print("---------- TEST 3: NEW blocked (physics+nav), OLD free ----------")
-	# Ensure at NEW and registered
 	if _building.global_position.distance_to(NEW_POS) > 0.5:
 		_building.global_position = NEW_POS
 		_building.unregister_nav()
@@ -209,30 +215,15 @@ func _test3_reregister() -> void:
 
 	print("[SPIKE] TEST3 building at ", _building.global_position, " old was ", OLD_POS)
 
-	# 3A physics-only into NEW building
+	# 3A physics into NEW
 	_worker.global_position = Vector3(NEW_POS.x - 6.0, 0.0, NEW_POS.z)
-	_worker.velocity = Vector3.ZERO
-	_worker.unit_state = BaseUnit.UnitState.IDLE
-	if _worker.movement:
-		_worker.movement.cancel()
+	_worker_ai_off()
 	await get_tree().physics_frame
-
-	var hit_new: bool = false
-	var t0: int = Time.get_ticks_msec()
-	while Time.get_ticks_msec() - t0 < 3000:
-		_worker.unit_state = BaseUnit.UnitState.IDLE
-		_worker.velocity = Vector3(6.0, 0.0, 0.0)
-		await get_tree().physics_frame
-		if _worker.get_slide_collision_count() > 0:
-			var col := _worker.get_slide_collision(0)
-			if col and col.get_collider() == _building:
-				hit_new = true
-				print("[SPIKE] TEST3A physics HIT NEW collider=", col.get_collider().name,
-					" pos=", _worker.global_position)
-				break
+	var r_new: Dictionary = await _drive_worker_x(6.0, 3000)
+	var hit_new: bool = r_new["hit"]
 	_results["T3_new_blocks_physics"] = hit_new
-	print("[SPIKE] TEST3A new_blocks_physics=", hit_new, " worker_pos=", _worker.global_position)
-	_worker.velocity = Vector3.ZERO
+	print("[SPIKE] TEST3A new_blocks_physics=", hit_new, " worker_pos=", r_new["pos"])
+	_worker_ai_on()
 
 	# 3A nav around NEW
 	_worker.global_position = Vector3(NEW_POS.x - 10.0, 0.0, NEW_POS.z)
@@ -246,37 +237,21 @@ func _test3_reregister() -> void:
 	_results["T3_new_nav_path"] = path_new
 	print("[SPIKE] TEST3A nav path_n around NEW=", path_new)
 
-	# 3B physics-only through OLD (should be free — no collider there)
+	# 3B physics through OLD — should be free
 	_worker.global_position = Vector3(OLD_POS.x - 6.0, 0.0, OLD_POS.z)
-	_worker.velocity = Vector3.ZERO
-	_worker.unit_state = BaseUnit.UnitState.IDLE
-	if _worker.movement:
-		_worker.movement.cancel()
+	_worker_ai_off()
 	await get_tree().physics_frame
-
-	var crossed_old: bool = false
-	var hit_ghost: bool = false
-	var t1: int = Time.get_ticks_msec()
-	while Time.get_ticks_msec() - t1 < 3000:
-		_worker.unit_state = BaseUnit.UnitState.IDLE
-		_worker.velocity = Vector3(6.0, 0.0, 0.0)
-		await get_tree().physics_frame
-		if _worker.get_slide_collision_count() > 0:
-			var col2 := _worker.get_slide_collision(0)
-			if col2 and col2.get_collider() == _building:
-				hit_ghost = true
-		if _worker.global_position.x > OLD_POS.x + 2.0:
-			crossed_old = true
-			break
-
+	var r_old: Dictionary = await _drive_worker_x(6.0, 3000)
+	var crossed_old: bool = (r_old["pos"] as Vector3).x > OLD_POS.x + 2.0
+	var hit_ghost: bool = r_old["hit"]
 	_results["T3_old_free_physics"] = crossed_old and not hit_ghost
 	print("[SPIKE] TEST3B old_free crossed=", crossed_old, " hit_ghost=", hit_ghost,
-		" worker_pos=", _worker.global_position)
-	_worker.velocity = Vector3.ZERO
+		" worker_pos=", r_old["pos"])
+	_worker_ai_on()
 
 
 func _print_summary() -> void:
-	print("========== PHASE 3 SPIKE SUMMARY (v2) ==========")
+	print("========== PHASE 3 SPIKE SUMMARY (v2.1) ==========")
 	print("[SPIKE] T1A physics blocks Worker: ", _results.get("T1_physics_blocks", false))
 	print("[SPIKE] T1B nav avoids building: ", _results.get("T1_nav_avoids", false))
 	print("[SPIKE] T2 building moves (after unregister): ", _results.get("T2_moves", false))
