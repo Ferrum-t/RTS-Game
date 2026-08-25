@@ -20,43 +20,58 @@
 | M7 | Stone harvest + stockpile parity с Wood | **ACCEPTED** |
 | M8.1 | Order data-object + `replace_order(Order)` dispatcher | **ACCEPTED** |
 | M8.2 | Audit ownership target-полей (без Increment 2) | **ACCEPTED** |
-| M8.x | Cleanup diagnostic logs (`NAV_DIAG` / `STUCK_DIAG` / `OBSTACLE_DIAG` / spam SIEGE) | **ACCEPTED** |
+| M8.x | Cleanup diagnostic logs | **ACCEPTED** |
 | M9 | Playable Match Loop (start setup, Win/Lose, command gate) | **ACCEPTED** |
+| **Phase 2** | **Stat resolver: `get_current_stat` + tier_modifiers on BaseBuilding** | **ACCEPTED** |
 
 ### Подтверждено в репозитории и F5
 
-- **Movement:** `Status.IDLE / MOVING / ARRIVED / BLOCKED / FAILED / CANCELLED`.  
-  `MovementComponent` — единственный HOW (NavigationAgent3D, path, velocity, `move_and_slide`).  
-  Не пишет `owner.unit_state`. Обход зданий по NavMesh (M6.8 footprint = runtime position).
-- **Harvest:** Tree + Stone → bag → RETURNING → deposit → stockpile; подход через Movement (не direct steer).
-- **Combat / Siege:** unit-vs-unit; `ATTACK_BUILDING`; destroy → unregister + free.
-- **Team:** `team_id` 0 = player, 1 = enemy; `TeamRules` (select / attack / attack_building / harvest / command).
-- **Order (M8.1):** `Scripts/Systems/Order.gd` (`class_name Order`, `Type`, `none()`).  
-  `BaseUnit.current_order: Order`; `replace_order(order)`; wrappers `replace_order_*` → `set_*_target`.  
-  Target-поля и компоненты **не** консолидированы (Increment 2 не делали намеренно).
-- **Match (M9):** Autoload `MatchManager` — spawn player TC (team 0) + enemy TC/Soldier (team 1);  
-  Win = все здания team 1 уничтожены; Lose = все здания team 0 уничтожены;  
-  `MATCH: VICTORY` / `MATCH: DEFEAT` + Label; `CommandManager` гейтит новые приказы после конца матча.
-- **Production / Construction:** train Worker/Soldier; build TC/Barracks; single-slot production.
+- **Movement / Harvest / Combat / Siege / Order / Match** — как в предыдущем статусе (M1–M9).
+- **Phase 2 (tier-часть резолвера):**
+  - `Scripts/Systems/DeploymentState.gd` — только `enum State` (DEPLOYED/PACKING/MOBILE/UNPACKING).
+  - `BaseBuilding.get_current_stat(stat_name, base_value)` = base × tier_modifiers[tier-1] × deployment_overrides[state].
+  - `_ready()`: `max_health = int(get_current_stat(...))` затем `health = max_health` (резолв **только при спавне**).
+  - Дефолты `tier_modifiers`: `[{}, {"max_health": 1.5}, {"max_health": 2.0}]` → tier1=500, tier2=750, tier3=1000 при base 500.
+  - F5: построенный TC tier=1 → `HP …/500`; тот же тип с tier=2 до `_ready` → `HP …/750`. Словари не шарятся между инстансами.
+  - `deployment_overrides` / смена `deployment_state` в рантайме **не** пересчитывают статы — это требование фазы 4.
 
-### Известный технический долг (не блокер текущего playable loop)
+### «Set tier» в Output — НЕ наш код
 
-- `NavigationBakeService.AGENT_RADIUS = 1.1` — эмпирика; пересмотреть при плотной застройке.
-- `MovementComponent.set_target()` пишет `owner.move_target` (небольшой dual-write; не трогать без нужды).
-- Target-поля (`move_target`, `harvest_target`, …) живут рядом с `Order` — M8.2 audit: компоненты Harvest/Combat **не** пишут их; внешний path только через `replace_order_*`.
-- `CombatComponent` задаёт `owner.velocity` в chase — учесть при Mobile Tower / entity-agnostic movement (фаза 3–4, §3.4).
-- Production — single-slot, без очереди (ок для v1.0).
-- `get_nearest_town_center` не фильтрует по `team_id` (deposit может выбрать ближайший TC любого team).
-- Runtime смена `team_id` в Inspector может мгновенно триггерить Win/Lose (тест-артефакт M9).
+В репозитории **нет** `print("Set tier")` и нет кастомного setter для `tier`.  
+Строка `Set tier` / `Set team_id` появляется, когда в **Remote Inspector** во время F5 меняют `@export`-свойство — это лог редактора Godot, не игровой print.  
+Смена `tier` на уже живом здании **не** вызывает повторный `get_current_stat` (ожидаемо до фазы 4).
+
+### MatchManager Win/Lose (факт кода)
+
+Считает **только** `team_id == 0` (player) и `team_id == 1` (enemy):
+
+- **VICTORY:** когда-то был ≥1 building team 1 **и** сейчас `enemy_alive == 0`.
+- **DEFEAT:** когда-то был ≥1 building team 0 **и** сейчас `player_alive == 0`.
+
+Любой другой `team_id` (2, 3, …) **игнорируется** в подсчёте. Поэтому:
+
+- смена **последнего** enemy TC с `1` → `2` → сразу **VICTORY** (team 1 «исчез» без destroy);
+- тестовое здание с `team_id = 3` не влияет на Win/Lose, пока живы team 0 и team 1.
+
+Для тестов фазы 3: держать player=0, enemy=1; не менять team_id enemy TC в Inspector.
+
+### Известный технический долг
+
+- `NavigationBakeService.AGENT_RADIUS = 1.1` — эмпирика.
+- `MovementComponent.set_target()` пишет `owner.move_target`.
+- `CombatComponent` → `owner.velocity` в chase (entity-agnostic movement — фазы 3–4).
+- Production single-slot.
+- `get_nearest_town_center` без фильтра по `team_id`.
+- **MatchManager жёстко team 0/1** — runtime смена team_id в Inspector ломает тесты (зафиксировано F5).
+- Enemy TC от MatchManager получает автоимя `@StaticBody3D@N` (не задан `.name`).
+- Phase 2: runtime смена tier/deployment **не** резолвит статы заново (нужно в фазе 4).
 
 ### Следующий шаг по roadmap (§4)
 
-Фаза **1 (Order)** — закрыта.  
-Cleanup диагностов — уже сделан раньше плана §4 п.6.  
-**Следующие по документу:**  
-2. Стат-резолвер base × tier × deployment  
-3. Спайк физики DEPLOYED ↔ MOBILE  
-4. DeploymentComponent + NavBake register/unregister  
+1. Order — **DONE**  
+2. Стат-резолвер (tier) — **DONE**  
+3. **← СЛЕДУЮЩИЙ:** спайк физики DEPLOYED ↔ MOBILE  
+4. DeploymentComponent + NavBake register/unregister (+ runtime re-resolve stats)  
 5. Мобильный Town Center  
 
 > Урок процесса: код из чата ≠ факт репозитория, пока не подтверждён чтением файлов после коммита и F5.
@@ -145,111 +160,66 @@ Cleanup диагностов — уже сделан раньше плана §4
 
 Эти пункты нужны именно потому, что без них v1.0-фичи (не бэклог!) лягут как хаки.
 
-### 3.1 Order abstraction (поднять по приоритету)
-Raid — это по сути ATTACK-приказ с побочным loot-эффектом. Если сейчас
-`CommandManager` продолжает напрямую дёргать методы юнита (`set_move_target` и
-т.п.), Raid и мобильные постройки лягут поверх старого паттерна как ещё один
-`get_first_barracks()`-style хак. Минимальный контракт:
+### 3.1 Order abstraction
+Raid — это по сути ATTACK-приказ с побочным loot-эффектом. Минимальный контракт:
 - `Order` как data-объект (type, target, params).
 - `Unit.current_order` + `execute_order()`.
-- Очередь длины 1 на первом этапе (без приоритетов/прерываний).
-Этого достаточно для MOVE/ATTACK/HARVEST/RAID на старте.
+- Очередь длины 1 на первом этапе.
 
 > **Статус:** минимальный контракт Order data-object + `replace_order` реализован (M8.1).
-> Полный `execute_order()` / очередь / RAID type — ещё нет; наращивать по мере фаз 5–8.
+> Полный `execute_order()` / очередь / RAID type — ещё нет.
 
 ### 3.2 DeploymentState — общий компонент, не bespoke-FSM на здание
 ```
 enum DeploymentState { DEPLOYED, PACKING, MOBILE, UNPACKING }
 ```
-- Отдельный `DeploymentComponent` (аналогично MovementComponent/HarvestComponent),
-  навешиваемый на здания, которые умеют быть мобильными.
+- Отдельный `DeploymentComponent` (фаза 4).
 - Сигнал `state_changed(old, new)`.
-- НЕ делать индивидуальную FSM под каждое здание — один компонент, простая
-  таблица переходов.
 
-### 3.3 Стат-резолюшн: base × tier × deployment (одна машина на всё)
-`BuildingData` расширить:
-```
-base_stats: Dictionary
-tier_modifiers: Array[Dictionary]        # per T1/T2/T3
-deployment_stat_overrides: Dictionary    # {DEPLOYED: {...}, MOBILE: {...}}
-```
-Единая функция `get_current_stat(name)` резолвит: base × tier_modifier ×
-deployment_override. Это упрощённая версия будущего Modifier/Effect механизма
-(ауры героев, климат, технологии) — делаем её один раз сейчас в расчёте на то,
-что позже те системы подключатся к тому же резолверу, а не создадут параллельный.
+> **Статус:** enum вынесен в `DeploymentState.gd` (Phase 2). Компонент и переходы — фаза 4.
+
+### 3.3 Стат-резолюшн: base × tier × deployment
+Единая функция `get_current_stat` резолвит: base × tier_modifier × deployment_override.
+
+> **Статус Phase 2:** реализовано **на BaseBuilding** (не через BuildingData — подключение Data отложено).
+> Tier-часть проверена F5. Deployment overrides + **runtime re-resolve** при смене state — фаза 4.
 
 ### 3.4 Movement/Combat компоненты должны быть entity-agnostic
-Сейчас компоненты, судя по коду, писаны в расчёте на владельца-юнита
-(`CharacterBody3D`, `owner.velocity` и т.п.). Мобильная башня — это здание с
-Movement+Combat одновременно. Нужно:
-- Компоненты работают по интерфейсу (нужен `global_position`, возможность
-  задавать `velocity`), а не жёстко завязаны на класс BaseUnit.
-- **Открытый технический вопрос (нужен отдельный спайк перед фиксацией
-  контракта):** как физически представить смену `StaticBody3D` (задеплоенное
-  здание) → `CharacterBody3D` (мобильное) в Godot в рантайме — пересоздавать
-  тело, или здание всегда CharacterBody3D, а "недвижимость" в DEPLOYED
-  эмулируется иначе. Проверить в изоляции, прежде чем строить поверх этого
-  Combat/Movement для башен.
+Открытый вопрос: StaticBody3D (DEPLOYED) ↔ CharacterBody3D (MOBILE) — **фаза 3 спайк**.
 
 ### 3.5 NavigationBakeService: динамическая регистрация препятствий
-- API `register_obstruction(building)` / `unregister_obstruction(building)`,
-  вызываемые при переходе DEPLOYED ↔ MOBILE.
-- Хорошая новость: ребейк навмеша во время движения юнита уже проверен и
-  работает чисто (M6.x тесты) — риск здесь ниже, чем мог бы быть.
+register/unregister при DEPLOYED ↔ MOBILE — фаза 4. Ребейк во время движения юнита уже проверен (M6.x).
 
 ### 3.6 Horses как отдельный тип ресурса/сущности
-- Не квадратный BaseResource-клон Stone/Tree "в лоб" — но и не полноценная
-  Livestock-система с AI сразу. Для v1.0: узел добычи, который выдаёт отдельный
-  ресурс-тип "Horses", гейтящий производство кавалерии через UnitData
-  (`required_horses: int`).
-- Ресурсная система не должна хардкодить wood/stone/gold по десяткам мест
-  (уже отмечено в исходном документе) — Horses стоит добавить как проверку
-  того, что расширение ресурсов действительно дёшево.
+Узел добычи + гейт кавалерии — после Mobile TC (фаза 7).
 
-### 3.7 Damage → Loot как отдельный хук, не завязанный на Destroy
-- Damage pipeline эмитит событие при попадании урона по зданию; Raid/Loot
-  подписывается на него отдельно от Destroy.
-- Явно НЕ `if building.name == "Stable": ...` — через тег/capability на
-  BuildingData (например `lootable_resources: {gold: ..., horses_chance: ...}`).
+### 3.7 Damage → Loot как отдельный хук
+Не на Destroy, а на hit — фаза 8.
 
 ---
 
 ## 4. Обновлённый порядок фаз (с учётом v1.0-скоупа)
 
-> Примечание (2026-08-25): диагностический cleanup уже выполнен (M8.x).
-> При спайке Mobile TC при необходимости можно временно вернуть точечные print'ы.
+> Примечание (2026-08-25): diagnostic cleanup и Phase 2 (tier resolver) выполнены.
 
-1. **Order abstraction** (см. 3.1) — **DONE (M8.1)**. Разблокирует Raid и мобильные здания.
-2. **Стат-резолвер base×tier×deployment** (см. 3.3) — до реализации мобильных
-   зданий, иначе характеристики придётся переписывать. **← СЛЕДУЮЩИЙ**
-3. **Спайк: физика DEPLOYED↔MOBILE в Godot** (см. 3.4) — маленький изолированный
-   прототип на одном здании, прежде чем фиксировать контракт компонентов.
-4. **DeploymentComponent + NavigationBakeService register/unregister** (3.2, 3.5).
-5. **Мобильный Town Center** — первая полная реализация фичи на основе 1–4.
-6. **Cleanup** — диагностические print'ы уже убраны; dead code по мере появления.
-7. **Horses как ресурс + гейт кавалерии** (3.6).
-8. **Raid/Loot (числовой вариант)** (3.7).
-9. **Мобильные башни** — после Town Center, переиспользуя тот же
-   DeploymentComponent/Movement/Combat контракт.
-10. **Базовая версия Environment Zones** — минимально достаточная, чтобы кочевье
-    имело игровой смысл.
+1. **Order abstraction** — **DONE (M8.1)**.
+2. **Стат-резолвер base×tier×deployment** — **DONE (Phase 2, tier-часть)**.  
+   Runtime re-resolve при deployment — вместе с фазой 4.
+3. **Спайк: физика DEPLOYED↔MOBILE в Godot** (см. 3.4) — **← СЛЕДУЮЩИЙ**.
+4. **DeploymentComponent + NavigationBakeService register/unregister** (+ re-resolve stats).
+5. **Мобильный Town Center**.
+6. **Cleanup** — диагносты уже убраны; dead code по мере появления.
+7. **Horses как ресурс + гейт кавалерии**.
+8. **Raid/Loot (числовой вариант)**.
+9. **Мобильные башни**.
+10. **Базовая версия Environment Zones**.
 11. Полировка одной расы, баланс, UI/UX — до релизного состояния v1.0.
-
-Все остальные разделы исходного концепт-документа (герои, другие фракции,
-живые животные, климат, режимы) — сознательно после этого списка.
 
 ---
 
 ## 5. Как использовать этот документ
 
 - Хранить как единственный источник правды по scope и архитектурным решениям.
-- В начале новой сессии с любой моделью — прикладывать этот файл (или
-  релевантный раздел) + короткий отдельный "снапшот текущего статуса"
-  (что сделано с последнего обновления, актуальный технический долг — например
-  `agent_radius=1.1`, freeze M6.6 и т.п.).
-- Не смешивать этот документ с оперативными логами/дебагом — держать отдельно,
-  чтобы не разрастался и не терял актуальность.
-- Обновлять раздел 4 (порядок фаз) по мере продвижения — остальное меняется
-  редко.
+- В начале новой сессии с любой моделью — прикладывать этот файл + короткий снапшот статуса.
+- Не смешивать с оперативными логами/дебагом.
+- Обновлять §0 и §4 по мере продвижения.
