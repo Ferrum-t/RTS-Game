@@ -2,7 +2,7 @@ extends BaseBuilding
 
 class_name Barracks
 
-## Military production. Soldiers + Cavalry (horses gate).
+## Military production. Soldiers + Cavalry + SiegeUnit.
 
 @export var soldier_scene: PackedScene
 @export var soldier_cost_wood: int = 80
@@ -12,6 +12,11 @@ class_name Barracks
 @export var cavalry_cost_wood: int = 100
 @export var cavalry_cost_horses: int = 1
 @export var cavalry_train_time: float = 6.0
+
+@export var siege_scene: PackedScene
+@export var siege_cost_wood: int = 150
+@export var siege_cost_stone: int = 50
+@export var siege_train_time: float = 8.0
 
 @export var spawn_offset: Vector3 = Vector3(3.0, 0.0, 0.0)
 
@@ -27,9 +32,11 @@ func _ready() -> void:
 		soldier_scene = load("res://Scenes/Units/soldier.tscn") as PackedScene
 	if cavalry_scene == null:
 		cavalry_scene = load("res://Scenes/Units/cavalry.tscn") as PackedScene
+	if siege_scene == null:
+		siege_scene = load("res://Scenes/Units/siege_unit.tscn") as PackedScene
 	print("Barracks ready at: ", global_position)
 	if OS.is_debug_build() and team_id == 0:
-		print("Barracks debug: C=train Cavalry (100 wood + 1 horse)")
+		print("Barracks debug: C=Cavalry  R=Siege (150W+50S)")
 
 
 func _process(delta: float) -> void:
@@ -48,9 +55,13 @@ func _unhandled_input(event: InputEvent) -> void:
 	if not (event is InputEventKey and event.pressed and not event.echo):
 		return
 	var key := event as InputEventKey
-	if key.keycode == KEY_C:
-		try_train_cavalry()
-		get_viewport().set_input_as_handled()
+	match key.keycode:
+		KEY_C:
+			try_train_cavalry()
+			get_viewport().set_input_as_handled()
+		KEY_R:
+			try_train_siege()
+			get_viewport().set_input_as_handled()
 
 
 func try_train_soldier() -> bool:
@@ -126,6 +137,52 @@ func try_train_cavalry() -> bool:
 	return true
 
 
+func try_train_siege() -> bool:
+	if is_training:
+		print("Barracks: already training")
+		return false
+
+	if siege_scene == null:
+		push_error("Barracks: siege_scene is null")
+		return false
+
+	var rm := get_node_or_null("/root/ResourceManager")
+	if rm == null:
+		return false
+
+	var cost: Dictionary = ResourceManager.make_cost(siege_cost_wood, siege_cost_stone)
+	if not rm.can_afford(cost):
+		print(
+			"Barracks: not enough resources for Siege (need W:",
+			siege_cost_wood,
+			" S:",
+			siege_cost_stone,
+			" have W:",
+			rm.wood,
+			" S:",
+			rm.stone,
+			")"
+		)
+		return false
+
+	if not rm.spend(cost):
+		return false
+
+	is_training = true
+	train_timer = siege_train_time
+	_pending_scene = siege_scene
+	print(
+		"Barracks: training SiegeUnit... (",
+		siege_train_time,
+		"s, cost ",
+		siege_cost_wood,
+		" wood + ",
+		siege_cost_stone,
+		" stone)"
+	)
+	return true
+
+
 func _finish_training() -> void:
 	is_training = false
 	train_timer = 0.0
@@ -144,7 +201,9 @@ func _finish_training() -> void:
 	unit.global_position = global_position + spawn_offset
 
 	var label := "unit"
-	if unit is Cavalry:
+	if unit is SiegeUnit:
+		label = "SiegeUnit"
+	elif unit is Cavalry:
 		label = "Cavalry"
 	elif unit is Soldier:
 		label = "Soldier"
