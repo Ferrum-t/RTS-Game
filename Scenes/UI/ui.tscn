@@ -7,6 +7,7 @@
 [ext_resource type="Script" path="res://Scripts/UI/TrainWorkerButton.gd" id="5_train"]
 [ext_resource type="Script" path="res://Scripts/UI/TrainSoldierButton.gd" id="6_soldier"]
 [ext_resource type="Script" path="res://Scripts/UI/TrainCavalryButton.gd" id="7_cav"]
+[ext_resource type="Script" path="res://Scripts/UI/TrainSiegeButton.gd" id="7b_siege"]
 [ext_resource type="Script" path="res://Scripts/UI/PackButton.gd" id="8_pack"]
 [ext_resource type="Script" path="res://Scripts/UI/UnpackButton.gd" id="9_unpack"]
 
@@ -41,7 +42,7 @@ layout_mode = 2
 offset_left = 10.0
 offset_top = 120.0
 offset_right = 260.0
-offset_bottom = 320.0
+offset_bottom = 360.0
 theme_override_constants/separation = 6
 
 [node name="TrainWorkerButton" type="Button" parent="ActionPanel"]
@@ -61,6 +62,12 @@ custom_minimum_size = Vector2(240, 28)
 layout_mode = 2
 text = "Train Cavalry (100W + 1H)"
 script = ExtResource("7_cav")
+
+[node name="TrainSiegeButton" type="Button" parent="ActionPanel"]
+custom_minimum_size = Vector2(240, 28)
+layout_mode = 2
+text = "Train Siege (150W + 50S)"
+script = ExtResource("7b_siege")
 
 [node name="Sep" type="HSeparator" parent="ActionPanel"]
 layout_mode = 2
