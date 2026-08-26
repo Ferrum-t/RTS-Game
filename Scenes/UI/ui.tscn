@@ -6,6 +6,9 @@
 [ext_resource type="Script" path="res://Scripts/UI/ResourceUI.gd" id="4_resui"]
 [ext_resource type="Script" path="res://Scripts/UI/TrainWorkerButton.gd" id="5_train"]
 [ext_resource type="Script" path="res://Scripts/UI/TrainSoldierButton.gd" id="6_soldier"]
+[ext_resource type="Script" path="res://Scripts/UI/TrainCavalryButton.gd" id="7_cav"]
+[ext_resource type="Script" path="res://Scripts/UI/PackButton.gd" id="8_pack"]
+[ext_resource type="Script" path="res://Scripts/UI/UnpackButton.gd" id="9_unpack"]
 
 [node name="UI" type="CanvasLayer"]
 
@@ -18,14 +21,14 @@ offset_right = -12.0
 offset_bottom = 36.0
 grow_horizontal = 2
 theme_override_font_sizes/font_size = 18
-text = "Wood: 0    Stone: 0    Gold: 0    Food: 0"
+text = "Wood: 0    Stone: 0    Gold: 0    Food: 0    Horses: 0"
 horizontal_alignment = 1
 script = ExtResource("4_resui")
 
 [node name="BuildPanel" type="PanelContainer" parent="."]
 offset_left = 10.0
 offset_top = 48.0
-offset_right = 300.0
+offset_right = 280.0
 offset_bottom = 78.0
 script = ExtResource("1_ahcct")
 build_catalog = ExtResource("2_de23q")
@@ -34,18 +37,42 @@ build_button_scene = ExtResource("3_c7mb3")
 [node name="VBoxContainer" type="VBoxContainer" parent="BuildPanel"]
 layout_mode = 2
 
-[node name="TrainWorkerButton" type="Button" parent="."]
+[node name="ActionPanel" type="VBoxContainer" parent="."]
 offset_left = 10.0
-offset_top = 90.0
-offset_right = 220.0
-offset_bottom = 120.0
+offset_top = 120.0
+offset_right = 260.0
+offset_bottom = 320.0
+theme_override_constants/separation = 6
+
+[node name="TrainWorkerButton" type="Button" parent="ActionPanel"]
+custom_minimum_size = Vector2(240, 28)
+layout_mode = 2
 text = "Train Worker (50 Wood)"
 script = ExtResource("5_train")
 
-[node name="TrainSoldierButton" type="Button" parent="."]
-offset_left = 10.0
-offset_top = 128.0
-offset_right = 220.0
-offset_bottom = 158.0
+[node name="TrainSoldierButton" type="Button" parent="ActionPanel"]
+custom_minimum_size = Vector2(240, 28)
+layout_mode = 2
 text = "Train Soldier (80 Wood)"
 script = ExtResource("6_soldier")
+
+[node name="TrainCavalryButton" type="Button" parent="ActionPanel"]
+custom_minimum_size = Vector2(240, 28)
+layout_mode = 2
+text = "Train Cavalry (100W + 1H)"
+script = ExtResource("7_cav")
+
+[node name="Sep" type="HSeparator" parent="ActionPanel"]
+layout_mode = 2
+
+[node name="PackButton" type="Button" parent="ActionPanel"]
+custom_minimum_size = Vector2(240, 28)
+layout_mode = 2
+text = "Pack TC"
+script = ExtResource("8_pack")
+
+[node name="UnpackButton" type="Button" parent="ActionPanel"]
+custom_minimum_size = Vector2(240, 28)
+layout_mode = 2
+text = "Unpack TC"
+script = ExtResource("9_unpack")
