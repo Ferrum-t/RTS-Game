@@ -2,6 +2,7 @@ extends Node
 
 ## M9 — Playable Match Loop.
 ## Owns match state only. Does not drive movement, orders, harvest, or combat.
+## Phase 7: wires EnemyAIComponent + EnemySpawner for team 1.
 
 enum MatchState {
 	PLAYING,
@@ -23,6 +24,7 @@ const PLAYER_TC_POS := Vector3(2.0, 0.0, -2.0)
 ## Far from player start
 const ENEMY_TC_POS := Vector3(-18.0, 0.0, 12.0)
 const ENEMY_SOLDIER_OFFSET := Vector3(3.5, 0.0, 0.0)
+const ENEMY_SPAWNER_OFFSET := Vector3(2.0, 0.0, 4.0)
 
 
 func _ready() -> void:
@@ -50,7 +52,7 @@ func _setup_match() -> void:
 	enemy_tc.position = ENEMY_TC_POS
 	scene.add_child(enemy_tc)
 
-	# Enemy Soldier (team 1) — static target, no AI
+	# Enemy Soldier (team 1) + AI brain
 	var units_parent: Node = scene.get_node_or_null("Units")
 	if units_parent == null:
 		units_parent = scene
@@ -58,9 +60,23 @@ func _setup_match() -> void:
 	soldier.team_id = 1
 	units_parent.add_child(soldier)
 	soldier.global_position = ENEMY_TC_POS + ENEMY_SOLDIER_OFFSET
+	if soldier is BaseUnit:
+		EnemyAIComponent.attach_to(soldier as BaseUnit, 24.0)
+
+	# Wave spawner near enemy base
+	var spawner := EnemySpawner.new()
+	spawner.name = "EnemySpawner"
+	spawner.team_id = 1
+	spawner.spawn_interval = 14.0
+	spawner.first_spawn_delay = 10.0
+	spawner.wave_size = 1
+	spawner.max_units_alive = 5
+	spawner.unit_scene = SOLDIER_SCENE
+	spawner.position = ENEMY_TC_POS + ENEMY_SPAWNER_OFFSET
+	scene.add_child(spawner)
 
 	_ensure_result_label()
-	print("MATCH: PLAYING (player TC team 0, enemy TC+Soldier team 1)")
+	print("MATCH: PLAYING (player TC team 0, enemy TC+Soldier+AI team 1)")
 
 
 func _process(_delta: float) -> void:
@@ -139,7 +155,6 @@ func _ensure_result_label() -> void:
 	_result_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 	_result_label.add_theme_font_size_override("font_size", 64)
 	_result_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	# Center via offsets after anchors
 	_result_label.offset_left = -200.0
 	_result_label.offset_right = 200.0
 	_result_label.offset_top = -40.0
