@@ -14,7 +14,7 @@ func _process(_delta: float) -> void:
 
 
 func _refresh_enabled() -> void:
-	var tc := _get_player_tc()
+	var tc: Node = _get_player_tc()
 	if tc == null:
 		disabled = true
 		return
@@ -24,7 +24,7 @@ func _refresh_enabled() -> void:
 
 
 func _on_pressed() -> void:
-	var tc := _get_player_tc()
+	var tc: Node = _get_player_tc()
 	if tc == null:
 		print("Pack: no player Town Center")
 		return
@@ -34,11 +34,15 @@ func _on_pressed() -> void:
 		tc.debug_pack()
 
 
-func _get_player_tc():
-	var bm := get_node_or_null("/root/BuildingManager")
+func _get_player_tc() -> Node:
+	var bm: Node = get_node_or_null("/root/BuildingManager")
 	if bm == null:
 		return null
-	for tc in bm.town_centers:
+	var list: Array = bm.get("town_centers")
+	if list == null:
+		return null
+	for item in list:
+		var tc: Node = item as Node
 		if tc == null or not is_instance_valid(tc):
 			continue
 		if int(tc.get("team_id")) == 0:
