@@ -23,6 +23,8 @@ enum UnitState
 @export var attack_range := 2.0
 @export var attack_cooldown := 1.0
 @export var building_attack_range := 6.5
+## Exit building attack only past this multiple of building_attack_range (hysteresis).
+@export var building_exit_range_mult := 1.2
 @export var health_bar_height := 1.6
 ## Phase 5: Cavalry sets false — cannot take HARVEST orders
 @export var can_gather: bool = true
@@ -57,6 +59,8 @@ var last_move_end_reason: String = ""
 var _building_attack_timer: float = 0.0
 var _siege_stuck_time: float = 0.0
 var _siege_last_pos: Vector3 = Vector3.ZERO
+## Polish: locked in building strike range (hysteresis).
+var _siege_in_range: bool = false
 
 const GRAVITY := 30.0
 const HEALTH_BAR_SCENE := preload("res://Scenes/UI/HealthBar3D.tscn")
@@ -225,6 +229,8 @@ func update_attacking_building(delta: float) -> void:
 	to_b.y = 0.0
 	var dist := to_b.length()
 
+	var exit_range: float = building_attack_range * building_exit_range_mult
+
 	var moved := global_position.distance_to(_siege_last_pos)
 	_siege_last_pos = global_position
 	if moved < 0.03:
@@ -232,7 +238,16 @@ func update_attacking_building(delta: float) -> void:
 	else:
 		_siege_stuck_time = 0.0
 
+	# Hysteresis: enter at building_attack_range, leave only past exit_range
+	if _siege_in_range:
+		if dist > exit_range:
+			_siege_in_range = false
+		else:
+			_siege_hold_and_strike(delta, building)
+			return
+
 	var in_range := dist <= building_attack_range
+	# Soft stuck near building edge still counts as enter once
 	if not in_range and dist <= building_attack_range + 2.5 and _siege_stuck_time >= 0.35:
 		in_range = true
 
@@ -246,6 +261,11 @@ func update_attacking_building(delta: float) -> void:
 		movement.update(delta)
 		return
 
+	_siege_in_range = true
+	_siege_hold_and_strike(delta, building)
+
+
+func _siege_hold_and_strike(delta: float, building: BaseBuilding) -> void:
 	if movement:
 		movement.cancel()
 	velocity = Vector3.ZERO
@@ -273,6 +293,7 @@ func _clear_building_attack() -> void:
 	attack_building_target = null
 	_building_attack_timer = 0.0
 	_siege_stuck_time = 0.0
+	_siege_in_range = false
 	velocity = Vector3.ZERO
 	current_order = Order.none()
 	unit_state = UnitState.IDLE
@@ -428,6 +449,7 @@ func set_move_target(target: Vector3) -> void:
 	return_target = null
 	_building_attack_timer = 0.0
 	_siege_stuck_time = 0.0
+	_siege_in_range = false
 	last_move_end_reason = ""
 	if harvest:
 		harvest.reset()
@@ -445,6 +467,7 @@ func set_harvest_target(resource: BaseResource) -> void:
 	attack_building_target = null
 	return_target = null
 	_building_attack_timer = 0.0
+	_siege_in_range = false
 	unit_state = UnitState.HARVESTING
 	if combat:
 		combat.reset()
@@ -469,6 +492,7 @@ func set_attack_target(enemy: BaseUnit) -> void:
 	harvest_target = null
 	return_target = null
 	_building_attack_timer = 0.0
+	_siege_in_range = false
 	unit_state = UnitState.ATTACKING
 	if harvest:
 		harvest.reset()
@@ -486,6 +510,7 @@ func set_attack_building_target(building: BaseBuilding) -> void:
 	return_target = null
 	_building_attack_timer = 0.0
 	_siege_stuck_time = 0.0
+	_siege_in_range = false
 	_siege_last_pos = global_position
 	unit_state = UnitState.ATTACKING
 	if current_order == null or current_order.type != Order.Type.ATTACK_BUILDING:
@@ -528,6 +553,7 @@ func die() -> void:
 	unit_state = UnitState.DEAD
 	current_order = Order.none()
 	attack_building_target = null
+	_siege_in_range = false
 	if movement:
 		movement.cancel()
 	if harvest:
