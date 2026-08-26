@@ -1,7 +1,8 @@
 extends Node
 
 ## Autoload singleton — player resource stockpile.
-## No class_name (avoids conflict with Autoload name).
+## Cost API is Dictionary-based: keys = BaseResource.Type (int), values = amount.
+## Stock fields (wood/stone/...) kept for HUD and deposit convenience.
 
 signal resources_changed
 
@@ -17,72 +18,115 @@ func _ready() -> void:
 	print("ResourceManager ready. Wood: ", wood, " Horses: ", horses)
 
 
-func add_wood(amount: int) -> void:
+## Build a cost dictionary from individual amounts (call sites / BuildingData).
+static func make_cost(
+	wood_amt: int = 0,
+	stone_amt: int = 0,
+	gold_amt: int = 0,
+	food_amt: int = 0,
+	horses_amt: int = 0
+) -> Dictionary:
+	var cost: Dictionary = {}
+	if wood_amt > 0:
+		cost[BaseResource.Type.WOOD] = wood_amt
+	if stone_amt > 0:
+		cost[BaseResource.Type.STONE] = stone_amt
+	if gold_amt > 0:
+		cost[BaseResource.Type.GOLD] = gold_amt
+	if food_amt > 0:
+		cost[BaseResource.Type.FOOD] = food_amt
+	if horses_amt > 0:
+		cost[BaseResource.Type.HORSES] = horses_amt
+	return cost
+
+
+func get_stock(resource_type: int) -> int:
+	match resource_type:
+		BaseResource.Type.WOOD:
+			return wood
+		BaseResource.Type.STONE:
+			return stone
+		BaseResource.Type.GOLD:
+			return gold
+		BaseResource.Type.FOOD:
+			return food
+		BaseResource.Type.HORSES:
+			return horses
+		_:
+			return 0
+
+
+func _set_stock(resource_type: int, value: int) -> void:
+	value = maxi(value, 0)
+	match resource_type:
+		BaseResource.Type.WOOD:
+			wood = value
+		BaseResource.Type.STONE:
+			stone = value
+		BaseResource.Type.GOLD:
+			gold = value
+		BaseResource.Type.FOOD:
+			food = value
+		BaseResource.Type.HORSES:
+			horses = value
+
+
+func can_afford(cost: Dictionary) -> bool:
+	if cost == null or cost.is_empty():
+		return true
+	for key in cost.keys():
+		var need: int = int(cost[key])
+		if need <= 0:
+			continue
+		if get_stock(int(key)) < need:
+			return false
+	return true
+
+
+func spend(cost: Dictionary) -> bool:
+	if not can_afford(cost):
+		return false
+	for key in cost.keys():
+		var need: int = int(cost[key])
+		if need <= 0:
+			continue
+		var t: int = int(key)
+		_set_stock(t, get_stock(t) - need)
+	resources_changed.emit()
+	return true
+
+
+func add(resource_type: int, amount: int) -> void:
 	if amount <= 0:
 		return
-	wood += amount
+	_set_stock(resource_type, get_stock(resource_type) + amount)
 	resources_changed.emit()
-	print("Stockpile Wood: ", wood)
+	match resource_type:
+		BaseResource.Type.WOOD:
+			print("Stockpile Wood: ", wood)
+		BaseResource.Type.STONE:
+			print("Stockpile Stone: ", stone)
+		BaseResource.Type.HORSES:
+			print("Stockpile Horses: ", horses)
+		_:
+			pass
+
+
+func add_wood(amount: int) -> void:
+	add(BaseResource.Type.WOOD, amount)
 
 
 func add_stone(amount: int) -> void:
-	if amount <= 0:
-		return
-	stone += amount
-	resources_changed.emit()
+	add(BaseResource.Type.STONE, amount)
 
 
 func add_gold(amount: int) -> void:
-	if amount <= 0:
-		return
-	gold += amount
-	resources_changed.emit()
+	add(BaseResource.Type.GOLD, amount)
 
 
 func add_food(amount: int) -> void:
-	if amount <= 0:
-		return
-	food += amount
-	resources_changed.emit()
+	add(BaseResource.Type.FOOD, amount)
 
 
 func add_horses(amount: int) -> void:
-	if amount <= 0:
-		return
-	horses += amount
-	resources_changed.emit()
-	print("Stockpile Horses: ", horses)
-
-
-func can_afford(
-	wood_cost: int = 0,
-	stone_cost: int = 0,
-	gold_cost: int = 0,
-	food_cost: int = 0,
-	horses_cost: int = 0
-) -> bool:
-	return (
-		wood >= wood_cost
-		and stone >= stone_cost
-		and gold >= gold_cost
-		and food >= food_cost
-		and horses >= horses_cost
-	)
-
-
-func spend(
-	wood_cost: int = 0,
-	stone_cost: int = 0,
-	gold_cost: int = 0,
-	food_cost: int = 0,
-	horses_cost: int = 0
-) -> bool:
-	if not can_afford(wood_cost, stone_cost, gold_cost, food_cost, horses_cost):
-		return false
-	wood -= wood_cost
-	stone -= stone_cost
-	gold -= gold_cost
-	food -= food_cost
-	horses -= horses_cost
-	resources_changed.emit()
-	return true
+	add(BaseResource.Type.HORSES, amount)

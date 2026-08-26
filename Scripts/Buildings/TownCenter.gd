@@ -36,7 +36,6 @@ func _process(delta: float) -> void:
 func _unhandled_input(event: InputEvent) -> void:
 	if not OS.is_debug_build():
 		return
-	# Only player TC (team 0) reacts — avoid enemy TC packing on same key
 	if team_id != 0:
 		return
 	if is_destroyed:
@@ -73,7 +72,8 @@ func try_train_worker() -> bool:
 	if rm == null:
 		return false
 
-	if not rm.spend(worker_cost_wood):
+	var cost: Dictionary = ResourceManager.make_cost(worker_cost_wood)
+	if not rm.spend(cost):
 		print("TownCenter: not enough wood for Worker (need ", worker_cost_wood, ")")
 		return false
 
@@ -103,7 +103,6 @@ func _finish_training() -> void:
 	_pending_scene = null
 
 
-## Debug / Phase 4 manual API (no Order.Type.PACK yet)
 func debug_pack() -> void:
 	request_pack()
 

@@ -16,3 +16,9 @@ class_name BuildingData
 @export var stone : int = 0
 @export var gold : int = 0
 @export var food : int = 0
+@export var horses : int = 0
+
+
+## Dictionary cost for ResourceManager.can_afford / spend.
+func get_cost_dict() -> Dictionary:
+	return ResourceManager.make_cost(wood, stone, gold, food, horses)

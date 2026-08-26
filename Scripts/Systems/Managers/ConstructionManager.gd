@@ -8,8 +8,9 @@ func start_building(data: BuildingData) -> void:
 	if data == null:
 		return
 
+	var cost: Dictionary = data.get_cost_dict()
 	var rm := get_node_or_null("/root/ResourceManager")
-	if rm and not rm.can_afford(data.wood, data.stone, data.gold, data.food):
+	if rm and not rm.can_afford(cost):
 		print("Construction: not enough resources for ", data.building_name,
 			" (need W:", data.wood, " S:", data.stone, " G:", data.gold, " F:", data.food, ")")
 		return
@@ -37,10 +38,11 @@ func confirm_build() -> void:
 		return
 
 	var data := current_building_data
+	var cost: Dictionary = data.get_cost_dict()
 	var rm := get_node_or_null("/root/ResourceManager")
 
 	if rm:
-		if not rm.spend(data.wood, data.stone, data.gold, data.food):
+		if not rm.spend(cost):
 			print("Construction: not enough resources to place ", data.building_name)
 			return
 
@@ -62,7 +64,6 @@ func confirm_build() -> void:
 	if nav != null and nav.has_method("update_building_position"):
 		nav.update_building_position(building)
 	elif nav != null and nav.has_method("register_building"):
-		# Fallback if building was not registered in _ready for any reason
 		var he := Vector3.ZERO
 		if "nav_half_extents" in building:
 			he = building.nav_half_extents

@@ -19,7 +19,7 @@ func _on_resources_changed() -> void:
 	var rm := get_node_or_null("/root/ResourceManager")
 	if rm == null:
 		return
-	disabled = rm.wood < COST_WOOD
+	disabled = not rm.can_afford(ResourceManager.make_cost(COST_WOOD))
 
 
 func _on_pressed() -> void:

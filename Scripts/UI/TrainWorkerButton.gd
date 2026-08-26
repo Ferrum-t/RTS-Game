@@ -2,6 +2,8 @@ extends Button
 
 ## Requests the first available Town Center to train a Worker.
 
+const COST_WOOD := 50
+
 
 func _ready() -> void:
 	text = "Train Worker (50 Wood)"
@@ -17,7 +19,7 @@ func _on_resources_changed() -> void:
 	var rm := get_node_or_null("/root/ResourceManager")
 	if rm == null:
 		return
-	disabled = rm.wood < 50
+	disabled = not rm.can_afford(ResourceManager.make_cost(COST_WOOD))
 
 
 func _on_pressed() -> void:

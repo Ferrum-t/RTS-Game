@@ -2,9 +2,9 @@ extends RefCounted
 
 class_name HarvestComponent
 
-## M2 + harvest-approach fix: reports Status only.
+## M2 + harvest-approach: reports Status only.
 ## Does NOT drive velocity / move_and_slide / NavigationAgent.
-## BaseUnit + MovementComponent handle HOW to reach the resource.
+## stand_pos is computed once per harvest order and snapped to NavMesh.
 
 enum Status {
 	IDLE,
@@ -24,8 +24,9 @@ var harvest_interval: float = 0.7
 var _timer: float = 0.0
 var _stuck_near: float = 0.0
 
-## Last computed stand position (for BaseUnit → Movement)
+## Locked stand position for current harvest order (not recomputed each frame).
 var approach_pos: Vector3 = Vector3.ZERO
+var _stand_locked: bool = false
 
 
 func _init(unit: BaseUnit) -> void:
@@ -36,6 +37,7 @@ func reset() -> void:
 	_timer = 0.0
 	_stuck_near = 0.0
 	approach_pos = Vector3.ZERO
+	_stand_locked = false
 	status = Status.IDLE
 
 
@@ -43,10 +45,11 @@ func get_status() -> Status:
 	return status
 
 
-## Stand point near resource (same formula as before: ~2.125 from center).
+## Stand point near resource, snapped onto walkable NavMesh.
 func get_approach_position(resource: BaseResource) -> Vector3:
 	if resource == null or not is_instance_valid(resource):
 		return owner.global_position
+
 	var to_res: Vector3 = resource.global_position - owner.global_position
 	to_res.y = 0.0
 	var dist := to_res.length()
@@ -54,7 +57,28 @@ func get_approach_position(resource: BaseResource) -> Vector3:
 	if dist > 0.01:
 		stand = resource.global_position - to_res.normalized() * (approach_distance * 0.85)
 	stand.y = 0.0
-	return stand
+	return _snap_to_navmesh(stand)
+
+
+func _snap_to_navmesh(pos: Vector3) -> Vector3:
+	if owner == null or not is_instance_valid(owner):
+		return pos
+	var world := owner.get_world_3d()
+	if world == null:
+		return pos
+	var map_rid: RID = world.get_navigation_map()
+	if not map_rid.is_valid():
+		return pos
+	var closest: Vector3 = NavigationServer3D.map_get_closest_point(map_rid, pos)
+	closest.y = 0.0
+	return closest
+
+
+func _ensure_stand_locked(resource: BaseResource) -> void:
+	if _stand_locked:
+		return
+	approach_pos = get_approach_position(resource)
+	_stand_locked = true
 
 
 func update(delta: float) -> void:
@@ -69,11 +93,11 @@ func update(delta: float) -> void:
 		status = Status.RESOURCE_GONE
 		return
 
+	_ensure_stand_locked(resource)
+
 	var to_res: Vector3 = resource.global_position - owner.global_position
 	to_res.y = 0.0
 	var dist := to_res.length()
-
-	approach_pos = get_approach_position(resource)
 
 	var in_range := dist <= approach_distance
 	if not in_range and dist <= approach_distance + 1.0:
