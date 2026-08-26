@@ -7,7 +7,8 @@ class_name MobileBuilding
 
 @export var pack_time: float = 2.0
 @export var unpack_time: float = 2.0
-@export var mobile_move_speed: float = 3.0
+## Slow pack-animal pace (was 3.0 — too arcade).
+@export var mobile_move_speed: float = 1.5
 @export var mobile_arrival_distance: float = 0.55
 
 var deployment: DeploymentComponent = null

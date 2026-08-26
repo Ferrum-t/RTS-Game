@@ -17,7 +17,7 @@ var owner: CharacterBody3D = null
 
 var pack_time: float = 2.0
 var unpack_time: float = 2.0
-var mobile_move_speed: float = 3.0
+var mobile_move_speed: float = 1.5
 var mobile_arrival_distance: float = 0.55
 
 var _timer: float = 0.0
@@ -170,6 +170,11 @@ func _update_move(_delta: float) -> void:
 	var dir: Vector3 = to_t.normalized()
 	owner.velocity = Vector3(dir.x * mobile_move_speed, 0.0, dir.z * mobile_move_speed)
 	owner.move_and_slide()
+	# Stay on plane (FLOATING + ground share layer 1; don't sink/climb).
+	var p: Vector3 = owner.global_position
+	p.y = 0.0
+	owner.global_position = p
+	owner.velocity.y = 0.0
 
 
 func _set_state(new_state: int) -> void:
@@ -199,9 +204,11 @@ func _register_nav() -> void:
 
 
 func _apply_mobile_collision() -> void:
+	# FLOATING: ignore floor logic. mask=1: collide with trees/stone/herds (layer 1).
+	# Phase 3 spike used mask=0 so TC phased through everything — fixed here.
 	owner.motion_mode = CharacterBody3D.MOTION_MODE_FLOATING
 	owner.collision_layer = 1
-	owner.collision_mask = 0
+	owner.collision_mask = 1
 
 
 func _apply_deployed_collision() -> void:
