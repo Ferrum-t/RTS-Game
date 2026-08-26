@@ -6,6 +6,13 @@ class_name BaseBuilding
 ## CharacterBody3D so TownCenter can move without losing BaseBuilding type for siege/CommandManager.
 ## Non-mobile buildings never call move_and_slide with nonzero velocity.
 
+enum VisualState {
+	INTACT,
+	DAMAGED,
+	BURNING,
+	DESTROYED,
+}
+
 @export var team_id: int = 0
 @export var max_health: int = 500
 ## Half-extents of footprint used for NavMesh obstruction (XZ)
@@ -34,6 +41,9 @@ var health: int = 500
 var is_destroyed: bool = false
 var lootable: LootableComponent = null
 
+## Phase 6.2 — presentation only; DESTROYED mirrors is_destroyed / die().
+var visual_state: int = VisualState.INTACT
+
 ## Accumulated loot this raid (for one summary line on destroy).
 var _raid_loot_total: Dictionary = {}
 var _raid_damage_total: int = 0
@@ -51,6 +61,7 @@ func get_current_stat(stat_name: String, base_value: float) -> float:
 func recompute_stats() -> void:
 	max_health = int(get_current_stat("max_health", float(base_max_health)))
 	health = mini(health, max_health)
+	_refresh_visual_state()
 
 
 func _ready() -> void:
@@ -76,6 +87,8 @@ func _ready() -> void:
 	var nav := get_node_or_null("/root/NavigationBakeService")
 	if nav:
 		nav.register_building(self, nav_half_extents)
+
+	_refresh_visual_state()
 
 
 func _setup_lootable() -> void:
@@ -120,6 +133,8 @@ func damage(amount: int, attacker_team_id: int = -1) -> void:
 	if health <= 0:
 		health = 0
 		die()
+	else:
+		_refresh_visual_state()
 
 
 func die() -> void:
@@ -127,6 +142,7 @@ func die() -> void:
 		return
 	is_destroyed = true
 	health = 0
+	_refresh_visual_state()
 	if is_lootable and _raid_damage_total > 0:
 		print(
 			"[RAID] ", name, " destroyed — total damage siphoned from: ",
@@ -136,3 +152,65 @@ func die() -> void:
 		)
 	print(name, " destroyed (team ", team_id, ")")
 	queue_free()
+
+
+## Phase 6.2 — HP event only. DESTROYED follows is_destroyed (die()), not a second destroy path.
+func _refresh_visual_state() -> void:
+	var next: int = VisualState.INTACT
+	if is_destroyed or health <= 0:
+		next = VisualState.DESTROYED
+	elif max_health <= 0:
+		next = VisualState.INTACT
+	else:
+		var ratio: float = float(health) / float(max_health)
+		if ratio > 0.75:
+			next = VisualState.INTACT
+		elif ratio > 0.25:
+			next = VisualState.DAMAGED
+		else:
+			next = VisualState.BURNING
+
+	if next == visual_state:
+		_apply_visual_presentation(next)
+		return
+
+	var prev: int = visual_state
+	visual_state = next
+	_apply_visual_presentation(next)
+	if OS.is_debug_build():
+		print(
+			"[BUILDING_VIS] ", name,
+			" ", _visual_state_name(prev), " → ", _visual_state_name(next),
+			" HP ", health, "/", max_health
+		)
+
+
+func _visual_state_name(s: int) -> String:
+	match s:
+		VisualState.INTACT:
+			return "INTACT"
+		VisualState.DAMAGED:
+			return "DAMAGED"
+		VisualState.BURNING:
+			return "BURNING"
+		VisualState.DESTROYED:
+			return "DESTROYED"
+		_:
+			return "?"
+
+
+## Distinguishable presentation without a material framework (MeshInstance modulate).
+func _apply_visual_presentation(state: int) -> void:
+	var color := Color(1.0, 1.0, 1.0, 1.0)
+	match state:
+		VisualState.INTACT:
+			color = Color(1.0, 1.0, 1.0, 1.0)
+		VisualState.DAMAGED:
+			color = Color(1.0, 0.85, 0.35, 1.0)
+		VisualState.BURNING:
+			color = Color(1.0, 0.35, 0.15, 1.0)
+		VisualState.DESTROYED:
+			color = Color(0.25, 0.25, 0.25, 1.0)
+	for child in get_children():
+		if child is MeshInstance3D:
+			(child as MeshInstance3D).modulate = color
