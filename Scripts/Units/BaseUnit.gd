@@ -279,13 +279,24 @@ func _clear_building_attack() -> void:
 
 
 func update_return(delta: float) -> void:
-	if return_target == null or not is_instance_valid(return_target):
+	# Drop invalid / enemy / destroyed deposit target
+	if return_target != null and is_instance_valid(return_target):
+		if return_target.get("is_destroyed") == true:
+			return_target = null
+		elif return_target.get("health") != null and int(return_target.health) <= 0:
+			return_target = null
+		elif return_target.get("team_id") != null and int(return_target.team_id) != team_id:
+			return_target = null
+	else:
+		return_target = null
+
+	if return_target == null:
 		var bm := get_node_or_null("/root/BuildingManager")
 		if bm:
-			return_target = bm.get_nearest_town_center(global_position)
+			return_target = bm.get_nearest_town_center(global_position, team_id)
 
 		if return_target == null:
-			print(name, " — no Town Center found, staying with full inventory")
+			print(name, " — no own-team Town Center found, keeping inventory")
 			unit_state = UnitState.IDLE
 			velocity = Vector3.ZERO
 			return
