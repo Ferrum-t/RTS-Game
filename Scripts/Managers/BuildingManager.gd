@@ -33,7 +33,9 @@ func unregister_building(building) -> void:
 	barracks_list.erase(building)
 
 
-func get_nearest_town_center(from_position: Vector3):
+## team_filter < 0 → any team; otherwise only matching team_id.
+## Skips destroyed / zero-health buildings.
+func get_nearest_town_center(from_position: Vector3, team_filter: int = -1):
 	if town_centers.is_empty():
 		return null
 
@@ -42,6 +44,12 @@ func get_nearest_town_center(from_position: Vector3):
 
 	for tc in town_centers:
 		if tc == null or not is_instance_valid(tc):
+			continue
+		if tc.get("is_destroyed") == true:
+			continue
+		if tc.get("health") != null and int(tc.health) <= 0:
+			continue
+		if team_filter >= 0 and int(tc.team_id) != team_filter:
 			continue
 		var dist_sq: float = from_position.distance_squared_to(tc.global_position)
 		if dist_sq < best_dist_sq:
