@@ -13,7 +13,12 @@ func handle_right_click(
 	world_position: Vector3
 ) -> void:
 
+	# No units selected: if player TC is MOBILE, RMB ground = move destination
+	# (replaces fixed debug KEY_M target for normal play).
 	if selected_units.is_empty():
+		if collider is BaseUnit or collider is BaseResource or collider is BaseBuilding:
+			return
+		_try_move_mobile_town_center(world_position)
 		return
 
 	if command_manager == null:
@@ -57,12 +62,30 @@ func handle_right_click(
 		if can_siege:
 			command_manager.issue_attack_building(selected_units, building)
 		else:
-			# Same-team / invalid → move outside (not attack)
 			var outside := _outside_point(building, world_position)
 			command_manager.issue_move(selected_units, outside)
 		return
 
 	command_manager.issue_move(selected_units, world_position)
+
+
+func _try_move_mobile_town_center(world_position: Vector3) -> void:
+	var bm := get_node_or_null("/root/BuildingManager")
+	if bm == null:
+		return
+	for tc in bm.town_centers:
+		if tc == null or not is_instance_valid(tc):
+			continue
+		if int(tc.get("team_id")) != 0:
+			continue
+		if int(tc.get("deployment_state")) != DeploymentState.State.MOBILE:
+			continue
+		if tc.has_method("request_move_to"):
+			var dest := world_position
+			dest.y = 0.0
+			tc.request_move_to(dest)
+			print("TownCenter Deployment: move via RMB to ", dest)
+			return
 
 
 func _outside_point(building: BaseBuilding, click_pos: Vector3) -> Vector3:

@@ -22,8 +22,9 @@ var agent: NavigationAgent3D = null
 
 var arrival_distance: float = 0.55
 var block_timeout: float = 1.75
-var separation_radius: float = 1.1
-var separation_strength: float = 1.2
+## Soft push between units (RVO avoidance still off — keeps M6 path contract simple).
+var separation_radius: float = 1.55
+var separation_strength: float = 2.0
 var waypoint_skip_distance: float = 0.4
 var default_retarget_distance: float = 0.85
 
