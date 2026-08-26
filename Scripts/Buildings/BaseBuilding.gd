@@ -43,6 +43,9 @@ var lootable: LootableComponent = null
 
 ## Phase 6.2 — presentation only; DESTROYED mirrors is_destroyed / die().
 var visual_state: int = VisualState.INTACT
+## Cached albedo from scene mesh material (captured once).
+var _visual_base_albedo: Color = Color(1, 1, 1, 1)
+var _visual_base_captured: bool = false
 
 ## Accumulated loot this raid (for one summary line on destroy).
 var _raid_loot_total: Dictionary = {}
@@ -88,6 +91,7 @@ func _ready() -> void:
 	if nav:
 		nav.register_building(self, nav_half_extents)
 
+	_capture_visual_base_albedo()
 	_refresh_visual_state()
 
 
@@ -199,18 +203,42 @@ func _visual_state_name(s: int) -> String:
 			return "?"
 
 
-## Distinguishable presentation without a material framework (MeshInstance modulate).
+func _capture_visual_base_albedo() -> void:
+	if _visual_base_captured:
+		return
+	for child in get_children():
+		if not (child is MeshInstance3D):
+			continue
+		var mi := child as MeshInstance3D
+		var mat: Material = mi.material_override
+		if mat == null:
+			mat = mi.get_active_material(0)
+		if mat is StandardMaterial3D:
+			_visual_base_albedo = (mat as StandardMaterial3D).albedo_color
+			_visual_base_captured = true
+			return
+	_visual_base_albedo = Color(0.77, 0.66, 0.46, 1.0)
+	_visual_base_captured = true
+
+
+## Godot 4 MeshInstance3D has no modulate (CanvasItem only). Tint via material_override.
 func _apply_visual_presentation(state: int) -> void:
-	var color := Color(1.0, 1.0, 1.0, 1.0)
+	_capture_visual_base_albedo()
+	var tint := Color(1.0, 1.0, 1.0, 1.0)
 	match state:
 		VisualState.INTACT:
-			color = Color(1.0, 1.0, 1.0, 1.0)
+			tint = Color(1.0, 1.0, 1.0, 1.0)
 		VisualState.DAMAGED:
-			color = Color(1.0, 0.85, 0.35, 1.0)
+			tint = Color(1.0, 0.85, 0.35, 1.0)
 		VisualState.BURNING:
-			color = Color(1.0, 0.35, 0.15, 1.0)
+			tint = Color(1.0, 0.4, 0.2, 1.0)
 		VisualState.DESTROYED:
-			color = Color(0.25, 0.25, 0.25, 1.0)
+			tint = Color(0.3, 0.3, 0.3, 1.0)
+	var albedo: Color = _visual_base_albedo * tint
 	for child in get_children():
-		if child is MeshInstance3D:
-			(child as MeshInstance3D).modulate = color
+		if not (child is MeshInstance3D):
+			continue
+		var mi := child as MeshInstance3D
+		var std := StandardMaterial3D.new()
+		std.albedo_color = albedo
+		mi.material_override = std
