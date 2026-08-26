@@ -3,9 +3,8 @@ extends RefCounted
 class_name MovementComponent
 
 ## M6 Movement (M1 status contract)
-## M6.4: monotonic waypoint index
-## M6.5: get_next_path_position() wakes NavigationAgent path query before reading path
-## M6.6: path exhausted → last path point / ARRIVED (never raw final_target)
+## M6.4–M6.6 path following
+## Polish: soft RVO via NavigationAgent3D.avoidance + velocity_computed
 
 enum Status {
 	IDLE,
@@ -22,9 +21,9 @@ var agent: NavigationAgent3D = null
 
 var arrival_distance: float = 0.55
 var block_timeout: float = 1.75
-## Soft push between units (RVO avoidance still off — keeps M6 path contract simple).
+## Soft push between units (backup if RVO neighbor list empty).
 var separation_radius: float = 1.55
-var separation_strength: float = 2.0
+var separation_strength: float = 1.2
 var waypoint_skip_distance: float = 0.4
 var default_retarget_distance: float = 0.85
 
@@ -35,6 +34,7 @@ var _last_bake_id: int = -1
 
 var _current_waypoint_index: int = 0
 var _last_path_size: int = 0
+var _awaiting_avoidance: bool = false
 
 
 func _init(unit: BaseUnit, nav_agent: NavigationAgent3D = null) -> void:
@@ -55,10 +55,20 @@ func set_agent(nav_agent: NavigationAgent3D) -> void:
 func _configure_agent() -> void:
 	agent.path_desired_distance = 0.5
 	agent.target_desired_distance = arrival_distance
-	agent.radius = 0.4
+	agent.radius = 0.45
 	agent.height = 1.2
-	agent.avoidance_enabled = false
 	agent.path_max_distance = 50.0
+	# Soft RVO — units avoid each other; path still from NavMesh
+	agent.avoidance_enabled = true
+	agent.neighbor_distance = 3.5
+	agent.max_neighbors = 10
+	agent.time_horizon_agents = 1.0
+	agent.time_horizon_obstacles = 0.0
+	agent.max_speed = 12.0
+	agent.avoidance_layers = 1
+	agent.avoidance_mask = 1
+	if not agent.velocity_computed.is_connected(_on_velocity_computed):
+		agent.velocity_computed.connect(_on_velocity_computed)
 
 
 func request_move(world_pos: Vector3) -> void:
@@ -74,6 +84,7 @@ func set_target(world_pos: Vector3) -> void:
 	_last_pos = owner.global_position
 	_current_waypoint_index = 0
 	_last_path_size = 0
+	_awaiting_avoidance = false
 	status = Status.MOVING
 	if agent:
 		agent.target_position = p
@@ -111,9 +122,12 @@ func cancel() -> void:
 	_no_progress_time = 0.0
 	_current_waypoint_index = 0
 	_last_path_size = 0
+	_awaiting_avoidance = false
 	status = Status.CANCELLED
 	if agent:
 		agent.target_position = owner.global_position
+		if agent.avoidance_enabled:
+			agent.set_velocity(Vector3.ZERO)
 
 
 func get_status() -> Status:
@@ -270,8 +284,29 @@ func update(delta: float) -> void:
 		direction = (direction + sep * separation_strength).normalized()
 
 	status = Status.MOVING
-	owner.velocity.x = direction.x * owner.move_speed
-	owner.velocity.z = direction.z * owner.move_speed
+	var desired := Vector3(direction.x * owner.move_speed, 0.0, direction.z * owner.move_speed)
+
+	if agent.avoidance_enabled:
+		agent.max_speed = maxf(owner.move_speed, 0.1)
+		_awaiting_avoidance = true
+		agent.set_velocity(desired)
+		# Physical move applied in _on_velocity_computed (same physics frame).
+	else:
+		owner.velocity.x = desired.x
+		owner.velocity.z = desired.z
+		owner.move_and_slide()
+
+
+func _on_velocity_computed(safe_velocity: Vector3) -> void:
+	if not _awaiting_avoidance:
+		return
+	_awaiting_avoidance = false
+	if status != Status.MOVING:
+		return
+	if owner == null or not is_instance_valid(owner):
+		return
+	owner.velocity.x = safe_velocity.x
+	owner.velocity.z = safe_velocity.z
 	owner.move_and_slide()
 
 
@@ -294,21 +329,30 @@ func _set_arrived() -> void:
 	_no_progress_time = 0.0
 	_current_waypoint_index = 0
 	_last_path_size = 0
+	_awaiting_avoidance = false
 	status = Status.ARRIVED
+	if agent and agent.avoidance_enabled:
+		agent.set_velocity(Vector3.ZERO)
 
 
 func _set_blocked() -> void:
 	owner.velocity = Vector3.ZERO
 	_stuck_time = 0.0
 	_no_progress_time = 0.0
+	_awaiting_avoidance = false
 	status = Status.BLOCKED
+	if agent and agent.avoidance_enabled:
+		agent.set_velocity(Vector3.ZERO)
 
 
 func _set_failed() -> void:
 	owner.velocity = Vector3.ZERO
 	_stuck_time = 0.0
 	_no_progress_time = 0.0
+	_awaiting_avoidance = false
 	status = Status.FAILED
+	if agent and agent.avoidance_enabled:
+		agent.set_velocity(Vector3.ZERO)
 
 
 func _separation() -> Vector3:
