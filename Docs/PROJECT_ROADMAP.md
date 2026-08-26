@@ -3,43 +3,36 @@
 ## RTS Framework
 
 ### Camera
-- [x] RTS Camera
-- [x] Edge Scroll
-- [x] Zoom
-- [x] Rotation
+- [x] RTS Camera / Edge Scroll / Zoom / Rotation
 
 ### Units
-- [x] BaseUnit
-- [x] Worker
-- [x] MovementComponent
-- [ ] HarvestComponent
-- [ ] CombatComponent
-- [ ] InventoryComponent
+- [x] BaseUnit + Order abstraction
+- [x] Worker / Soldier / Cavalry / SiegeUnit
+- [x] MovementComponent (NavAgent + soft RVO)
+- [x] HarvestComponent / CombatComponent / InventoryComponent
+- [x] EnemyAIComponent (Phase 7)
 
 ### Managers
-- [x] UnitManager
-- [x] SelectionManager
-- [x] CommandManager
-- [x] InteractionManager
-- [x] ConstructionManager
+- [x] UnitManager / BuildingManager / ResourceManager
+- [x] Selection / Command / Interaction / Construction
+- [x] MatchManager
+- [x] EnemySpawner
+- [x] NavigationBakeService
 
 ### Buildings
-- [x] Ghost Building
-- [x] BuildingData
-- [x] BuildCatalog
-- [ ] Production
-- [ ] Upgrades
+- [x] TownCenter (mobile) / Barracks
+- [x] DeploymentComponent
+- [x] Building visual states (INTACT→DESTROYED)
+- [x] LootableComponent / damage modifiers
+- [ ] Phase 8 — towers / defenses
 
 ### Gameplay
-- [x] Unit Selection
-- [x] Group Selection
-- [x] Move Commands
-- [ ] Harvest
-- [ ] Resources
-- [ ] AI
-- [ ] Fog of War
+- [x] Selection / Move / Harvest / Attack / Siege
+- [x] Resources (Wood, Stone, Horses + dictionary costs)
+- [x] Phase 7 AI waves + core loop
+- [ ] **Polish: attack hysteresis + RVO** (active)
+- [ ] Environment belts / migration
 
 ### Polish
-- [ ] UI
-- [ ] Audio
-- [ ] VFX
+- [x] Resource HUD + train / pack UI
+- [ ] Audio / VFX
