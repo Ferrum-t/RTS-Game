@@ -3,6 +3,7 @@ extends BaseUnit
 class_name Cavalry
 
 ## Mounted combat unit. Faster, stronger; cannot harvest.
+## Phase 6: still MELEE vs buildings (0.25x). Future siege units use SIEGE.
 
 
 func _ready() -> void:
@@ -13,6 +14,7 @@ func _ready() -> void:
 	move_speed = 6.5
 	health_bar_height = 1.9
 	can_gather = false
+	damage_type = DamageType.Type.MELEE
 
 	super()
 	print("Cavalry spawned at ", global_position)

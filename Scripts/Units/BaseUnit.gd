@@ -26,6 +26,8 @@ enum UnitState
 @export var health_bar_height := 1.6
 ## Phase 5: Cavalry sets false — cannot take HARVEST orders
 @export var can_gather: bool = true
+## Phase 6: building damage modifier class
+@export var damage_type: int = DamageType.Type.MELEE
 
 var health := 100
 
@@ -254,8 +256,14 @@ func update_attacking_building(delta: float) -> void:
 		return
 	_building_attack_timer = attack_cooldown
 
-	print(name, " hits building ", building.name, " for ", attack_damage, " dmg (HP ", max(building.health - attack_damage, 0), "/", building.max_health, ")")
-	building.damage(attack_damage)
+	var raw_dmg: int = attack_damage
+	var mod_dmg: int = BuildingDamageRules.modified_building_damage(raw_dmg, damage_type)
+	print(
+		name, " hits building ", building.name,
+		" for ", raw_dmg, " dmg → modified ", mod_dmg,
+		" (HP ", max(building.health - mod_dmg, 0), "/", building.max_health, ")"
+	)
+	building.damage(mod_dmg, team_id)
 
 	if not is_instance_valid(building) or building.is_destroyed or building.health <= 0:
 		_clear_building_attack()

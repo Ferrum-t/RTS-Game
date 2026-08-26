@@ -71,6 +71,19 @@ func _set_stock(resource_type: int, value: int) -> void:
 			horses = value
 
 
+## Remove up to amount; returns how many were actually removed (raid siphon).
+func remove(resource_type: int, amount: int) -> int:
+	if amount <= 0:
+		return 0
+	var have: int = get_stock(resource_type)
+	var taken: int = mini(amount, have)
+	if taken <= 0:
+		return 0
+	_set_stock(resource_type, have - taken)
+	resources_changed.emit()
+	return taken
+
+
 func can_afford(cost: Dictionary) -> bool:
 	if cost == null or cost.is_empty():
 		return true

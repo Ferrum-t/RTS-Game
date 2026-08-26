@@ -4,6 +4,7 @@ class_name TownCenter
 
 ## Economy hub. Trains Workers only while DEPLOYED.
 ## Phase 4: pack / move / unpack via DeploymentComponent.
+## Phase 6: lootable (loot_ratio 0.5 via BaseBuilding defaults).
 
 @export var worker_scene: PackedScene
 @export var worker_cost_wood: int = 50
@@ -16,6 +17,9 @@ var _pending_scene: PackedScene = null
 
 
 func _ready() -> void:
+	# Explicit raid defaults (can still override in Inspector)
+	is_lootable = true
+	loot_ratio = 0.5
 	super()
 	add_to_group("Obstacle")
 	if worker_scene == null:

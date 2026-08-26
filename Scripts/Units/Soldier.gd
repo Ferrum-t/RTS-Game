@@ -13,6 +13,7 @@ func _ready() -> void:
 	attack_cooldown = 0.9
 	move_speed = 4.5
 	health_bar_height = 1.8
+	damage_type = DamageType.Type.MELEE
 
 	super()
 	print("Soldier spawned at ", global_position)
