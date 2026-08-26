@@ -1,5 +1,4 @@
 extends Node
-
 ## Autoload singleton — player resource stockpile.
 ## Cost API is Dictionary-based: keys = BaseResource.Type (int), values = amount.
 ## Stock fields (wood/stone/...) kept for HUD and deposit convenience.
@@ -12,11 +11,9 @@ var gold: int = 0
 var food: int = 0
 var horses: int = 0
 
-
 func _ready() -> void:
 	resources_changed.emit()
 	print("ResourceManager ready. Wood: ", wood, " Horses: ", horses)
-
 
 ## Build a cost dictionary from individual amounts (call sites / BuildingData).
 static func make_cost(
@@ -39,6 +36,9 @@ static func make_cost(
 		cost[BaseResource.Type.HORSES] = horses_amt
 	return cost
 
+## Phase 8.0 — Watchtower cost helper (Wood 40 / Stone 20).
+static func cost_watchtower() -> Dictionary:
+	return make_cost(40, 20)
 
 func get_stock(resource_type: int) -> int:
 	match resource_type:
@@ -55,7 +55,6 @@ func get_stock(resource_type: int) -> int:
 		_:
 			return 0
 
-
 func _set_stock(resource_type: int, value: int) -> void:
 	value = maxi(value, 0)
 	match resource_type:
@@ -70,7 +69,6 @@ func _set_stock(resource_type: int, value: int) -> void:
 		BaseResource.Type.HORSES:
 			horses = value
 
-
 ## Remove up to amount; returns how many were actually removed (raid siphon).
 func remove(resource_type: int, amount: int) -> int:
 	if amount <= 0:
@@ -83,7 +81,6 @@ func remove(resource_type: int, amount: int) -> int:
 	resources_changed.emit()
 	return taken
 
-
 func can_afford(cost: Dictionary) -> bool:
 	if cost == null or cost.is_empty():
 		return true
@@ -94,7 +91,6 @@ func can_afford(cost: Dictionary) -> bool:
 		if get_stock(int(key)) < need:
 			return false
 	return true
-
 
 func spend(cost: Dictionary) -> bool:
 	if not can_afford(cost):
@@ -107,7 +103,6 @@ func spend(cost: Dictionary) -> bool:
 		_set_stock(t, get_stock(t) - need)
 	resources_changed.emit()
 	return true
-
 
 func add(resource_type: int, amount: int) -> void:
 	if amount <= 0:
@@ -124,22 +119,17 @@ func add(resource_type: int, amount: int) -> void:
 		_:
 			pass
 
-
 func add_wood(amount: int) -> void:
 	add(BaseResource.Type.WOOD, amount)
-
 
 func add_stone(amount: int) -> void:
 	add(BaseResource.Type.STONE, amount)
 
-
 func add_gold(amount: int) -> void:
 	add(BaseResource.Type.GOLD, amount)
 
-
 func add_food(amount: int) -> void:
 	add(BaseResource.Type.FOOD, amount)
-
 
 func add_horses(amount: int) -> void:
 	add(BaseResource.Type.HORSES, amount)
