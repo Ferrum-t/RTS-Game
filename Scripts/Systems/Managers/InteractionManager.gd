@@ -13,12 +13,12 @@ func handle_right_click(
 	world_position: Vector3
 ) -> void:
 
-	# No units selected: if player TC is MOBILE, RMB ground = move destination
-	# (replaces fixed debug KEY_M target for normal play).
+	# No units selected: RMB on ground moves any player MOBILE building
+	# (TownCenter + Watchtower Phase 8.1). Replaces fixed debug KEY_M target.
 	if selected_units.is_empty():
 		if collider is BaseUnit or collider is BaseResource or collider is BaseBuilding:
 			return
-		_try_move_mobile_town_center(world_position)
+		_try_move_mobile_buildings(world_position)
 		return
 
 	if command_manager == null:
@@ -69,23 +69,33 @@ func handle_right_click(
 	command_manager.issue_move(selected_units, world_position)
 
 
-func _try_move_mobile_town_center(world_position: Vector3) -> void:
+## Phase 4 TC + Phase 8.1 Watchtower: RMB ground while no units selected.
+func _try_move_mobile_buildings(world_position: Vector3) -> void:
 	var bm := get_node_or_null("/root/BuildingManager")
 	if bm == null:
 		return
+
+	var dest: Vector3 = world_position
+	dest.y = 0.0
+
 	for tc in bm.town_centers:
-		if tc == null or not is_instance_valid(tc):
-			continue
-		if int(tc.get("team_id")) != 0:
-			continue
-		if int(tc.get("deployment_state")) != DeploymentState.State.MOBILE:
-			continue
-		if tc.has_method("request_move_to"):
-			var dest := world_position
-			dest.y = 0.0
-			tc.request_move_to(dest)
-			print("TownCenter Deployment: move via RMB to ", dest)
-			return
+		_try_move_one_mobile(tc, dest, "TownCenter")
+
+	for w in bm.watchtowers_list:
+		_try_move_one_mobile(w, dest, "Watchtower")
+
+
+func _try_move_one_mobile(building: Variant, dest: Vector3, label: String) -> void:
+	if building == null or not is_instance_valid(building):
+		return
+	if int(building.get("team_id")) != 0:
+		return
+	if int(building.get("deployment_state")) != DeploymentState.State.MOBILE:
+		return
+	if not building.has_method("request_move_to"):
+		return
+	building.request_move_to(dest)
+	print(label, " Deployment: move via RMB to ", dest)
 
 
 func _outside_point(building: BaseBuilding, click_pos: Vector3) -> Vector3:
