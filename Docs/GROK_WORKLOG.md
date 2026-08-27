@@ -4,6 +4,30 @@
 
 ---
 
+## 2026-08-27 — Phase 8.0 Watchtower wired (waiting F5)
+
+Polish sprint (hysteresis + RVO) **ACCEPTED** по F5 игрока. RVO wall-nudge у стен зданий — tech debt, не блокер.
+
+### Phase 8.0 code
+
+- `BuildingCombatComponent` — scan `UnitManager.units` каждые 0.4s, без Area3D / PhysicsQuery
+- `Watchtower` extends `BaseBuilding` (HP 350, range 14, dmg 12, RANGED)
+- Damage: frozen `BaseUnit.damage(amount)` — не `take_damage`
+- Catalog: `WatchtowerData` Wood 40 / Stone 20 → BuildPanel button
+- `ResourceManager.cost_watchtower()` и `BuildingManager.watchtowers_list` уже были — не трогали
+- MatchManager спаунит player Watchtower на марше врага (TC + `(0,0,6)`)
+- Win/Lose формула не менялась (все buildings). DEFEAT теперь требует снести TC **и** башню
+
+### F5
+
+См. `Docs/PHASE_8_0_INTEGRATION.md`. Ждём `[TOWER] acquired` / `hits`.
+
+### Next
+
+F5 accept 8.0 → Phase 8.1 MobileTower (`DeploymentComponent`).
+
+---
+
 ## 2026-08-26 — Phase 7 COMPLETE + Polish sprint start
 
 ### Phase 7 (Enemy AI)
