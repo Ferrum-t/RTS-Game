@@ -4,6 +4,7 @@ class_name DeploymentComponent
 
 ## Phase 4/8.1 FSM: DEPLOYED → PACKING → MOBILE → UNPACKING → DEPLOYED
 ## Phase 8.2: placement validation before UNPACKING; progress for UI.
+## Stuck detection: straight-line mover + collision_mask=1 can jam forever.
 
 signal state_changed(old_state: int, new_state: int)
 signal pack_started()
@@ -13,6 +14,7 @@ signal move_arrived(position: Vector3)
 signal unpack_started()
 signal unpack_finished()
 signal unpack_blocked(reason: String)
+signal move_stuck(position: Vector3, reason: String)
 
 var owner: CharacterBody3D = null
 
@@ -25,6 +27,12 @@ var _timer: float = 0.0
 var _timer_max: float = 0.0
 var _moving: bool = false
 var _move_target: Vector3 = Vector3.ZERO
+
+## Stuck detection (same idea as unit _no_progress_time / BLOCKED).
+var _stuck_time: float = 0.0
+var _last_move_pos: Vector3 = Vector3.ZERO
+const STUCK_TIMEOUT: float = 1.5
+const STUCK_MOVE_EPS: float = 0.02
 
 
 func _init(building: CharacterBody3D) -> void:
@@ -83,6 +91,7 @@ func request_pack() -> bool:
 	_timer_max = pack_time
 	_timer = pack_time
 	_moving = false
+	_reset_stuck()
 	pack_started.emit()
 	print(owner.name, " Deployment: PACKING (", pack_time, "s)")
 	return true
@@ -95,6 +104,9 @@ func request_move_to(world_pos: Vector3) -> bool:
 	_move_target = world_pos
 	_move_target.y = 0.0
 	_moving = true
+	_reset_stuck()
+	_last_move_pos = owner.global_position
+	_last_move_pos.y = 0.0
 	_apply_mobile_collision()
 	move_started.emit(_move_target)
 	print(owner.name, " Deployment: move to ", _move_target)
@@ -112,6 +124,7 @@ func request_unpack() -> bool:
 		print(owner.name, " Deployment: unpack blocked — ", reason)
 		return false
 	_moving = false
+	_reset_stuck()
 	owner.velocity = Vector3.ZERO
 	_apply_deployed_collision()
 	_register_nav()
@@ -127,6 +140,7 @@ func cancel_move() -> void:
 	if get_state() != DeploymentState.State.MOBILE:
 		return
 	_moving = false
+	_reset_stuck()
 	owner.velocity = Vector3.ZERO
 	print(owner.name, " Deployment: move cancelled (still MOBILE)")
 
@@ -159,6 +173,7 @@ func _finish_pack() -> void:
 	_apply_mobile_collision()
 	owner.velocity = Vector3.ZERO
 	_moving = false
+	_reset_stuck()
 	pack_finished.emit()
 	print(owner.name, " Deployment: MOBILE (footprint cleared)")
 
@@ -170,7 +185,7 @@ func _finish_unpack() -> void:
 	print(owner.name, " Deployment: DEPLOYED at ", owner.global_position)
 
 
-func _update_move(_delta: float) -> void:
+func _update_move(delta: float) -> void:
 	if not _moving:
 		owner.velocity = Vector3.ZERO
 		return
@@ -180,12 +195,26 @@ func _update_move(_delta: float) -> void:
 	if to_t.length() <= mobile_arrival_distance:
 		owner.velocity = Vector3.ZERO
 		_moving = false
+		_reset_stuck()
 		var pos: Vector3 = owner.global_position
 		pos.y = 0.0
 		owner.global_position = pos
 		move_arrived.emit(pos)
 		print(owner.name, " Deployment: ARRIVED ", pos)
 		return
+
+	# Progress since last frame (same pattern as unit BLOCKED / _no_progress_time).
+	var cur: Vector3 = owner.global_position
+	cur.y = 0.0
+	var moved: float = cur.distance_to(_last_move_pos)
+	_last_move_pos = cur
+	if moved < STUCK_MOVE_EPS:
+		_stuck_time += delta
+		if _stuck_time >= STUCK_TIMEOUT:
+			_on_move_stuck()
+			return
+	else:
+		_stuck_time = 0.0
 
 	var dir: Vector3 = to_t.normalized()
 	owner.velocity = Vector3(dir.x * mobile_move_speed, 0.0, dir.z * mobile_move_speed)
@@ -194,6 +223,22 @@ func _update_move(_delta: float) -> void:
 	p.y = 0.0
 	owner.global_position = p
 	owner.velocity.y = 0.0
+
+
+func _on_move_stuck() -> void:
+	owner.velocity = Vector3.ZERO
+	_moving = false
+	var pos: Vector3 = owner.global_position
+	pos.y = 0.0
+	var reason: String = "no progress toward target for %.1fs" % STUCK_TIMEOUT
+	move_stuck.emit(pos, reason)
+	print(owner.name, " Deployment: STUCK at ", pos, " — ", reason)
+	# Stay MOBILE — do NOT auto-unpack (placement may be invalid).
+	_reset_stuck()
+
+
+func _reset_stuck() -> void:
+	_stuck_time = 0.0
 
 
 func _set_state(new_state: int) -> void:
@@ -257,6 +302,9 @@ func _register_nav() -> void:
 
 
 func _apply_mobile_collision() -> void:
+	# FLOATING + mask=1: intentional post-Phase-3 design.
+	# Phase 3 spike used mask=0 (phasing) to avoid ground sink; here buildings
+	# must collide with trees/stone/other buildings while mobile (not ghost).
 	owner.motion_mode = CharacterBody3D.MOTION_MODE_FLOATING
 	owner.collision_layer = 1
 	owner.collision_mask = 1
