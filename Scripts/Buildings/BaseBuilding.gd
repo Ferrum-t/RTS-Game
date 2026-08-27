@@ -13,6 +13,13 @@ enum VisualState {
 	DESTROYED,
 }
 
+## Mesh names used by MobileBuilding UI — never retint these.
+const _UI_MESH_NAMES: Array[String] = [
+	"DeploymentProgressBar",
+	"DeploymentProgressBg",
+	"AttackRangeRing",
+]
+
 @export var team_id: int = 0
 @export var max_health: int = 500
 ## Half-extents of footprint used for NavMesh obstruction (XZ)
@@ -215,6 +222,10 @@ func _visual_state_name(s: int) -> String:
 			return "?"
 
 
+func _is_ui_mesh(mi: MeshInstance3D) -> bool:
+	return str(mi.name) in _UI_MESH_NAMES
+
+
 func _capture_visual_base_albedo() -> void:
 	if _visual_base_captured:
 		return
@@ -222,6 +233,8 @@ func _capture_visual_base_albedo() -> void:
 		if not (child is MeshInstance3D):
 			continue
 		var mi := child as MeshInstance3D
+		if _is_ui_mesh(mi):
+			continue
 		var mat: Material = mi.material_override
 		if mat == null:
 			mat = mi.get_active_material(0)
@@ -234,6 +247,7 @@ func _capture_visual_base_albedo() -> void:
 
 
 ## Godot 4 MeshInstance3D has no modulate (CanvasItem only). Tint via material_override.
+## Skips deployment progress bar / range ring so they keep their own colours.
 func _apply_visual_presentation(state: int) -> void:
 	_capture_visual_base_albedo()
 	var tint := Color(1.0, 1.0, 1.0, 1.0)
@@ -251,6 +265,8 @@ func _apply_visual_presentation(state: int) -> void:
 		if not (child is MeshInstance3D):
 			continue
 		var mi := child as MeshInstance3D
+		if _is_ui_mesh(mi):
+			continue
 		var std := StandardMaterial3D.new()
 		std.albedo_color = albedo
 		mi.material_override = std
