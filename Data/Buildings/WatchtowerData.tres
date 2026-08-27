@@ -1,4 +1,4 @@
-[gd_resource type="Resource" script_class="BuildingData" format=3 uid="uid://eph8wtdata000"]
+[gd_resource type="Resource" script_class="BuildingData" format=3 uid="uid://t3ecrf082488"]
 
 [ext_resource type="Script" path="res://Scripts/Buildings/BuildingData.gd" id="1_data"]
 [ext_resource type="PackedScene" path="res://Scenes/Buildings/Watchtower.tscn" id="2_scene"]

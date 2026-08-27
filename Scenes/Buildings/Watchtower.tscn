@@ -1,4 +1,4 @@
-[gd_scene load_steps=5 format=3 uid="uid://dph8wtscene00"]
+[gd_scene format=3 uid="uid://dph8wtscene00"]
 
 [ext_resource type="Script" path="res://Scripts/Buildings/Watchtower.gd" id="1_wt"]
 [ext_resource type="Script" path="res://Scripts/Components/BuildingCombatComponent.gd" id="2_combat"]
