@@ -15,6 +15,7 @@ class_name MobileBuilding
 @export var transit_vulnerability: float = 1.0
 
 var deployment: DeploymentComponent = null
+var _progress_root: Node3D = null
 var _progress_bg: MeshInstance3D = null
 var _progress_fill: MeshInstance3D = null
 var _range_ring: MeshInstance3D = null
@@ -96,56 +97,78 @@ func _on_deployment_state_changed(_old: int, new_state: int) -> void:
 
 
 func _setup_progress_bar() -> void:
+	# Root pivots so the whole bar faces the camera (Y-axis billboard).
+	var root := Node3D.new()
+	root.name = "DeploymentProgressRoot"
+	root.position = Vector3(0.0, _BAR_HEIGHT, 0.0)
+	root.visible = false
+	add_child(root)
+	_progress_root = root
+
 	var bg := MeshInstance3D.new()
 	bg.name = "DeploymentProgressBg"
 	var bg_mesh := BoxMesh.new()
-	bg_mesh.size = Vector3(_BAR_WIDTH, 0.14, 0.14)
+	bg_mesh.size = Vector3(_BAR_WIDTH, 0.14, 0.08)
 	bg.mesh = bg_mesh
 	var bg_mat := StandardMaterial3D.new()
 	bg_mat.albedo_color = Color(0.08, 0.08, 0.1, 0.9)
 	bg_mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	bg_mat.cull_mode = BaseMaterial3D.CULL_DISABLED
 	bg.material_override = bg_mat
-	bg.position = Vector3(0.0, _BAR_HEIGHT, 0.0)
-	bg.visible = false
-	add_child(bg)
+	bg.position = Vector3.ZERO
+	root.add_child(bg)
 	_progress_bg = bg
 
 	var fill := MeshInstance3D.new()
 	fill.name = "DeploymentProgressBar"
 	var fill_mesh := BoxMesh.new()
-	fill_mesh.size = Vector3(_BAR_WIDTH, 0.16, 0.16)
+	fill_mesh.size = Vector3(_BAR_WIDTH, 0.18, 0.1)
 	fill.mesh = fill_mesh
 	var fill_mat := StandardMaterial3D.new()
 	fill_mat.albedo_color = Color(0.15, 0.85, 1.0, 1.0)
 	fill_mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	fill_mat.cull_mode = BaseMaterial3D.CULL_DISABLED
 	fill.material_override = fill_mat
-	fill.position = Vector3(0.0, _BAR_HEIGHT, 0.0)
-	fill.visible = false
-	add_child(fill)
+	fill.position = Vector3.ZERO
+	root.add_child(fill)
 	_progress_fill = fill
 
 
 func _update_progress_bar() -> void:
-	if _progress_fill == null or deployment == null:
+	if _progress_root == null or _progress_fill == null or deployment == null:
 		return
 	var st: int = deployment_state
 	var in_transition: bool = (
 		st == DeploymentState.State.PACKING
 		or st == DeploymentState.State.UNPACKING
 	)
-	if _progress_bg:
-		_progress_bg.visible = in_transition
-	_progress_fill.visible = in_transition
+	_progress_root.visible = in_transition
 	if not in_transition:
 		return
+
+	_billboard_progress_toward_camera()
 
 	var remaining: float = clampf(deployment.get_transition_progress(), 0.0, 1.0)
 	var done: float = 1.0 - remaining
 	done = maxf(done, 0.02)
+	# Scale along local X (bar length); offset so fill grows left→right.
 	_progress_fill.scale = Vector3(done, 1.0, 1.0)
-	_progress_fill.position = Vector3(-_BAR_WIDTH * 0.5 * (1.0 - done), _BAR_HEIGHT, 0.0)
+	_progress_fill.position = Vector3(-_BAR_WIDTH * 0.5 * (1.0 - done), 0.0, 0.02)
 	if _progress_bg:
-		_progress_bg.position = Vector3(0.0, _BAR_HEIGHT, 0.0)
+		_progress_bg.position = Vector3(0.0, 0.0, 0.0)
+
+
+## Keep bar upright, only yaw toward camera (same idea as world-space HP bars).
+func _billboard_progress_toward_camera() -> void:
+	var cam: Camera3D = get_viewport().get_camera_3d()
+	if cam == null:
+		return
+	var from: Vector3 = _progress_root.global_position
+	var to: Vector3 = cam.global_position
+	to.y = from.y
+	if from.distance_squared_to(to) < 0.0001:
+		return
+	_progress_root.look_at(to, Vector3.UP)
 
 
 func _setup_range_ring() -> void:
@@ -190,7 +213,6 @@ func _make_ground_ring_mesh(radius: float, thickness: float, segments: int) -> A
 		verts.append(c1 * r_in)
 		for _j in range(4):
 			norms.append(Vector3.UP)
-		# two triangles
 		indices.append_array([base + 0, base + 1, base + 2, base + 0, base + 2, base + 3])
 
 	var arrays: Array = []
