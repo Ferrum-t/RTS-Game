@@ -5,9 +5,10 @@ class_name InteractionManager
 @export var command_manager: CommandManager
 
 const BUILDING_APPROACH_DISTANCE := 3.5
-## Grid spacing between MOBILE buildings sharing one RMB destination.
-## ~ nav_half_extents*2 + margin so unpack AABB does not overlap.
-const BUILDING_FORMATION_SPACING := 6.0
+## Must match DeploymentComponent._validate_placement margin.
+const UNPACK_MARGIN := 0.4
+## Extra gap so two large footprints still unpack after arrive.
+const FORMATION_BUFFER := 1.5
 
 
 func handle_right_click(
@@ -16,8 +17,8 @@ func handle_right_click(
 	world_position: Vector3
 ) -> void:
 
-	# No units selected: RMB on ground moves any player MOBILE building
-	# (TownCenter + Watchtower Phase 8.1). Replaces fixed debug KEY_M target.
+	# Empty unit selection + RMB ground = whole player caravan (all MOBILE).
+	# Buildings are not in SelectionManager yet — selection-aware move is deferred.
 	if selected_units.is_empty():
 		if collider is BaseUnit or collider is BaseResource or collider is BaseBuilding:
 			return
@@ -72,8 +73,7 @@ func handle_right_click(
 	command_manager.issue_move(selected_units, world_position)
 
 
-## Phase 4 TC + Phase 8.1 Watchtower: RMB ground while no units selected.
-## Multiple MOBILE buildings get formation offsets (not one shared point).
+## Caravan move: every team-0 MOBILE building gets its own dest (no shared point).
 func _try_move_mobile_buildings(world_position: Vector3) -> void:
 	var bm := get_node_or_null("/root/BuildingManager")
 	if bm == null:
@@ -92,14 +92,18 @@ func _try_move_mobile_buildings(world_position: Vector3) -> void:
 
 	var anchor: Vector3 = world_position
 	anchor.y = 0.0
-	var dests: Array[Vector3] = _building_formation_dests(anchor, mobiles.size())
+	var spacing: float = _building_formation_spacing(mobiles)
+	var dests: Array[Vector3] = _building_formation_dests(anchor, mobiles.size(), spacing)
 
 	for i in range(mobiles.size()):
 		var building: Variant = mobiles[i]
 		var dest: Vector3 = dests[i]
 		building.request_move_to(dest)
 		var label: String = str(building.name)
-		print(label, " Deployment: move via RMB to ", dest, " (slot ", i, "/", mobiles.size(), ")")
+		print(
+			label, " Deployment: move via RMB to ", dest,
+			" (slot ", i, "/", mobiles.size(), " spacing=", snappedf(spacing, 0.1), ")"
+		)
 
 
 func _is_movable_player_building(building: Variant) -> bool:
@@ -114,8 +118,21 @@ func _is_movable_player_building(building: Variant) -> bool:
 	return true
 
 
-## Centered grid around anchor. Spacing covers footprint + unpack margin.
-func _building_formation_dests(anchor: Vector3, count: int) -> Array[Vector3]:
+## Worst-case pair: 2 * max(nav_half_extents.xz) + unpack margin + buffer.
+func _building_formation_spacing(mobiles: Array) -> float:
+	var max_he: float = 2.2
+	for b in mobiles:
+		if b == null or not is_instance_valid(b):
+			continue
+		var raw: Variant = b.get("nav_half_extents")
+		if raw is Vector3:
+			var v: Vector3 = raw
+			max_he = maxf(max_he, maxf(v.x, v.z))
+	return max_he * 2.0 + UNPACK_MARGIN + FORMATION_BUFFER
+
+
+## Centered grid around anchor. Does not touch Formation.gd (unit spacing).
+func _building_formation_dests(anchor: Vector3, count: int, spacing: float) -> Array[Vector3]:
 	var out: Array[Vector3] = []
 	if count <= 0:
 		return out
@@ -125,7 +142,6 @@ func _building_formation_dests(anchor: Vector3, count: int) -> Array[Vector3]:
 
 	var cols: int = int(ceili(sqrt(float(count))))
 	var rows: int = int(ceili(float(count) / float(cols)))
-	var spacing: float = BUILDING_FORMATION_SPACING
 	var i: int = 0
 	for row in range(rows):
 		for col in range(cols):
