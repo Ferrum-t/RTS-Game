@@ -1,0 +1,32 @@
+[gd_scene load_steps=5 format=3 uid="uid://dph8wtscene00"]
+
+[ext_resource type="Script" path="res://Scripts/Buildings/Watchtower.gd" id="1_wt"]
+[ext_resource type="Script" path="res://Scripts/Components/BuildingCombatComponent.gd" id="2_combat"]
+
+[sub_resource type="StandardMaterial3D" id="Mat_tower"]
+albedo_color = Color(0.48, 0.44, 0.38, 1)
+
+[sub_resource type="BoxMesh" id="BoxMesh_tower"]
+material = SubResource("Mat_tower")
+size = Vector3(1.6, 4, 1.6)
+
+[sub_resource type="BoxShape3D" id="BoxShape_tower"]
+size = Vector3(1.6, 4, 1.6)
+
+[node name="Watchtower" type="CharacterBody3D"]
+collision_layer = 1
+collision_mask = 1
+script = ExtResource("1_wt")
+max_health = 350
+nav_half_extents = Vector3(1.1, 1, 1.1)
+
+[node name="MeshInstance3D" type="MeshInstance3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 2, 0)
+mesh = SubResource("BoxMesh_tower")
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 2, 0)
+shape = SubResource("BoxShape_tower")
+
+[node name="BuildingCombatComponent" type="Node" parent="."]
+script = ExtResource("2_combat")
