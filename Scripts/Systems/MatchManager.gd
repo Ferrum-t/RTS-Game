@@ -3,6 +3,7 @@ extends Node
 ## M9 — Playable Match Loop.
 ## Owns match state only. Does not drive movement, orders, harvest, or combat.
 ## Phase 7: wires EnemyAIComponent + EnemySpawner for team 1.
+## Phase 8.0: also spawns a player Watchtower on the enemy approach path.
 
 enum MatchState {
 	PLAYING,
@@ -17,10 +18,13 @@ var _enemy_had_building: bool = false
 var _result_label: Label = null
 
 const TOWN_CENTER_SCENE := preload("res://Scenes/Buildings/TownCenter.tscn")
+const WATCHTOWER_SCENE := preload("res://Scenes/Buildings/Watchtower.tscn")
 const SOLDIER_SCENE := preload("res://Scenes/Units/soldier.tscn")
 
 ## Near existing Workers at (7,0,0) / (10,0,0)
 const PLAYER_TC_POS := Vector3(2.0, 0.0, -2.0)
+## Approach side of player TC (toward enemy +Z) so F5 [TOWER] logs fire on march.
+const PLAYER_WATCHTOWER_OFFSET := Vector3(0.0, 0.0, 6.0)
 ## Far from player start
 const ENEMY_TC_POS := Vector3(-18.0, 0.0, 12.0)
 const ENEMY_SOLDIER_OFFSET := Vector3(3.5, 0.0, 0.0)
@@ -45,6 +49,12 @@ func _setup_match() -> void:
 	player_tc.team_id = 0
 	player_tc.position = PLAYER_TC_POS
 	scene.add_child(player_tc)
+
+	# Player Watchtower (Phase 8.0) — covers the enemy march onto player TC
+	var player_wt: Node3D = WATCHTOWER_SCENE.instantiate()
+	player_wt.team_id = 0
+	player_wt.position = PLAYER_TC_POS + PLAYER_WATCHTOWER_OFFSET
+	scene.add_child(player_wt)
 
 	# Enemy Town Center (team 1)
 	var enemy_tc: Node3D = TOWN_CENTER_SCENE.instantiate()
@@ -76,7 +86,7 @@ func _setup_match() -> void:
 	scene.add_child(spawner)
 
 	_ensure_result_label()
-	print("MATCH: PLAYING (player TC team 0, enemy TC+Soldier+AI team 1)")
+	print("MATCH: PLAYING (player TC+Watchtower team 0, enemy TC+Soldier+AI team 1)")
 
 
 func _process(_delta: float) -> void:
