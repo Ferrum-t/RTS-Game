@@ -26,59 +26,63 @@ text = "Wood: 0    Stone: 0    Gold: 0    Food: 0    Horses: 0"
 horizontal_alignment = 1
 script = ExtResource("4_resui")
 
-[node name="BuildPanel" type="PanelContainer" parent="."]
+[node name="LeftPanel" type="VBoxContainer" parent="."]
 offset_left = 10.0
-offset_top = 48.0
-offset_right = 280.0
-offset_bottom = 78.0
+offset_top = 44.0
+offset_right = 270.0
+offset_bottom = 520.0
+theme_override_constants/separation = 8
+
+[node name="BuildPanel" type="PanelContainer" parent="LeftPanel"]
+layout_mode = 2
+size_flags_horizontal = 3
 script = ExtResource("1_ahcct")
 build_catalog = ExtResource("2_de23q")
 build_button_scene = ExtResource("3_c7mb3")
 
-[node name="VBoxContainer" type="VBoxContainer" parent="BuildPanel"]
+[node name="VBoxContainer" type="VBoxContainer" parent="LeftPanel/BuildPanel"]
 layout_mode = 2
+theme_override_constants/separation = 4
 
-[node name="ActionPanel" type="VBoxContainer" parent="."]
-offset_left = 10.0
-offset_top = 120.0
-offset_right = 260.0
-offset_bottom = 360.0
+[node name="ActionPanel" type="VBoxContainer" parent="LeftPanel"]
+layout_mode = 2
+size_flags_horizontal = 3
 theme_override_constants/separation = 6
 
-[node name="TrainWorkerButton" type="Button" parent="ActionPanel"]
+[node name="TrainWorkerButton" type="Button" parent="LeftPanel/ActionPanel"]
 custom_minimum_size = Vector2(240, 28)
 layout_mode = 2
 text = "Train Worker (50 Wood)"
 script = ExtResource("5_train")
 
-[node name="TrainSoldierButton" type="Button" parent="ActionPanel"]
+[node name="TrainSoldierButton" type="Button" parent="LeftPanel/ActionPanel"]
 custom_minimum_size = Vector2(240, 28)
 layout_mode = 2
 text = "Train Soldier (80 Wood)"
 script = ExtResource("6_soldier")
 
-[node name="TrainCavalryButton" type="Button" parent="ActionPanel"]
+[node name="TrainCavalryButton" type="Button" parent="LeftPanel/ActionPanel"]
 custom_minimum_size = Vector2(240, 28)
 layout_mode = 2
 text = "Train Cavalry (100W + 1H)"
 script = ExtResource("7_cav")
 
-[node name="TrainSiegeButton" type="Button" parent="ActionPanel"]
+[node name="TrainSiegeButton" type="Button" parent="LeftPanel/ActionPanel"]
 custom_minimum_size = Vector2(240, 28)
 layout_mode = 2
 text = "Train Siege (150W + 50S)"
 script = ExtResource("7b_siege")
 
-[node name="Sep" type="HSeparator" parent="ActionPanel"]
+[node name="Sep" type="HSeparator" parent="LeftPanel/ActionPanel"]
 layout_mode = 2
 
-[node name="PackButton" type="Button" parent="ActionPanel"]
+[node name="PackButton" type="Button" parent="LeftPanel/ActionPanel"]
 custom_minimum_size = Vector2(240, 28)
 layout_mode = 2
 text = "Pack TC"
 script = ExtResource("8_pack")
 
-[node name="UnpackButton" type="Button" parent="ActionPanel"]
+[node name="UnpackButton" type="Button" parent="LeftPanel/ActionPanel"]
 custom_minimum_size = Vector2(240, 28)
 layout_mode = 2
 text = "Unpack TC"
