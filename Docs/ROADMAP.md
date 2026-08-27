@@ -1,31 +1,33 @@
 # ROADMAP
 
-## Foundation
+**Do not maintain a second roadmap.**  
+Canonical phase order and status: `Docs/nomad_wars_v1_scope_and_architecture.md` §0 and §4.
 
-- [x] Selection / Command / Interaction
-- [x] MovementComponent + NavigationAgent + NavMesh bake
-- [x] Harvest / Return / Deposit (team-filtered TC)
-- [x] Combat unit + building (modifiers, loot, visual states)
-- [x] Production (Worker, Soldier, Cavalry, Siege)
-- [x] Mobile Town Center (Deployment)
-- [x] Match Win/Lose
-- [x] **Phase 7 — Enemy AI Waves**
-- [x] Polish: attack hysteresis + RVO (ACCEPTED)
+This file is a short pointer only.
 
----
+## Done (high level)
 
-## Phase 8
+- Foundation: selection, command, nav, harvest, combat, production
+- Mobile Town Center + DeploymentComponent
+- Phase 5 Horses / Cavalry
+- Phase 6 Raid/Loot + Siege + building visual states
+- Phase 7 Enemy AI waves + match Win/Lose
+- Polish: attack hysteresis + RVO
+- Phase 8.0–8.2 Watchtower auto-attack, MobileTower cycle, DeploymentConfig / transit vuln / unpack AABB
+- Stuck detection + billboard pack bar
 
-- [ ] **Phase 8.0 — Stationary Watchtower + auto-attack** (wired, waiting F5)
-- [ ] Phase 8.1 — MobileTower (`DeploymentComponent`)
+## Active
 
----
+- [ ] **Formation-offsets** (WAITING F5)
+
+## Next content
+
+- Environment Zones
+- Enemy AI strengthening
+- v1.0 polish (debug keys, names, MOBILE combat balance review)
 
 ## Later
 
-- [ ] Siege / large unit corner pathing
-- [ ] Frame-sliced path updates (50+ units)
-- [ ] Stronger enemy AI (economy, expand)
-- [ ] Environment belts / migration pressure
-- [ ] Fog of War / Minimap
-- [ ] Multiplayer (later)
+- Fog of War / Minimap
+- Multiplayer
+- See `NOMAD_WORLD_BACKLOG.md`

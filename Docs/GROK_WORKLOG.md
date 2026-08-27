@@ -2,81 +2,72 @@
 
 Ветка: `nomads-wars-grok` (репозиторий `RTS-Game`)
 
+**Scope / status:** только `Docs/nomad_wars_v1_scope_and_architecture.md`
+
 ---
 
-## 2026-08-27 — Phase 8.0 Watchtower wired (waiting F5)
+## 2026-08-28 — Docs cleanup (Claude audit) + formation-offsets code present
 
-Polish sprint (hysteresis + RVO) **ACCEPTED** по F5 игрока. RVO wall-nudge у стен зданий — tech debt, не блокер.
+### Claude audit accepted
 
-### Phase 8.0 code
+- **Stuck Detection** — ACCEPTED (log 26): STUCK → stays MOBILE; manual U → UNPACKING → DEPLOYED; no false positives on open routes.
+- **Billboard** pack/unpack bar — ACCEPTED (visual; no console proof required).
+- **Log 27 death spiral** — confirmed: TC + Watchtower same dest → mutual `unpack blocked — footprint overlaps` → permanent MOBILE → defenseless → TC destroyed. Priority #1 = formation-offsets.
 
-- `BuildingCombatComponent` — scan `UnitManager.units` каждые 0.4s, без Area3D / PhysicsQuery
-- `Watchtower` extends `BaseBuilding` (HP 350, range 14, dmg 12, RANGED)
-- Damage: frozen `BaseUnit.damage(amount)` — не `take_damage`
-- Catalog: `WatchtowerData` Wood 40 / Stone 20 → BuildPanel button
-- `ResourceManager.cost_watchtower()` и `BuildingManager.watchtowers_list` уже были — не трогали
-- MatchManager спаунит player Watchtower на марше врага (TC + `(0,0,6)`)
-- Win/Lose формула не менялась (все buildings). DEFEAT теперь требует снести TC **и** башню
+### Code (already on branch)
 
-### F5
+`InteractionManager._try_move_mobile_buildings`:
+- Collects team-0 MOBILE TC + Watchtowers
+- Local grid dests (`_building_formation_dests`); **does not** edit `Formation.gd`
+- Spacing = `2 * max(nav_half_extents.xz) + UNPACK_MARGIN(0.4) + FORMATION_BUFFER(1.5)`
+- Empty unit selection + RMB ground = whole caravan (selection-aware building move deferred — no building selection yet)
 
-См. `Docs/PHASE_8_0_INTEGRATION.md`. Ждём `[TOWER] acquired` / `hits`.
+### Design fixed explicitly (scope §0)
+
+- MOBILE combat: attack **off** binary; inbound vuln ×1.5 TC / ×1.3 tower — conscious choice until balance pass (not accident).
+- Selection-aware building move — deferred until building selection exists.
+
+### Docs hygiene (this pass)
+
+- Single living roadmap: `nomad_wars_v1_scope_and_architecture.md`
+- Pointers only: CURRENT_STATE, TODO, ROADMAP
+- Deleted obsolete: ARCHITECTURE, PROJECT_ROADMAP, PHASE_8_*, SESSION
+
+### F5 formation-offsets
+
+See scope §0. Need different `move via RMB to` + `spacing=` and zero footprint overlaps on dual U.
 
 ### Next
 
-F5 accept 8.0 → Phase 8.1 MobileTower (`DeploymentComponent`).
+F5 accept → Environment Zones.
 
 ---
 
-## 2026-08-26 — Phase 7 COMPLETE + Polish sprint start
+## 2026-08-27 — Phase 8.0 Watchtower wired (later ACCEPTED)
+
+Polish sprint (hysteresis + RVO) **ACCEPTED**. RVO wall-nudge у стен зданий — tech debt, не блокер.
+
+### Phase 8.0–8.2
+
+- `BuildingCombatComponent` — scan `UnitManager.units` каждые 0.4s, без Area3D / PhysicsQuery
+- Watchtower / MobileTower / DeploymentConfig path completed through 8.2
+- MatchManager spawns player Watchtower on enemy march path
+
+---
+
+## 2026-08-26 — Phase 7 COMPLETE + Polish sprint
 
 ### Phase 7 (Enemy AI)
 
 - `EnemyAIComponent` + `EnemySpawner`
 - Waves → player TC → Barracks → priority SiegeUnit
-- Match DEFEAT / VICTORY intact
-- F5: full enemy pressure, player can lose legitimately
+- Deposit own-team only hotfix
 
-### Hotfix deposit
+### Polish
 
-- `BuildingManager.get_nearest_town_center(pos, team_filter)`
-- Workers no longer deposit to enemy TC
-- Log: `no own-team Town Center found, keeping inventory`
-
-### Polish sprint (Navigation & Combat)
-
-**Code**
-
-1. **Attack hysteresis (unit)** — `CombatComponent`
-   - Enter melee at `attack_range`
-   - Exit only past `attack_range * 1.25`
-   - On IN_RANGE: `movement.cancel()` freezes agent
-
-2. **Attack hysteresis (building)** — `BaseUnit.update_attacking_building`
-   - Enter at `building_attack_range`
-   - Exit past `building_attack_range * building_exit_range_mult` (1.2)
-   - `_siege_in_range` lock + cancel movement while striking
-
-3. **Soft RVO** — `MovementComponent`
-   - `avoidance_enabled = true`, radius 0.45, layers/mask 1
-   - `set_velocity` + `velocity_computed` → `move_and_slide`
-   - Light separation push kept as backup
-   - Does not change Harvest / Order / Match contracts
-
-**Docs updated:** TODO, CURRENT_STATE, ROADMAP, PROJECT_ROADMAP, this worklog.
-
-### F5 checklist (polish)
-
-1. Soldier siege player TC — no constant approach/attack jitter
-2. Unit-vs-unit melee — less oscillation at range edge
-3. Two workers pass near each other / enemy soldier — soft avoid
-4. Harvest → deposit still works
-5. Enemy waves still attack buildings
-
-### Next
-
-After F5 accept polish → Phase 8 defenses / mobile towers.
+1. Attack hysteresis (unit + building)
+2. Soft RVO on MovementComponent
 
 ---
 
-*Older sessions: M1–M6, Phase 4–6, UI, Raid/Siege — see git history.*
+*Older sessions: M1–M6, Phase 4–6 — see git history.*

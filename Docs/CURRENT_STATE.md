@@ -1,39 +1,44 @@
 # CURRENT STATE
 
+**Single source of truth:** [`Docs/nomad_wars_v1_scope_and_architecture.md`](nomad_wars_v1_scope_and_architecture.md)
+
 **Branch:** `nomads-wars-grok`  
-**Version:** 0.2 playable match loop + Phase 8.0 Watchtower (F5 pending)
+**Engine:** Godot 4.7  
+**Version pointer:** see §0 of the scope doc (do not duplicate status here).
 
-## Status
+## Snapshot (2026-08-28)
 
-| Milestone | State |
-|-----------|--------|
-| M1–M6.9 Foundation / Nav / Harvest-through-Movement | COMPLETE |
-| Phase 4 Mobile TC (Deployment) | COMPLETE |
-| Phase 5 Horses & Cavalry | COMPLETE |
-| Phase 6 Raid/Loot + Siege + Building Visual States | COMPLETE |
-| Phase 7 AI Waves & Core Loop | COMPLETE |
-| Deposit own-team only | COMPLETE |
-| Sprint: Navigation & Combat Polish (Hysteresis & RVO) | **ACCEPTED** |
-| **Phase 8.0 Stationary Watchtower + auto-attack** | **WAITING F5** |
+| Item | State |
+|------|--------|
+| Phase 7 AI waves + match loop | ACCEPTED |
+| Polish (hysteresis + RVO) | ACCEPTED |
+| Phase 8.0–8.2 Watchtower / MobileTower / DeploymentConfig | ACCEPTED |
+| Stuck detection (STUCK stays MOBILE) | ACCEPTED |
+| Billboard pack/unpack bar | ACCEPTED |
+| **Formation-offsets** (multi-MOBILE RMB grid) | **WAITING F5** |
 
 ## Active work
 
-**Phase 8.0 — Watchtower**
+**Formation-offsets** — critical death-spiral fix (log 27).  
+Code lives in `InteractionManager._try_move_mobile_buildings` (local grid; `Formation.gd` untouched).  
+F5 checklist: §0 of the scope doc.
 
-- `BuildingCombatComponent` scans `UnitManager.units` (`scan_interval = 0.4`)
-- No Area3D / PhysicsQuery
-- Catalog cost Wood 40 / Stone 20 (`WatchtowerData` + `ResourceManager.cost_watchtower()`)
-- MatchManager spawns one player tower on the enemy march path
+## Next after F5 accept
 
-## Architecture (stable)
+1. Environment Zones  
+2. Pre-public polish (hide debug keys P/M/U/C/R; readable enemy building names)
 
-- `BaseUnit` owns `unit_state` + `Order`
-- `MovementComponent` = HOW (NavAgent + path + optional RVO)
-- `Harvest` / `Combat` report status; Unit decides transitions
-- `MatchManager` Win/Lose by buildings team 0 vs 1
-- `EnemyAIComponent` + `EnemySpawner` for team 1 waves
-- `BuildingCombatComponent` = building auto-attack (does not issue Orders)
+## Doc map
 
-## Next after F5 accept 8.0
+| File | Role |
+|------|------|
+| `nomad_wars_v1_scope_and_architecture.md` | **Only** living scope / status / phase order |
+| `TODO.md` | Short operational checklist |
+| `GROK_WORKLOG.md` | Session history |
+| `MOBILE_SETTLEMENTS.md` | Design philosophy |
+| `DESIGN_DEPLOYMENT_EFFICIENCY.md` | Mechanical contract |
+| `NOMAD_WORLD_BACKLOG.md` | Future, not current architecture |
+| `00_WORLD_FOUNDATION.md` | World philosophy |
+| `PROJECT_RULES.md` | Coding / AI rules |
 
-Phase 8.1 — MobileTower via existing `DeploymentComponent`
+Deleted as obsolete: `ARCHITECTURE.md`, `PROJECT_ROADMAP.md`, `PHASE_8_*`, `SESSION.md`.
