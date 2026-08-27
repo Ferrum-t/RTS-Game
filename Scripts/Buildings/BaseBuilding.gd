@@ -33,6 +33,9 @@ enum VisualState {
 ## Per-hit [RAID] lines only when true (mass siege spam otherwise).
 @export var raid_debug_verbose: bool = false
 
+## Phase 8.2 — incoming damage mult while PACKING/MOBILE/UNPACKING (1.0 = none).
+var vulnerability_multiplier: float = 1.0
+
 var deployment_state: int = DeploymentState.State.DEPLOYED
 
 ## Value from inspector before tier/deployment resolve (set once in _ready)
@@ -114,21 +117,30 @@ func _exit_tree() -> void:
 
 
 ## amount is already modified (building multipliers applied by attacker).
+## Phase 8.2: if not DEPLOYED, multiply by vulnerability_multiplier.
 ## attacker_team_id >= 0 triggers loot siphon when lootable is present.
 func damage(amount: int, attacker_team_id: int = -1) -> void:
 	if is_destroyed:
 		return
-	health -= amount
-	if lootable != null and attacker_team_id >= 0 and amount > 0:
-		var looted: Dictionary = lootable.extract_loot(float(amount), attacker_team_id)
-		_raid_damage_total += amount
+	var final_amount: int = amount
+	if deployment_state != DeploymentState.State.DEPLOYED and vulnerability_multiplier > 1.0:
+		final_amount = maxi(1, int(round(float(amount) * vulnerability_multiplier)))
+		if OS.is_debug_build():
+			print(
+				name, " transit dmg ", amount, " × ", snappedf(vulnerability_multiplier, 0.01),
+				" → ", final_amount, " (state=", deployment_state, ")"
+			)
+	health -= final_amount
+	if lootable != null and attacker_team_id >= 0 and final_amount > 0:
+		var looted: Dictionary = lootable.extract_loot(float(final_amount), attacker_team_id)
+		_raid_damage_total += final_amount
 		for k in looted.keys():
 			var key: int = int(k)
 			_raid_loot_total[key] = int(_raid_loot_total.get(key, 0)) + int(looted[k])
 		if raid_debug_verbose:
 			var remaining: Dictionary = lootable.snapshot_stock()
 			print(
-				"[RAID] Attacker dealt ", amount,
+				"[RAID] Attacker dealt ", final_amount,
 				" damage (team ", attacker_team_id, "). Siphoned loot: ",
 				LootableComponent.format_stock(looted),
 				". Enemy remaining: ",
