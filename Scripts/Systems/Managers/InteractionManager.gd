@@ -5,6 +5,9 @@ class_name InteractionManager
 @export var command_manager: CommandManager
 
 const BUILDING_APPROACH_DISTANCE := 3.5
+## Grid spacing between MOBILE buildings sharing one RMB destination.
+## ~ nav_half_extents*2 + margin so unpack AABB does not overlap.
+const BUILDING_FORMATION_SPACING := 6.0
 
 
 func handle_right_click(
@@ -70,32 +73,71 @@ func handle_right_click(
 
 
 ## Phase 4 TC + Phase 8.1 Watchtower: RMB ground while no units selected.
+## Multiple MOBILE buildings get formation offsets (not one shared point).
 func _try_move_mobile_buildings(world_position: Vector3) -> void:
 	var bm := get_node_or_null("/root/BuildingManager")
 	if bm == null:
 		return
 
-	var dest: Vector3 = world_position
-	dest.y = 0.0
-
+	var mobiles: Array = []
 	for tc in bm.town_centers:
-		_try_move_one_mobile(tc, dest, "TownCenter")
-
+		if _is_movable_player_building(tc):
+			mobiles.append(tc)
 	for w in bm.watchtowers_list:
-		_try_move_one_mobile(w, dest, "Watchtower")
+		if _is_movable_player_building(w):
+			mobiles.append(w)
+
+	if mobiles.is_empty():
+		return
+
+	var anchor: Vector3 = world_position
+	anchor.y = 0.0
+	var dests: Array[Vector3] = _building_formation_dests(anchor, mobiles.size())
+
+	for i in range(mobiles.size()):
+		var building: Variant = mobiles[i]
+		var dest: Vector3 = dests[i]
+		building.request_move_to(dest)
+		var label: String = str(building.name)
+		print(label, " Deployment: move via RMB to ", dest, " (slot ", i, "/", mobiles.size(), ")")
 
 
-func _try_move_one_mobile(building: Variant, dest: Vector3, label: String) -> void:
+func _is_movable_player_building(building: Variant) -> bool:
 	if building == null or not is_instance_valid(building):
-		return
+		return false
 	if int(building.get("team_id")) != 0:
-		return
+		return false
 	if int(building.get("deployment_state")) != DeploymentState.State.MOBILE:
-		return
+		return false
 	if not building.has_method("request_move_to"):
-		return
-	building.request_move_to(dest)
-	print(label, " Deployment: move via RMB to ", dest)
+		return false
+	return true
+
+
+## Centered grid around anchor. Spacing covers footprint + unpack margin.
+func _building_formation_dests(anchor: Vector3, count: int) -> Array[Vector3]:
+	var out: Array[Vector3] = []
+	if count <= 0:
+		return out
+	if count == 1:
+		out.append(anchor)
+		return out
+
+	var cols: int = int(ceili(sqrt(float(count))))
+	var rows: int = int(ceili(float(count) / float(cols)))
+	var spacing: float = BUILDING_FORMATION_SPACING
+	var i: int = 0
+	for row in range(rows):
+		for col in range(cols):
+			if i >= count:
+				break
+			var ox: float = (float(col) - float(cols - 1) * 0.5) * spacing
+			var oz: float = (float(row) - float(rows - 1) * 0.5) * spacing
+			out.append(Vector3(anchor.x + ox, 0.0, anchor.z + oz))
+			i += 1
+		if i >= count:
+			break
+	return out
 
 
 func _outside_point(building: BaseBuilding, click_pos: Vector3) -> Vector3:
