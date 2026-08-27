@@ -15,8 +15,11 @@ class_name MobileBuilding
 @export var transit_vulnerability: float = 1.0
 
 var deployment: DeploymentComponent = null
-var _progress_bar: Node3D = null
+var _progress_bg: MeshInstance3D = null
+var _progress_fill: MeshInstance3D = null
 var _range_ring: MeshInstance3D = null
+const _BAR_WIDTH: float = 2.2
+const _BAR_HEIGHT: float = 5.2
 
 
 func _ready() -> void:
@@ -93,39 +96,59 @@ func _on_deployment_state_changed(_old: int, new_state: int) -> void:
 
 
 func _setup_progress_bar() -> void:
-	var bar := MeshInstance3D.new()
-	bar.name = "DeploymentProgressBar"
-	var box := BoxMesh.new()
-	box.size = Vector3(2.0, 0.12, 0.12)
-	bar.mesh = box
-	var mat := StandardMaterial3D.new()
-	mat.albedo_color = Color(0.2, 0.75, 1.0, 0.95)
-	mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
-	bar.material_override = mat
-	bar.position = Vector3(0.0, 5.0, 0.0)
-	bar.visible = false
-	add_child(bar)
-	_progress_bar = bar
+	# Dark background track
+	var bg := MeshInstance3D.new()
+	bg.name = "DeploymentProgressBg"
+	var bg_mesh := BoxMesh.new()
+	bg_mesh.size = Vector3(_BAR_WIDTH, 0.14, 0.14)
+	bg.mesh = bg_mesh
+	var bg_mat := StandardMaterial3D.new()
+	bg_mat.albedo_color = Color(0.08, 0.08, 0.1, 0.9)
+	bg_mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	bg.material_override = bg_mat
+	bg.position = Vector3(0.0, _BAR_HEIGHT, 0.0)
+	bg.visible = false
+	add_child(bg)
+	_progress_bg = bg
+
+	# Cyan fill grows left → right as pack/unpack completes
+	var fill := MeshInstance3D.new()
+	fill.name = "DeploymentProgressBar"
+	var fill_mesh := BoxMesh.new()
+	fill_mesh.size = Vector3(_BAR_WIDTH, 0.16, 0.16)
+	fill.mesh = fill_mesh
+	var fill_mat := StandardMaterial3D.new()
+	fill_mat.albedo_color = Color(0.15, 0.85, 1.0, 1.0)
+	fill_mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	fill.material_override = fill_mat
+	fill.position = Vector3(0.0, _BAR_HEIGHT, 0.0)
+	fill.visible = false
+	add_child(fill)
+	_progress_fill = fill
 
 
 func _update_progress_bar() -> void:
-	if _progress_bar == null or deployment == null:
+	if _progress_fill == null or deployment == null:
 		return
 	var st: int = deployment_state
 	var in_transition: bool = (
 		st == DeploymentState.State.PACKING
 		or st == DeploymentState.State.UNPACKING
 	)
-	_progress_bar.visible = in_transition
+	if _progress_bg:
+		_progress_bg.visible = in_transition
+	_progress_fill.visible = in_transition
 	if not in_transition:
 		return
-	var p: float = clampf(deployment.get_transition_progress(), 0.0, 1.0)
-	# Progress = time remaining ratio inverted → filled amount grows as work completes.
-	var done: float = 1.0 - p
-	_progress_bar.scale = Vector3(maxi(done, 0.05), 1.0, 1.0)
-	var cam := get_viewport().get_camera_3d()
-	if cam:
-		_progress_bar.global_transform.basis = cam.global_transform.basis
+
+	var remaining: float = clampf(deployment.get_transition_progress(), 0.0, 1.0)
+	var done: float = 1.0 - remaining
+	done = maxf(done, 0.02)
+	# Scale fill width; keep left edge fixed under the bar center-left.
+	_progress_fill.scale = Vector3(done, 1.0, 1.0)
+	_progress_fill.position = Vector3(-_BAR_WIDTH * 0.5 * (1.0 - done), _BAR_HEIGHT, 0.0)
+	if _progress_bg:
+		_progress_bg.position = Vector3(0.0, _BAR_HEIGHT, 0.0)
 
 
 func _setup_range_ring() -> void:
@@ -134,21 +157,24 @@ func _setup_range_ring() -> void:
 		radius = deployment_config.attack_range_display
 	if radius <= 0.0:
 		return
+	# Thin torus outline — NOT a solid disc (CylinderMesh looked like a giant blotch).
 	var ring := MeshInstance3D.new()
 	ring.name = "AttackRangeRing"
-	var cyl := CylinderMesh.new()
-	cyl.top_radius = radius
-	cyl.bottom_radius = radius
-	cyl.height = 0.05
-	cyl.radial_segments = 48
-	ring.mesh = cyl
+	var torus := TorusMesh.new()
+	torus.inner_radius = maxf(radius - 0.35, 0.5)
+	torus.outer_radius = radius
+	torus.rings = 48
+	torus.ring_segments = 16
+	ring.mesh = torus
 	var mat := StandardMaterial3D.new()
-	mat.albedo_color = Color(0.2, 0.9, 0.4, 0.25)
+	mat.albedo_color = Color(0.25, 1.0, 0.45, 0.55)
 	mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
 	mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
 	mat.cull_mode = BaseMaterial3D.CULL_DISABLED
 	ring.material_override = mat
-	ring.position = Vector3(0.0, 0.05, 0.0)
+	# Flat on ground
+	ring.rotation_degrees = Vector3(90.0, 0.0, 0.0)
+	ring.position = Vector3(0.0, 0.08, 0.0)
 	ring.visible = false
 	add_child(ring)
 	_range_ring = ring
@@ -157,7 +183,6 @@ func _setup_range_ring() -> void:
 func _update_range_ring_visibility(state: int) -> void:
 	if _range_ring == null:
 		return
-	# Show while mobile / unpacking so player sees coverage of the landing spot.
 	_range_ring.visible = (
 		state == DeploymentState.State.MOBILE
 		or state == DeploymentState.State.UNPACKING
