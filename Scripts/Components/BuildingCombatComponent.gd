@@ -23,16 +23,17 @@ var _target: BaseUnit = null
 func _ready() -> void:
 	_scan_timer = 0.0
 	_attack_timer = 0.0
-	var b := _host()
-	if b:
-		print(
-			"[TOWER] ", b.name, " combat ready team=", b.team_id,
-			" range=", attack_range, " dmg=", attack_damage
-		)
+	var b: BaseBuilding = _host()
+	if b == null:
+		return
+	print(
+		"[TOWER] ", b.name, " combat ready team=", b.team_id,
+		" range=", attack_range, " dmg=", attack_damage
+	)
 
 
 func _process(delta: float) -> void:
-	var b := _host()
+	var b: BaseBuilding = _host()
 	if b == null or b.is_destroyed or b.health <= 0:
 		_clear_target("host dead")
 		return
@@ -57,7 +58,7 @@ func _process(delta: float) -> void:
 
 
 func _host() -> BaseBuilding:
-	var p := get_parent()
+	var p: Node = get_parent()
 	if p is BaseBuilding:
 		return p as BaseBuilding
 	return null
@@ -67,17 +68,18 @@ func _acquire(b: BaseBuilding) -> void:
 	if _is_target_valid(b, _target, true):
 		return
 
-	var um := get_node_or_null("/root/UnitManager")
+	var um: Node = get_node_or_null("/root/UnitManager")
 	if um == null:
 		return
 
+	var units: Array = um.get("units") as Array
 	var best: BaseUnit = null
-	var best_dist := INF
-	var origin := b.global_position
-	for u in um.units:
+	var best_dist: float = INF
+	var origin: Vector3 = b.global_position
+	for u in units:
 		if not (u is BaseUnit):
 			continue
-		var unit := u as BaseUnit
+		var unit: BaseUnit = u as BaseUnit
 		if not _is_target_valid(b, unit, false):
 			continue
 		var dist: float = origin.distance_to(unit.global_position)
@@ -133,7 +135,9 @@ func _strike(b: BaseBuilding, unit: BaseUnit) -> void:
 func _clear_target(reason: String) -> void:
 	if _target == null:
 		return
-	var b := _host()
-	var host_name := b.name if b else "tower"
+	var b: BaseBuilding = _host()
+	var host_name: String = "tower"
+	if b != null:
+		host_name = str(b.name)
 	print("[TOWER] ", host_name, " lost target (", reason, ")")
 	_target = null
