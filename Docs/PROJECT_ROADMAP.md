@@ -24,13 +24,15 @@
 - [x] DeploymentComponent
 - [x] Building visual states (INTACT→DESTROYED)
 - [x] LootableComponent / damage modifiers
-- [ ] Phase 8 — towers / defenses
+- [ ] **Phase 8.0 Watchtower** (wired, waiting F5)
+- [ ] Phase 8.1 MobileTower
 
 ### Gameplay
 - [x] Selection / Move / Harvest / Attack / Siege
 - [x] Resources (Wood, Stone, Horses + dictionary costs)
 - [x] Phase 7 AI waves + core loop
-- [ ] **Polish: attack hysteresis + RVO** (active)
+- [x] Polish: attack hysteresis + RVO
+- [ ] Phase 8.0 tower auto-attack F5
 - [ ] Environment belts / migration
 
 ### Polish
