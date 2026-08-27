@@ -17,7 +17,8 @@ class_name BuildingCombatComponent
 
 var _scan_timer: float = 0.0
 var _attack_timer: float = 0.0
-var _target: BaseUnit = null
+## Untyped so a freed instance is not forced through BaseUnit arg checks.
+var _target: Object = null
 
 
 func _ready() -> void:
@@ -47,14 +48,19 @@ func _process(delta: float) -> void:
 		_scan_timer = scan_interval
 		_acquire(b)
 
-	if not _is_target_valid(b, _target, true):
+	# Freed units must not be passed into typed BaseUnit parameters.
+	if not is_instance_valid(_target):
 		if _target != null:
-			_clear_target("lost")
+			_clear_target("freed")
+		return
+
+	if not _is_target_valid(b, _target, true):
+		_clear_target("lost")
 		return
 
 	if _attack_timer > 0.0:
 		return
-	_strike(b, _target)
+	_strike(b, _target as BaseUnit)
 
 
 func _host() -> BaseBuilding:
@@ -65,8 +71,10 @@ func _host() -> BaseBuilding:
 
 
 func _acquire(b: BaseBuilding) -> void:
-	if _is_target_valid(b, _target, true):
+	if is_instance_valid(_target) and _is_target_valid(b, _target, true):
 		return
+	if not is_instance_valid(_target):
+		_target = null
 
 	var um: Node = get_node_or_null("/root/UnitManager")
 	if um == null:
@@ -77,6 +85,8 @@ func _acquire(b: BaseBuilding) -> void:
 	var best_dist: float = INF
 	var origin: Vector3 = b.global_position
 	for u in units:
+		if not is_instance_valid(u):
+			continue
 		if not (u is BaseUnit):
 			continue
 		var unit: BaseUnit = u as BaseUnit
@@ -101,23 +111,27 @@ func _acquire(b: BaseBuilding) -> void:
 		)
 
 
-func _is_target_valid(b: BaseBuilding, unit: BaseUnit, use_exit_range: bool) -> bool:
+## unit is Object so callers can pass a possibly-freed ref without typed-arg crash.
+func _is_target_valid(b: BaseBuilding, unit: Object, use_exit_range: bool) -> bool:
 	if unit == null or not is_instance_valid(unit):
 		return false
-	if unit.unit_state == BaseUnit.UnitState.DEAD:
+	if not (unit is BaseUnit):
 		return false
-	if int(unit.team_id) == int(b.team_id):
+	var u: BaseUnit = unit as BaseUnit
+	if u.unit_state == BaseUnit.UnitState.DEAD:
+		return false
+	if int(u.team_id) == int(b.team_id):
 		return false
 	var limit: float = attack_range
 	if use_exit_range:
 		limit = attack_range * exit_range_mult
-	if b.global_position.distance_to(unit.global_position) > limit:
+	if b.global_position.distance_to(u.global_position) > limit:
 		return false
 	return true
 
 
 func _strike(b: BaseBuilding, unit: BaseUnit) -> void:
-	if not _is_target_valid(b, unit, true):
+	if not is_instance_valid(unit) or not _is_target_valid(b, unit, true):
 		_clear_target("invalid strike")
 		return
 	_attack_timer = attack_cooldown
@@ -126,7 +140,6 @@ func _strike(b: BaseBuilding, unit: BaseUnit) -> void:
 		"[TOWER] ", b.name, " hits ", unit.name, " for ", attack_damage,
 		" dmg (HP ", hp_after, "/", unit.max_health, ")"
 	)
-	# Frozen unit combat contract — BaseUnit.damage(amount).
 	unit.damage(attack_damage)
 	if not is_instance_valid(unit) or unit.unit_state == BaseUnit.UnitState.DEAD:
 		_clear_target("killed")
@@ -137,7 +150,7 @@ func _clear_target(reason: String) -> void:
 		return
 	var b: BaseBuilding = _host()
 	var host_name: String = "tower"
-	if b != null:
+	if b != null and is_instance_valid(b):
 		host_name = str(b.name)
 	print("[TOWER] ", host_name, " lost target (", reason, ")")
 	_target = null
