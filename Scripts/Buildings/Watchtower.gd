@@ -1,12 +1,7 @@
-extends BaseBuilding
+extends MobileTower
 
 class_name Watchtower
 
-## Phase 8.0 — stationary defensive tower.
-## Auto-attack lives on child BuildingCombatComponent (timer scan of UnitManager.units).
-## Phase 8.1 MobileTower will add DeploymentComponent — do not add it here.
-
-func _ready() -> void:
-	super()
-	add_to_group("Obstacle")
-	print("[TOWER] ", name, " ready team=", team_id, " HP=", health, "/", max_health)
+## Phase 8.0 combat + Phase 8.1 mobility.
+## class_name Watchtower preserved for BuildingManager.register_building.
+## All deployment / combat logic lives on MobileTower + child BuildingCombatComponent.
