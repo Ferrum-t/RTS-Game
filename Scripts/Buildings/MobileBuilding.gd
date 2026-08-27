@@ -96,7 +96,6 @@ func _on_deployment_state_changed(_old: int, new_state: int) -> void:
 
 
 func _setup_progress_bar() -> void:
-	# Dark background track
 	var bg := MeshInstance3D.new()
 	bg.name = "DeploymentProgressBg"
 	var bg_mesh := BoxMesh.new()
@@ -111,7 +110,6 @@ func _setup_progress_bar() -> void:
 	add_child(bg)
 	_progress_bg = bg
 
-	# Cyan fill grows left → right as pack/unpack completes
 	var fill := MeshInstance3D.new()
 	fill.name = "DeploymentProgressBar"
 	var fill_mesh := BoxMesh.new()
@@ -144,7 +142,6 @@ func _update_progress_bar() -> void:
 	var remaining: float = clampf(deployment.get_transition_progress(), 0.0, 1.0)
 	var done: float = 1.0 - remaining
 	done = maxf(done, 0.02)
-	# Scale fill width; keep left edge fixed under the bar center-left.
 	_progress_fill.scale = Vector3(done, 1.0, 1.0)
 	_progress_fill.position = Vector3(-_BAR_WIDTH * 0.5 * (1.0 - done), _BAR_HEIGHT, 0.0)
 	if _progress_bg:
@@ -157,27 +154,53 @@ func _setup_range_ring() -> void:
 		radius = deployment_config.attack_range_display
 	if radius <= 0.0:
 		return
-	# Thin torus outline — NOT a solid disc (CylinderMesh looked like a giant blotch).
+
+	# Procedural flat ring on XZ (ground). Avoids TorusMesh XY default (vertical arch).
 	var ring := MeshInstance3D.new()
 	ring.name = "AttackRangeRing"
-	var torus := TorusMesh.new()
-	torus.inner_radius = maxf(radius - 0.35, 0.5)
-	torus.outer_radius = radius
-	torus.rings = 48
-	torus.ring_segments = 16
-	ring.mesh = torus
+	ring.mesh = _make_ground_ring_mesh(radius, 0.28, 64)
 	var mat := StandardMaterial3D.new()
-	mat.albedo_color = Color(0.25, 1.0, 0.45, 0.55)
+	mat.albedo_color = Color(0.25, 1.0, 0.45, 0.7)
 	mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
 	mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
 	mat.cull_mode = BaseMaterial3D.CULL_DISABLED
 	ring.material_override = mat
-	# Flat on ground
-	ring.rotation_degrees = Vector3(90.0, 0.0, 0.0)
-	ring.position = Vector3(0.0, 0.08, 0.0)
+	ring.position = Vector3(0.0, 0.12, 0.0)
 	ring.visible = false
 	add_child(ring)
 	_range_ring = ring
+
+
+## Flat annulus in the local XZ plane (Y up), so it lies on the ground without rotation hacks.
+func _make_ground_ring_mesh(radius: float, thickness: float, segments: int) -> ArrayMesh:
+	var r_out: float = radius
+	var r_in: float = maxf(radius - thickness, 0.5)
+	var verts := PackedVector3Array()
+	var norms := PackedVector3Array()
+	var indices := PackedInt32Array()
+	for i in range(segments):
+		var a0: float = TAU * float(i) / float(segments)
+		var a1: float = TAU * float(i + 1) / float(segments)
+		var c0 := Vector3(cos(a0), 0.0, sin(a0))
+		var c1 := Vector3(cos(a1), 0.0, sin(a1))
+		var base: int = verts.size()
+		verts.append(c0 * r_in)
+		verts.append(c0 * r_out)
+		verts.append(c1 * r_out)
+		verts.append(c1 * r_in)
+		for _j in range(4):
+			norms.append(Vector3.UP)
+		# two triangles
+		indices.append_array([base + 0, base + 1, base + 2, base + 0, base + 2, base + 3])
+
+	var arrays: Array = []
+	arrays.resize(Mesh.ARRAY_MAX)
+	arrays[Mesh.ARRAY_VERTEX] = verts
+	arrays[Mesh.ARRAY_NORMAL] = norms
+	arrays[Mesh.ARRAY_INDEX] = indices
+	var mesh := ArrayMesh.new()
+	mesh.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES, arrays)
+	return mesh
 
 
 func _update_range_ring_visibility(state: int) -> void:
