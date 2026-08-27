@@ -10,20 +10,21 @@
 - [x] Mobile Town Center (Deployment)
 - [x] Match Win/Lose
 - [x] **Phase 7 — Enemy AI Waves**
+- [x] Polish: attack hysteresis + RVO (ACCEPTED)
 
 ---
 
-## Polish
+## Phase 8
 
-- [ ] **Polish Sprint: Navigation & Combat Stability** (hysteresis + RVO) — in progress
+- [ ] **Phase 8.0 — Stationary Watchtower + auto-attack** (wired, waiting F5)
+- [ ] Phase 8.1 — MobileTower (`DeploymentComponent`)
+
+---
+
+## Later
+
 - [ ] Siege / large unit corner pathing
 - [ ] Frame-sliced path updates (50+ units)
-
----
-
-## Phase 8+
-
-- [ ] Defensive buildings / mobile towers
 - [ ] Stronger enemy AI (economy, expand)
 - [ ] Environment belts / migration pressure
 - [ ] Fog of War / Minimap
