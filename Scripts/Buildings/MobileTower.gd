@@ -2,19 +2,19 @@ extends MobileBuilding
 
 class_name MobileTower
 
-## Phase 8.1 — mobile defensive tower.
-## Deployment: DeploymentComponent (same path as TownCenter).
-## Combat: child BuildingCombatComponent (Phase 8.0) — fires only while DEPLOYED.
-## No deployment efficiency multipliers (Phase 8.2).
-## No unit MovementComponent.
+## Phase 8.1 mobility + Phase 8.2 DeploymentConfig (fast pack, vuln 1.3, range ring).
 
 func _ready() -> void:
+	if deployment_config == null:
+		deployment_config = DeploymentConfig.preset_watchtower()
 	super()
 	add_to_group("Obstacle")
 	print(
 		"[TOWER] ", name, " ready team=", team_id,
 		" HP=", health, "/", max_health,
-		" deployment=", deployment_state
+		" deployment=", deployment_state,
+		" pack=", pack_time, "s speed=", mobile_move_speed,
+		" vuln=", vulnerability_multiplier
 	)
 	if OS.is_debug_build() and team_id == 0:
 		print("[TOWER] debug keys: P=pack  M=move(8,0,5)  U=unpack")
