@@ -3,8 +3,7 @@ extends MobileBuilding
 class_name TownCenter
 
 ## Economy hub. Trains Workers only while DEPLOYED.
-## Phase 4: pack / move / unpack via DeploymentComponent.
-## Phase 6: lootable (loot_ratio 0.5 via BaseBuilding defaults).
+## Phase 8.2: DeploymentConfig preset_town_center().
 
 @export var worker_scene: PackedScene
 @export var worker_cost_wood: int = 50
@@ -17,14 +16,16 @@ var _pending_scene: PackedScene = null
 
 
 func _ready() -> void:
-	# Explicit raid defaults (can still override in Inspector)
 	is_lootable = true
 	loot_ratio = 0.5
+	if deployment_config == null:
+		deployment_config = DeploymentConfig.preset_town_center()
 	super()
 	add_to_group("Obstacle")
 	if worker_scene == null:
 		worker_scene = load("res://Scenes/Units/worker.tscn") as PackedScene
-	print("TownCenter ready at: ", global_position, " deployment=", deployment_state)
+	print("TownCenter ready at: ", global_position, " deployment=", deployment_state,
+		" pack=", pack_time, "s vuln=", vulnerability_multiplier)
 	if OS.is_debug_build() and team_id == 0:
 		print("TownCenter debug keys: P=pack  M=move(8,0,5)  U=unpack")
 
