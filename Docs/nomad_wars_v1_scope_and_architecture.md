@@ -1,196 +1,166 @@
 # Nomad Wars — MVP v1.0 Scope и архитектурная дорожная карта
 
-> Документ-якорь для проекта. Обновлять при значимых архитектурных решениях.
-> Прикладывать целиком в начале новой сессии с любой моделью (Claude/ChatGPT/Grok).
-> Секция CURRENT STATUS ниже меняется часто — обновлять перед каждой сессией.
-> Остальные разделы (SCOPE/ARCHITECTURE) меняются редко.
+> **Единственный живой документ** по scope / статусу / порядку фаз.
+> Не заводить параллельные ROADMAP / ARCHITECTURE / PHASE_8_x_INTEGRATION.
+> Прикладывать целиком в начале новой сессии.
+> §0 менять перед каждой сессией. §1–3 — редко.
 
 ---
 
-## 0. CURRENT STATUS (обновлено 2026-08-26, ветка `nomads-wars-grok`)
+## 0. CURRENT STATUS (2026-08-28, ветка `nomads-wars-grok`)
 
-**Ветка:** `Ferrum-t/RTS-Game` → `nomads-wars-grok`  
-**Движок:** Godot 4.7 stable
+**Репо:** `Ferrum-t/RTS-Game` → `nomads-wars-grok`  
+**Движок:** Godot 4.7 stable  
+**Правило приёмки:** код из чата ≠ факт, пока нет F5-лога + чтения файла.
 
-### Милестоуны (приняты после F5)
+### Милестоуны
 
 | ID | Содержание | Статус |
 |----|------------|--------|
-| M1–M6.9 | Movement (NavAgent + bake), Harvest-through-Movement, Siege path | **ACCEPTED** |
-| M7 | Stone harvest + stockpile parity с Wood | **ACCEPTED** |
-| M8.1 | Order data-object + `replace_order(Order)` dispatcher | **ACCEPTED** |
-| M8.2 | Audit ownership target-полей (без Increment 2) | **ACCEPTED** |
-| M8.x | Cleanup diagnostic logs | **ACCEPTED** |
-| M9 | Playable Match Loop (start setup, Win/Lose, command gate) | **ACCEPTED** |
-| Phase 2 | Stat resolver: `get_current_stat` + tier_modifiers on BaseBuilding | **ACCEPTED** |
-| Phase 3 | SPIKE: CharacterBody3D mobile building (physics + nav + move) | **ACCEPTED** |
-| Phase 4 | DeploymentComponent + Mobile TC (pack/move/unpack + NavBake) | **ACCEPTED** |
-| Phase 5 | Horses resource + Cavalry gate (Barracks) | **ACCEPTED** |
-| UI-пакет | Horses HUD, Train Cavalry, Pack/Unpack buttons | **ACCEPTED** |
-| **Phase 6 Core** | **Building damage modifiers + LootableComponent + SiegeUnit** | **ACCEPTED** |
+| M1–M6.9 | NavAgent + bake, Harvest-through-Movement, Siege | **ACCEPTED** |
+| M7 | Stone harvest | **ACCEPTED** |
+| M8.1 / M8.2 | Order + ownership audit | **ACCEPTED** |
+| M9 | Match loop Win/Lose | **ACCEPTED** |
+| Phase 2–5 | Stats, mobile TC, Horses/Cavalry, Pack UI | **ACCEPTED** |
+| Phase 6 Core | DamageType + loot + SiegeUnit | **ACCEPTED** |
+| Phase 6.2 | Building visual INTACT→DESTROYED | **ACCEPTED** |
+| Phase 7 | EnemyAI + waves | **ACCEPTED** |
+| Polish | Attack hysteresis + RVO | **ACCEPTED** |
+| Phase 8.0 | Watchtower auto-attack (`BuildingCombatComponent`) | **ACCEPTED** |
+| Phase 8.1 | MobileTower pack/move/unpack | **ACCEPTED** |
+| Phase 8.2 | DeploymentConfig, transit vuln, unpack AABB, UI | **ACCEPTED** |
+| Stuck | STUCK stays MOBILE, no auto-unpack | **ACCEPTED** |
+| Billboard | Pack/unpack bar faces camera | **ACCEPTED** |
+| **Formation-offsets** | Grid dests for multi-MOBILE RMB | **WAITING F5** |
 
-### Подтверждено в репозитории и F5 (Phase 6)
+### Сейчас
 
-- **DamageType:** MELEE / RANGED / SIEGE.
-- **BuildingDamageRules** (`Scripts/Systems/BuildingDamageRules.gd`):
-  - MELEE vs building = **0.25×**
-  - RANGED vs building = **0.10×**
-  - SIEGE vs building = **2.0×**
-  - Формула (проверена логом + кодом):
-    ```
-    modified_building_damage = max(1, round(base_damage × damage_multiplier))
-    ```
-    - **округление: `round()`, НЕ `floor()`**
-    - при `base_damage > 0` минимум урона по зданию = **1**
-  - Примеры: Worker 10→3, Soldier 20→5, Cavalry 25→6, Siege 30→60.
-- **LootableComponent** (`Scripts/Components/LootableComponent.gd`):
-  - `loot_ratio` (TC default 0.5); pool = modified_damage × loot_ratio
-  - пропорциональное распределение по остатку stock
-  - **инвариант:** `taken = mini(amount, avail)` — нельзя высосать больше, чем есть
-  - enemy: virtual stock; player team 0: global ResourceManager
-- **SiegeUnit:** HP 200, base_damage 30, SIEGE, move_speed 3.0; Barracks train (150W+50S, key R)
-- RAID verbose logs gated; summary on destroy
-- MATCH: VICTORY после destroy enemy buildings
+**Formation-offsets** — критичный фикс death spiral (лог 27): TC + Watchtower ехали в одну точку, оба `unpack blocked — footprint overlaps`, оба вечно MOBILE, беззащитны, TC умер.
 
-### MatchManager Win/Lose
+Код: `InteractionManager._try_move_mobile_buildings` — локальная сетка, **без** правки `Formation.gd`. Spacing = `2 * max(nav_half_extents.xz) + 0.4 + 1.5`.
 
-Только `team_id == 0` и `team_id == 1`. `team_id >= 2` игнорируется (тестовые объекты).
+**Caravan move (решено явно):** RMB по земле при пустом selection юнитов двигает **все** team-0 MOBILE здания. Selection-aware move зданий — после building selection, не сейчас.
 
-### Известный технический долг
+### F5 formation-offsets
 
-- Enemy buildings в логе как `@CharacterBody3D@N` (косметика spawn naming).
-- Debug keys P/M/U/C/R — убрать или спрятать перед релизом.
-- TC mobile path без NavigationAgent (застревание в деревьях при MOBILE).
-- `NavigationBakeService.AGENT_RADIUS = 1.1` — эмпирика.
-- Production single-slot; unit-unit separation при mass attack.
-- Полная data-driven генерализация ресурсов — при 6-м типе.
+1. TC + Watchtower оба MOBILE.
+2. RMB в одну точку (юниты не выделены).
+3. Лог: разные `move via RMB to` + `spacing=`.
+4. U на обоих → UNPACKING → DEPLOYED, **ноль** `footprint overlaps`.
+5. Повтор с близкого старта — цели всё равно разные.
 
-### Следующий шаг по roadmap (§4)
+### Открытые решения (не кодить сейчас)
 
-1–7. Foundation … Horses — **DONE**  
-8. Raid/Loot Core — **DONE (Phase 6)**  
-**8b. ← СЛЕДУЮЩИЙ:** Phase 6.2 Building visual states (Intact / Damaged / Burning / Destroyed)  
-9. Мобильные башни  
-10. Environment Zones  
-11. Enemy AI (простой RTS) — после 6.2  
-12. Полировка расы / баланс / Steam-ready
+| ID | Вопрос | Статус |
+|----|--------|--------|
+| MOBILE combat | Атака в MOBILE выключена бинарно (не %). Входящий урон ×1.5 TC / ×1.3 tower. | **Сознательный чойс до баланса.** Не случайность. Лог 27 показал цену. |
+| A | Selection-aware move зданий | Отложено: нет building selection. Сейчас = весь караван. |
+| C | Unpack vs resources/terrain | Средний. Сейчас только building-vs-building. |
+| D | Enemy AI vs MOBILE buildings | Отложено (баланс/AI). |
 
-> Урок процесса: код из чата ≠ факт репозитория, пока не подтверждён F5-логом + чтением файла.
+### Следующий шаг
+
+1. F5 accept formation-offsets.
+2. **Environment Zones** — внешнее давление, иначе мобильность геймплейно пуста.
+3. Мелкий техдолг перед публичным билдом: спрятать P/M/U/C/R; имена enemy-buildings вместо `@CharacterBody3D@N`.
 
 ---
 
-## 1. V1.0 SCOPE — что входит в первый релиз
+## 1. V1.0 SCOPE
 
-Цель v1.0: одна полностью проработанная раса, играбельное ядро, готовое к раннему
-доступу / демо в Steam. Приоритет — глубина одной механики, а не широта контента.
+Цель v1.0: одна раса, играбельное ядро, ранний Steam. Глубина одной механики, не ширина контента.
 
 ### 1.1 Раса
-- Одна фракция (выбрать одну из четырёх задуманных), доведённая до релизного
-  качества: юниты, здания, арт, звук.
-- Остальные 3 фракции — **бэклог**.
+Одна фракция до релизного качества. Остальные 3 — бэклог.
 
 ### 1.2 Экономика
-- Базовые ресурсы: wood, stone, gold (уже есть).
-- **Horses** — Phase 5 **DONE** (узел + stockpile + cavalry gate + UI label).
+Wood, stone, gold, **Horses (Phase 5 DONE)**.
 
-### 1.3 Grab / Raid (Orc-style из Warcraft 3)
-- **Phase 6 Core DONE:** урон по зданиям с типом (MELEE/RANGED/SIEGE) +
-  мгновенный siphon ресурсов пропорционально modified damage.
-- Полноценный Capture/Steal (визуальный угон живых юнитов) — **бэклог**.
+### 1.3 Grab / Raid
+Phase 6 Core **DONE**. Capture/Steal юнитов — бэклог.
 
-### 1.4 Мобильные поселения (главная фича v1.0)
-- Town Center: DEPLOYED / PACKING / MOBILE / UNPACKING — **Phase 4 DONE**.
-- UI Pack/Unpack — **DONE**.
+### 1.4 Мобильные поселения
+Town Center DEPLOYED/PACKING/MOBILE/UNPACKING — **DONE**. UI Pack/Unpack — **DONE**.
 
 ### 1.5 Мобильные башни
-- После Phase 6.2 / параллельно с polish.
+Watchtower auto-attack + MobileTower cycle — **DONE (8.0–8.2)**. Efficiency tables — баланс, не сейчас.
 
-### 1.6 Меняющаяся среда (Environment Zones)
-- Базовая версия в v1.0 после мобильных башен.
+### 1.6 Environment Zones
+**Следующий контентный блок после F5 formation.** Без зон у игрока нет причины поднимать лагерь.
 
 ### 1.7 Боевые юниты
-- Worker, Soldier, Cavalry, **SiegeUnit (Phase 6)**.
+Worker, Soldier, Cavalry, SiegeUnit.
 
 ---
 
-## 2. BACKLOG — что сознательно откладывается после v1.0
+## 2. BACKLOG после v1.0
 
-- Остальные 3 фракции.
-- Полноценная система героев.
-- Живые угоняемые/приручаемые животные с AI.
-- Полный Capture/Steal pipeline.
-- Полная климатическая система / «живые агенты» мира.
-- Летающие юниты, магия как слой.
-- Кампания, multiplayer.
-- Fire DoT / распространение огня (не часть Phase 6.2 visual Burning).
+- Остальные 3 фракции, герои, Capture/Steal, лёт, магия, кампания, multiplayer.
+- Лошади как лимит миграции, settlement mass, сигналы соседям — `NOMAD_WORLD_BACKLOG.md`.
+- Fire DoT (не часть visual Burning).
 
 ---
 
-## 3. Архитектурные контракты
+## 3. Архитектурные контракты (заморожены)
 
-### 3.1 Order abstraction
-> **DONE (M8.1).**
+### 3.1 Order — DONE (M8.1)
+### 3.2 DeploymentState — DONE (Phase 4)
+### 3.3 Stats `base × tier × deployment` — DONE (Phase 2+4). Efficiency tables не включены.
+### 3.4 Building mover ≠ unit MovementComponent — DONE
+### 3.5 NavigationBakeService — DONE (footprint off on MOBILE, on on UNPACKING)
+### 3.6 Horses — DONE (Phase 5)
+### 3.7 Damage → Loot — DONE
 
-### 3.2 DeploymentState
-> **DONE (Phase 4).**
+```
+modified_building_damage = max(1, round(base_damage × damage_multiplier))
+```
 
-### 3.3 Стат-резолюшн base × tier × deployment
-> **DONE (Phase 2 + 4).**
+| Type | vs Building |
+|------|-------------|
+| MELEE | 0.25× |
+| RANGED | 0.10× |
+| SIEGE | 2.0× |
 
-### 3.4 Entity-agnostic movement for buildings
-> **DONE (Phase 3/4).**
+Siphon: `taken = mini(want, available)`.
 
-### 3.5 NavigationBakeService dynamic obstacles
-> **DONE (Phase 4).**
+### 3.8 Building visual state — DONE (Phase 6.2)
+INTACT / DAMAGED / BURNING / DESTROYED от % HP. Burning ≠ fire DoT.
 
-### 3.6 Horses
-> **DONE (Phase 5).**
+### 3.9 Building auto-attack — DONE (8.0)
+`BuildingCombatComponent` сканирует `UnitManager.units` (0.4s). Нет Area3D. `BaseUnit.damage()`. Только при `DEPLOYED`.
 
-### 3.7 Damage → Loot (Phase 6 Core)
-> **DONE.** Инварианты:
->
-> ```
-> modified_building_damage = max(1, round(base_damage × damage_multiplier))
-> ```
->
-> | Type  | vs Building |
-> |-------|-------------|
-> | MELEE | 0.25×       |
-> | RANGED| 0.10×       |
-> | SIEGE | 2.0×        |
->
-> - Округление: **`round()`** (не floor).
-> - Минимум 1 при base_damage > 0.
-> - Siphon: `taken = mini(want, available)` — нельзя извлечь больше stock.
-> - Файлы: `BuildingDamageRules.gd`, `LootableComponent.gd`, `BaseBuilding.damage()`.
+### 3.10 Match Win/Lose
+Все живые buildings team 0 vs 1. `team_id >= 2` игнор.
 
-### 3.8 Building visual state (Phase 6.2)
-> **Следующий блок** — design-spec ниже / отдельно. Только визуал от % HP.
-> Burning ≠ fire DoT.
+### 3.11 Три уровня мобильности (не смешивать)
+1. Философия — `MOBILE_SETTLEMENTS.md`
+2. Механический контракт — `DESIGN_DEPLOYMENT_EFFICIENCY.md`
+3. Баланс-цифры — только после прототипов
 
 ---
 
 ## 4. Порядок фаз
 
-1. Order — **DONE**  
-2. Стат-резолвер — **DONE**  
-3. Спайк физики — **DONE**  
-4. DeploymentComponent — **DONE**  
-5. Мобильный TC — **DONE**  
-6. Cleanup / UI — **DONE**  
-7. Horses + Cavalry — **DONE**  
-8. Raid/Loot Core — **DONE (Phase 6)**  
-**8b. Building visual states — Phase 6.2 ← следующий**  
-9. Мобильные башни  
-10. Environment Zones  
-11. Enemy AI (простой RTS)  
-12. Полировка v1.0
+1–8. Foundation … Raid/Loot — **DONE**  
+8b. Building visual states — **DONE**  
+9. Мобильные башни 8.0–8.2 — **DONE**  
+9b. Formation-offsets — **WAITING F5**  
+**10. Environment Zones ← следующий контент**  
+11. Enemy AI усиление (экономика / реакция на MOBILE)  
+12. Полировка v1.0 (спрятать debug keys, имена, баланс MOBILE combat)
 
 ---
 
-## 5. Как использовать этот документ
+## 5. Как работать с этим документом и с Grok
 
-- Единственный источник правды по scope.
-- В начале сессии — этот файл + F5-факт.
-- Обновлять §0 и §4 по мере продвижения.
-- Формулы урона/лута — только из §3.7 (проверено кодом 2026-08-26).
+- Единственный источник правды по scope — **этот файл**.
+- Операционно: `TODO.md` (чеклист), `GROK_WORKLOG.md` (история), `CURRENT_STATE.md` (короткий указатель сюда).
+- Дизайн: `MOBILE_SETTLEMENTS.md`, `DESIGN_DEPLOYMENT_EFFICIENCY.md`, `00_WORLD_FOUNDATION.md`.
+- Будущее вне фаз: `NOMAD_WORLD_BACKLOG.md`.
+
+### Правило сессии (Grok / Claude)
+
+1. Grok действует **по конкретному промту**: scope, файлы, запреты. Не «реализуй что посчитаешь нужным».
+2. «Готово» подтверждается **реальным F5-логом**, не пересказом.
+3. Замороженные контракты (§3) не рефакторить «заодно».
+4. Не создавать второй roadmap. После приёмки фазы — строка в §0/§4, не новый `PHASE_X_INTEGRATION.md` навсегда.
