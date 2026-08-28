@@ -97,7 +97,7 @@ func _on_deployment_state_changed(_old: int, new_state: int) -> void:
 
 
 func _setup_progress_bar() -> void:
-	# Root pivots so the whole bar faces the camera (Y-axis billboard).
+	# Root pivots so the whole bar faces the camera (true billboard like HealthBar3D).
 	var root := Node3D.new()
 	root.name = "DeploymentProgressRoot"
 	root.position = Vector3(0.0, _BAR_HEIGHT, 0.0)
@@ -158,17 +158,13 @@ func _update_progress_bar() -> void:
 		_progress_bg.position = Vector3(0.0, 0.0, 0.0)
 
 
-## Keep bar upright, only yaw toward camera (same idea as world-space HP bars).
+## True billboard: copy camera basis (same as HealthBar3D) so the bar is face-on from high RTS angle.
 func _billboard_progress_toward_camera() -> void:
 	var cam: Camera3D = get_viewport().get_camera_3d()
 	if cam == null:
 		return
-	var from: Vector3 = _progress_root.global_position
-	var to: Vector3 = cam.global_position
-	to.y = from.y
-	if from.distance_squared_to(to) < 0.0001:
-		return
-	_progress_root.look_at(to, Vector3.UP)
+	var origin: Vector3 = _progress_root.global_position
+	_progress_root.global_transform = Transform3D(cam.global_transform.basis, origin)
 
 
 func _setup_range_ring() -> void:

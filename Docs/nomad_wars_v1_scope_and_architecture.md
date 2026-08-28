@@ -30,39 +30,36 @@
 | Phase 8.1 | MobileTower pack/move/unpack | **ACCEPTED** |
 | Phase 8.2 | DeploymentConfig, transit vuln, unpack AABB, UI | **ACCEPTED** |
 | Stuck | STUCK stays MOBILE, no auto-unpack | **ACCEPTED** |
-| Billboard | Pack/unpack bar faces camera | **ACCEPTED** |
-| **Formation-offsets** | Grid dests for multi-MOBILE RMB | **WAITING F5** |
+| Billboard | Pack/unpack bar faces camera | **ACCEPTED** (true billboard fix 2026-08-28) |
+| **Formation-offsets** | Grid dests for multi-MOBILE RMB | **ACCEPTED** (F5 log 2026-08-28) |
 
 ### Сейчас
 
-**Formation-offsets** — критичный фикс death spiral (лог 27): TC + Watchtower ехали в одну точку, оба `unpack blocked — footprint overlaps`, оба вечно MOBILE, беззащитны, TC умер.
+**Formation-offsets ACCEPTED** по F5-логу:
+- `slot 0/2` / `slot 1/2` с `spacing=6.3` — разные dest
+- оба ARRIVED → Watchtower UNPACKING→DEPLOYED → TC UNPACKING→DEPLOYED
+- **ноль** `footprint overlaps` (death spiral log 27 закрыт)
 
-Код: `InteractionManager._try_move_mobile_buildings` — локальная сетка, **без** правки `Formation.gd`. Spacing = `2 * max(nav_half_extents.xz) + 0.4 + 1.5`.
+**Billboard progress bar:** был только yaw `look_at`; с высокого RTS-угла выглядел 3D-палочкой. Исправлено как у `HealthBar3D`: `global_transform.basis = cam.basis`.
+
+**MOBILE unit collision:** юниты проходят сквозь MOBILE-здания — ожидаемо на этом этапе. При MOBILE nav footprint снят (путь через точку свободен); unit↔building physics не контракт текущего milestone. Tech debt / medium — не блокер Environment Zones.
 
 **Caravan move (решено явно):** RMB по земле при пустом selection юнитов двигает **все** team-0 MOBILE здания. Selection-aware move зданий — после building selection, не сейчас.
-
-### F5 formation-offsets
-
-1. TC + Watchtower оба MOBILE.
-2. RMB в одну точку (юниты не выделены).
-3. Лог: разные `move via RMB to` + `spacing=`.
-4. U на обоих → UNPACKING → DEPLOYED, **ноль** `footprint overlaps`.
-5. Повтор с близкого старта — цели всё равно разные.
 
 ### Открытые решения (не кодить сейчас)
 
 | ID | Вопрос | Статус |
 |----|--------|--------|
-| MOBILE combat | Атака в MOBILE выключена бинарно (не %). Входящий урон ×1.5 TC / ×1.3 tower. | **Сознательный чойс до баланса.** Не случайность. Лог 27 показал цену. |
+| MOBILE combat | Атака в MOBILE выключена бинарно (не %). Входящий урон ×1.5 TC / ×1.3 tower. | **Сознательный чойс до баланса.** Не случайность. |
 | A | Selection-aware move зданий | Отложено: нет building selection. Сейчас = весь караван. |
 | C | Unpack vs resources/terrain | Средний. Сейчас только building-vs-building. |
 | D | Enemy AI vs MOBILE buildings | Отложено (баланс/AI). |
+| Collision | Unit pass-through while MOBILE | Tech debt; not blocking. |
 
 ### Следующий шаг
 
-1. F5 accept formation-offsets.
-2. **Environment Zones** — внешнее давление, иначе мобильность геймплейно пуста.
-3. Мелкий техдолг перед публичным билдом: спрятать P/M/U/C/R; имена enemy-buildings вместо `@CharacterBody3D@N`.
+1. **Environment Zones** — внешнее давление, иначе мобильность геймплейно пуста.
+2. Мелкий техдолг перед публичным билдом: спрятать P/M/U/C/R; имена enemy-buildings; (opt) MOBILE unit collision.
 
 ---
 
@@ -86,7 +83,7 @@ Town Center DEPLOYED/PACKING/MOBILE/UNPACKING — **DONE**. UI Pack/Unpack — *
 Watchtower auto-attack + MobileTower cycle — **DONE (8.0–8.2)**. Efficiency tables — баланс, не сейчас.
 
 ### 1.6 Environment Zones
-**Следующий контентный блок после F5 formation.** Без зон у игрока нет причины поднимать лагерь.
+**Следующий контентный блок.** Без зон у игрока нет причины поднимать лагерь.
 
 ### 1.7 Боевые юниты
 Worker, Soldier, Cavalry, SiegeUnit.
@@ -144,10 +141,10 @@ INTACT / DAMAGED / BURNING / DESTROYED от % HP. Burning ≠ fire DoT.
 1–8. Foundation … Raid/Loot — **DONE**  
 8b. Building visual states — **DONE**  
 9. Мобильные башни 8.0–8.2 — **DONE**  
-9b. Formation-offsets — **WAITING F5**  
+9b. Formation-offsets — **ACCEPTED**  
 **10. Environment Zones ← следующий контент**  
 11. Enemy AI усиление (экономика / реакция на MOBILE)  
-12. Полировка v1.0 (спрятать debug keys, имена, баланс MOBILE combat)
+12. Полировка v1.0 (спрятать debug keys, имена, баланс MOBILE combat, opt collision)
 
 ---
 

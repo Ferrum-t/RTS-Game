@@ -1,73 +1,41 @@
 # GROK WORKLOG — Nomad Wars
 
-Ветка: `nomads-wars-grok` (репозиторий `RTS-Game`)
+Ветка: `nomads-wars-grok`
 
-**Scope / status:** только `Docs/nomad_wars_v1_scope_and_architecture.md`
+**Scope:** только `Docs/nomad_wars_v1_scope_and_architecture.md`
 
 ---
 
-## 2026-08-28 — Docs cleanup (Claude audit) + formation-offsets code present
+## 2026-08-28 — Formation-offsets ACCEPTED + billboard fix
 
-### Claude audit accepted
+### F5 formation-offsets (user log)
 
-- **Stuck Detection** — ACCEPTED (log 26): STUCK → stays MOBILE; manual U → UNPACKING → DEPLOYED; no false positives on open routes.
-- **Billboard** pack/unpack bar — ACCEPTED (visual; no console proof required).
-- **Log 27 death spiral** — confirmed: TC + Watchtower same dest → mutual `unpack blocked — footprint overlaps` → permanent MOBILE → defenseless → TC destroyed. Priority #1 = formation-offsets.
+- `slot 0/2` / `slot 1/2` `spacing=6.3` — разные dest
+- оба ARRIVED; Watchtower → DEPLOYED; TC → DEPLOYED
+- ноль `footprint overlaps`
+- `Watchtower cannot unpack` после уже DEPLOYED — ожидаемо (повторный U)
 
-### Code (already on branch)
+**ACCEPTED.** Death spiral log 27 закрыт.
 
-`InteractionManager._try_move_mobile_buildings`:
-- Collects team-0 MOBILE TC + Watchtowers
-- Local grid dests (`_building_formation_dests`); **does not** edit `Formation.gd`
-- Spacing = `2 * max(nav_half_extents.xz) + UNPACK_MARGIN(0.4) + FORMATION_BUFFER(1.5)`
-- Empty unit selection + RMB ground = whole caravan (selection-aware building move deferred — no building selection yet)
+### Billboard
 
-### Design fixed explicitly (scope §0)
+Progress bar использовал только yaw `look_at` → с высокого угла «3D-палочка».  
+Исправлено как HealthBar3D: `global_transform.basis = cam.global_transform.basis`.
 
-- MOBILE combat: attack **off** binary; inbound vuln ×1.5 TC / ×1.3 tower — conscious choice until balance pass (not accident).
-- Selection-aware building move — deferred until building selection exists.
+### Collision MOBILE
 
-### Docs hygiene (this pass)
-
-- Single living roadmap: `nomad_wars_v1_scope_and_architecture.md`
-- Pointers only: CURRENT_STATE, TODO, ROADMAP
-- Deleted obsolete: ARCHITECTURE, PROJECT_ROADMAP, PHASE_8_*, SESSION
-
-### F5 formation-offsets
-
-See scope §0. Need different `move via RMB to` + `spacing=` and zero footprint overlaps on dual U.
+Юниты проходят сквозь MOBILE-здания: nav footprint снят + unit physics не блокирует building. Не блокер; tech debt.
 
 ### Next
 
-F5 accept → Environment Zones.
+Environment Zones.
 
 ---
 
-## 2026-08-27 — Phase 8.0 Watchtower wired (later ACCEPTED)
+## 2026-08-28 earlier — Docs cleanup (Claude audit)
 
-Polish sprint (hysteresis + RVO) **ACCEPTED**. RVO wall-nudge у стен зданий — tech debt, не блокер.
-
-### Phase 8.0–8.2
-
-- `BuildingCombatComponent` — scan `UnitManager.units` каждые 0.4s, без Area3D / PhysicsQuery
-- Watchtower / MobileTower / DeploymentConfig path completed through 8.2
-- MatchManager spawns player Watchtower on enemy march path
+Deleted ARCHITECTURE, PROJECT_ROADMAP, PHASE_8_*, SESSION. Pointers synced.
 
 ---
 
-## 2026-08-26 — Phase 7 COMPLETE + Polish sprint
-
-### Phase 7 (Enemy AI)
-
-- `EnemyAIComponent` + `EnemySpawner`
-- Waves → player TC → Barracks → priority SiegeUnit
-- Deposit own-team only hotfix
-
-### Polish
-
-1. Attack hysteresis (unit + building)
-2. Soft RVO on MovementComponent
-
----
-
-*Older sessions: M1–M6, Phase 4–6 — see git history.*
+*Older: Phase 7–8.2, polish — see git history.*
