@@ -10,14 +10,12 @@
 
 ---
 
-# TEMP_MARKER_FULL_FILE_IN_ARTIFACTS
+# 1. PURPOSE
 
-The full corrected file is 34KB. Please replace this marker by pushing from local:
+The world of Nomads Wars is inhabited by several major cultures that evolved under different environmental conditions and developed different answers to the same fundamental problem:
 
-1. Download 05_FACTIONS.md from Grok artifacts session
-2. Or use the content prepared at /tmp/05_final.md on the agent machine
+> **How does a society survive in a world that never remains stable?**
 
-<<<<<<< HEAD
 The factions are not intended to be simple visual variations of the same nomadic civilization.
 
 Their differences should emerge from:
@@ -178,7 +176,7 @@ Migration
 Nomadic settlements
    ↓
 Society
-````
+```
 
 The civilization has developed around the idea that the world itself must be followed rather than conquered.
 
@@ -1192,18 +1190,18 @@ Their advantage may instead be:
 
 The four factions should eventually be distinguishable through multiple dimensions.
 
-| Dimension         | Andronovo                | Saka                    | Hunnic                | Turan                     |
-| ----------------- | ------------------------ | ----------------------- | --------------------- | ------------------------- |
-| Environment       | Cold north               | Steppe / forest-steppe  | Central harsh steppe  | Central / south           |
-| Mobility          | Very high                | High                    | High                  | Very high                 |
-| Animal dependence | Very high                | High                    | High                  | High                      |
-| Architecture      | Organic / massive        | Elegant / ceremonial    | Rough / massive       | Mobile / practical        |
-| Main material     | Bone / hide / wood       | Gold / metal / wood     | Wood / leather / iron | Felt / wood / metal       |
-| Military identity | Heavy / survival         | Ranged / elite          | Melee / force         | Mobile combined arms      |
-| Magic             | Low / spiritual          | Strong                  | Low / moderate        | Moderate                  |
-| Heroes            | Beast / elder archetypes | Golden / warrior / fire | Warlord               | Khan / commander / mystic |
-| Technology        | Traditional              | Refined                 | Practical             | Mobile engineering        |
-| MVP               | No                       | No                      | No                    | **Yes**                   |
+| Dimension | Andronovo | Saka | Hunnic | Turan |
+| --- | --- | --- | --- | --- |
+| Environment | Cold north | Steppe / forest-steppe | Central harsh steppe | Central / south |
+| Mobility | Very high | High | High | Very high |
+| Animal dependence | Very high | High | High | High |
+| Architecture | Organic / massive | Elegant / ceremonial | Rough / massive | Mobile / practical |
+| Main material | Bone / hide / wood | Gold / metal / wood | Wood / leather / iron | Felt / wood / metal |
+| Military identity | Heavy / survival | Ranged / elite | Melee / force | Mobile combined arms |
+| Magic | Low / spiritual | Strong | Low / moderate | Moderate |
+| Heroes | Beast / elder archetypes | Golden / warrior / fire | Warlord | Khan / commander / mystic |
+| Technology | Traditional | Refined | Practical | Mobile engineering |
+| MVP | No | No | No | **Yes** |
 
 This table is a conceptual foundation.
 
@@ -1621,11 +1619,3 @@ And conflict creates the game.
 The ultimate faction design goal is:
 
 > **When the player chooses a faction, they should not merely choose an army. They should choose a different way of surviving the world.**
-=======
-Critical fixes already applied in the full body:
-- §37: no "at least one hero" in MVP; Explicitly NOT v1.0 for heroes
-- §10.2: Raise Entire only in code (Formation-offsets)
-- §26: heroes not v1.0 MVP
-- §41: 03 planned
-- stripped ChatGPT wrapper
->>>>>>> ff1f83fbbb5b36463fdbef35a7623a90aed1ada7
