@@ -1,6 +1,3 @@
-Ниже — полный `05_FACTIONS.md`. Я бы зафиксировал его именно как **worldbuilding/design foundation**, а не как окончательный справочник юнитов. Названия фракций пока рабочие; важнее сейчас закрепить их происхождение, философию, экологическую нишу и принципиальные различия.
-
-````markdown
 # 05 — FACTIONS
 
 ## Status
@@ -661,6 +658,8 @@ Purpose:
 
 The distinction is important because not every building must be mobile.
 
+**Implementation note (v1.0 code, 2026-08-28):** the game currently implements only **Raise Entire Settlement** behaviour — empty unit selection + RMB ground moves **all** team-0 MOBILE buildings (Formation-offsets). **Raise Settlement (TC only)** is not selectable yet; distinguish as separate commands after Environment Zones. See `nomad_wars_v1_scope_and_architecture.md`.
+
 ---
 
 # 11. TURAN MOBILE BUILDING PHILOSOPHY
@@ -1126,7 +1125,7 @@ Potential future formats:
 * DotA-like hero maps;
 * hero-based spin-off games.
 
-This is not part of the MVP.
+This is **not part of the v1.0 MVP**. Heroes are backlog after v1.0 (`nomad_wars_v1_scope_and_architecture.md` §2). Lore may describe archetypes; code must not start a hero system until that scope decision is changed.
 
 However, the architecture should avoid making the hero system impossible to reuse later.
 
@@ -1460,20 +1459,28 @@ The faction determines:
 
 For the first playable version, only the Turan-inspired faction needs to be fully implemented.
 
+**Scope authority:** gameplay MVP list is governed by `nomad_wars_v1_scope_and_architecture.md`. This section must not expand that scope.
+
 The MVP should prove the following:
 
 * mobile Town Center;
 * mobile settlement concept;
-* deployed/mobile building states;
-* migration;
-* changing environmental zones;
-* resource redistribution;
-* horse capture;
+* deployed / packing / mobile / unpacking building states;
+* migration of the player settlement;
+* changing environmental zones (pressure to move);
+* resource redistribution tied to zones;
+* horse capture / horses as a strategic resource;
 * basic nomadic economy;
-* basic military;
-* raiding/plunder foundation;
-* at least one hero;
-* basic mobile defensive structure.
+* basic military (Worker, Soldier, Cavalry, Siege);
+* raiding / plunder foundation;
+* basic mobile defensive structure (Watchtower).
+
+**Explicitly NOT v1.0 MVP (backlog — do not implement because this lore doc mentions them):**
+
+* hero system (XP, abilities, auras, inventory, archetypes in §23–26);
+* playable non-Turan factions;
+* full Capture/Steal of animals beyond current horse resource node;
+* Raise Settlement (TC only) as a separate command from Raise Entire Settlement — see §10.2 note.
 
 The other factions do not need implementation yet.
 
@@ -1542,7 +1549,7 @@ Detailed systems belong elsewhere.
 * `00_WORLD_FOUNDATION.md`
 * `01_WORLD_AND_PLANET.md`
 * `02_GEOGRAPHY_AND_CLIMATE.md`
-* `03_ECOSYSTEMS_AND_RESOURCES.md`
+* `03_ECOSYSTEMS_AND_RESOURCES.md` *(planned — not in repo yet)*
 * `04_HISTORY_AND_ORIGIN.md`
 * `05_FACTIONS.md`
 
@@ -1612,6 +1619,3 @@ And conflict creates the game.
 The ultimate faction design goal is:
 
 > **When the player chooses a faction, they should not merely choose an army. They should choose a different way of surviving the world.**
-
-```
-```
