@@ -1,24 +1,25 @@
 # CURRENT STATE
 
-**Single source of truth:** [`Docs/nomad_wars_v1_scope_and_architecture.md`](nomad_wars_v1_scope_and_architecture.md)
+**Single source of truth (gameplay):** [`nomad_wars_v1_scope_and_architecture.md`](nomad_wars_v1_scope_and_architecture.md)
 
-**Branch:** `nomads-wars-grok`  
-**Engine:** Godot 4.7
+**Branch:** `nomads-wars-grok`
 
 ## Snapshot (2026-08-28)
 
 | Item | State |
 |------|--------|
-| Phase 7–8.2 + Stuck + Formation-offsets | **ACCEPTED** |
-| Billboard progress (true cam basis) | fix pushed — confirm visually |
+| Formation-offsets + Phase 8.x | **ACCEPTED** |
+| Doc sync: heroes NOT v1.0 MVP | **DONE** (scope §1.8 + `05_FACTIONS_MVP_OVERRIDE.md`) |
+| `01_WORLD_AND_PLANET.md` | **EXISTS** in repo |
+| Raise TC-only vs Entire | Named backlog; code = Entire only |
 | **Next** | **Environment Zones** |
 
-## Active work
+## Attention
 
-Environment Zones — external pressure so mobility has a gameplay reason.
+`05_FACTIONS.md` may need full-body restore if a partial push truncated it — binding MVP constraints are in `05_FACTIONS_MVP_OVERRIDE.md` + scope doc until restored.
 
-## Residual (not blocking)
+## Residual
 
-- MOBILE: units can pass through buildings (nav footprint cleared; physics not contracted)
-- Debug keys P/M/U/C/R visible
+- MOBILE unit pass-through (tech debt)
+- Debug keys P/M/U/C/R
 - Enemy building names `@CharacterBody3D@N`
