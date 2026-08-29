@@ -21,6 +21,7 @@ var _progress_fill: MeshInstance3D = null
 var _range_ring: MeshInstance3D = null
 const _BAR_WIDTH: float = 2.2
 const _BAR_HEIGHT: float = 5.2
+const _BAR_THICKNESS: float = 0.16
 
 
 func _ready() -> void:
@@ -97,7 +98,7 @@ func _on_deployment_state_changed(_old: int, new_state: int) -> void:
 
 
 func _setup_progress_bar() -> void:
-	# Root pivots so the whole bar faces the camera (true billboard like HealthBar3D).
+	# Flat quads + camera basis (same idea as HealthBar3D) — no BoxMesh side edge.
 	var root := Node3D.new()
 	root.name = "DeploymentProgressRoot"
 	root.position = Vector3(0.0, _BAR_HEIGHT, 0.0)
@@ -107,29 +108,33 @@ func _setup_progress_bar() -> void:
 
 	var bg := MeshInstance3D.new()
 	bg.name = "DeploymentProgressBg"
-	var bg_mesh := BoxMesh.new()
-	bg_mesh.size = Vector3(_BAR_WIDTH, 0.14, 0.08)
+	var bg_mesh := QuadMesh.new()
+	bg_mesh.size = Vector2(_BAR_WIDTH, _BAR_THICKNESS)
 	bg.mesh = bg_mesh
 	var bg_mat := StandardMaterial3D.new()
-	bg_mat.albedo_color = Color(0.08, 0.08, 0.1, 0.9)
+	bg_mat.albedo_color = Color(0.08, 0.08, 0.1, 0.92)
+	bg_mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
 	bg_mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
 	bg_mat.cull_mode = BaseMaterial3D.CULL_DISABLED
+	bg_mat.billboard_mode = BaseMaterial3D.BILLBOARD_DISABLED
 	bg.material_override = bg_mat
-	bg.position = Vector3.ZERO
+	bg.position = Vector3(0.0, 0.0, 0.0)
 	root.add_child(bg)
 	_progress_bg = bg
 
 	var fill := MeshInstance3D.new()
 	fill.name = "DeploymentProgressBar"
-	var fill_mesh := BoxMesh.new()
-	fill_mesh.size = Vector3(_BAR_WIDTH, 0.18, 0.1)
+	var fill_mesh := QuadMesh.new()
+	fill_mesh.size = Vector2(_BAR_WIDTH, _BAR_THICKNESS)
 	fill.mesh = fill_mesh
 	var fill_mat := StandardMaterial3D.new()
 	fill_mat.albedo_color = Color(0.15, 0.85, 1.0, 1.0)
 	fill_mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
 	fill_mat.cull_mode = BaseMaterial3D.CULL_DISABLED
+	fill_mat.billboard_mode = BaseMaterial3D.BILLBOARD_DISABLED
 	fill.material_override = fill_mat
-	fill.position = Vector3.ZERO
+	# Slightly in front of bg so no z-fight
+	fill.position = Vector3(0.0, 0.0, 0.001)
 	root.add_child(fill)
 	_progress_fill = fill
 
@@ -151,14 +156,14 @@ func _update_progress_bar() -> void:
 	var remaining: float = clampf(deployment.get_transition_progress(), 0.0, 1.0)
 	var done: float = 1.0 - remaining
 	done = maxf(done, 0.02)
-	# Scale along local X (bar length); offset so fill grows left→right.
+	# Same shrink-from-right pattern as HealthBar3D
 	_progress_fill.scale = Vector3(done, 1.0, 1.0)
-	_progress_fill.position = Vector3(-_BAR_WIDTH * 0.5 * (1.0 - done), 0.0, 0.02)
+	_progress_fill.position = Vector3(-_BAR_WIDTH * 0.5 * (1.0 - done), 0.0, 0.001)
 	if _progress_bg:
 		_progress_bg.position = Vector3(0.0, 0.0, 0.0)
 
 
-## True billboard: copy camera basis (same as HealthBar3D) so the bar is face-on from high RTS angle.
+## True billboard: copy camera basis (same as HealthBar3D).
 func _billboard_progress_toward_camera() -> void:
 	var cam: Camera3D = get_viewport().get_camera_3d()
 	if cam == null:
@@ -174,7 +179,6 @@ func _setup_range_ring() -> void:
 	if radius <= 0.0:
 		return
 
-	# Procedural flat ring on XZ (ground). Avoids TorusMesh XY default (vertical arch).
 	var ring := MeshInstance3D.new()
 	ring.name = "AttackRangeRing"
 	ring.mesh = _make_ground_ring_mesh(radius, 0.28, 64)
@@ -190,7 +194,6 @@ func _setup_range_ring() -> void:
 	_range_ring = ring
 
 
-## Flat annulus in the local XZ plane (Y up), so it lies on the ground without rotation hacks.
 func _make_ground_ring_mesh(radius: float, thickness: float, segments: int) -> ArrayMesh:
 	var r_out: float = radius
 	var r_in: float = maxf(radius - thickness, 0.5)
