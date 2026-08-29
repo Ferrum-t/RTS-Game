@@ -5,80 +5,79 @@ class_name InteractionManager
 @export var command_manager: CommandManager
 
 const BUILDING_APPROACH_DISTANCE := 3.5
-## Must match DeploymentComponent._validate_placement margin.
 const UNPACK_MARGIN := 0.4
-## Extra gap so two large footprints still unpack after arrive.
 const FORMATION_BUFFER := 1.5
 
 
 func handle_right_click(
 	selected_units: Array[BaseUnit],
 	collider,
-	world_position: Vector3
+	world_position: Vector3,
+	selected_buildings: Array = []
 ) -> void:
 
-	# Empty unit selection + RMB ground = whole player caravan (all MOBILE).
-	# Buildings are not in SelectionManager yet — selection-aware move is deferred.
-	if selected_units.is_empty():
+	# Units selected → unit commands only (no caravan steal).
+	if not selected_units.is_empty():
+		if command_manager == null:
+			push_warning("InteractionManager: command_manager not set")
+			return
+
+		if collider is BaseUnit:
+			var target := collider as BaseUnit
+			if not is_instance_valid(target):
+				return
+			if target.unit_state == BaseUnit.UnitState.DEAD:
+				return
+			var can_any := false
+			for u in selected_units:
+				if TeamRules.can_attack(u, target):
+					can_any = true
+					break
+			if can_any:
+				command_manager.issue_attack(selected_units, target)
+			return
+
+		if collider is BaseResource:
+			if TeamRules.can_harvest(selected_units[0], collider):
+				command_manager.issue_harvest(selected_units, collider)
+			return
+
+		if collider is BaseBuilding:
+			var building := collider as BaseBuilding
+			if not is_instance_valid(building) or building.is_destroyed:
+				return
+			var can_siege := false
+			for u in selected_units:
+				if TeamRules.can_attack_building(u, building):
+					can_siege = true
+					break
+			if can_siege:
+				command_manager.issue_attack_building(selected_units, building)
+			else:
+				var outside := _outside_point(building, world_position)
+				command_manager.issue_move(selected_units, outside)
+			return
+
+		command_manager.issue_move(selected_units, world_position)
+		return
+
+	# Buildings selected → move only those MOBILE ones (individual control).
+	if not selected_buildings.is_empty():
 		if collider is BaseUnit or collider is BaseResource or collider is BaseBuilding:
 			return
-		_try_move_mobile_buildings(world_position)
+		_try_move_mobile_list(selected_buildings, world_position)
 		return
 
-	if command_manager == null:
-		push_warning("InteractionManager: command_manager not set")
+	# Nothing selected → whole caravan (all player MOBILE).
+	if collider is BaseUnit or collider is BaseResource or collider is BaseBuilding:
 		return
-
-	# Click on unit: attack only if enemy; same team → no-op
-	if collider is BaseUnit:
-		var target := collider as BaseUnit
-		if not is_instance_valid(target):
-			return
-		if target.unit_state == BaseUnit.UnitState.DEAD:
-			return
-
-		var can_any := false
-		for u in selected_units:
-			if TeamRules.can_attack(u, target):
-				can_any = true
-				break
-
-		if can_any:
-			command_manager.issue_attack(selected_units, target)
-		return
-
-	if collider is BaseResource:
-		if TeamRules.can_harvest(selected_units[0], collider):
-			command_manager.issue_harvest(selected_units, collider)
-		return
-
-	if collider is BaseBuilding:
-		var building := collider as BaseBuilding
-		if not is_instance_valid(building) or building.is_destroyed:
-			return
-
-		var can_siege := false
-		for u in selected_units:
-			if TeamRules.can_attack_building(u, building):
-				can_siege = true
-				break
-
-		if can_siege:
-			command_manager.issue_attack_building(selected_units, building)
-		else:
-			var outside := _outside_point(building, world_position)
-			command_manager.issue_move(selected_units, outside)
-		return
-
-	command_manager.issue_move(selected_units, world_position)
+	_try_move_mobile_buildings(world_position)
 
 
-## Caravan move: every team-0 MOBILE building gets its own dest (no shared point).
 func _try_move_mobile_buildings(world_position: Vector3) -> void:
 	var bm := get_node_or_null("/root/BuildingManager")
 	if bm == null:
 		return
-
 	var mobiles: Array = []
 	for tc in bm.town_centers:
 		if _is_movable_player_building(tc):
@@ -86,7 +85,14 @@ func _try_move_mobile_buildings(world_position: Vector3) -> void:
 	for w in bm.watchtowers_list:
 		if _is_movable_player_building(w):
 			mobiles.append(w)
+	_try_move_mobile_list(mobiles, world_position)
 
+
+func _try_move_mobile_list(candidates: Array, world_position: Vector3) -> void:
+	var mobiles: Array = []
+	for b in candidates:
+		if _is_movable_player_building(b):
+			mobiles.append(b)
 	if mobiles.is_empty():
 		return
 
@@ -99,9 +105,8 @@ func _try_move_mobile_buildings(world_position: Vector3) -> void:
 		var building: Variant = mobiles[i]
 		var dest: Vector3 = dests[i]
 		building.request_move_to(dest)
-		var label: String = str(building.name)
 		print(
-			label, " Deployment: move via RMB to ", dest,
+			str(building.name), " Deployment: move via RMB to ", dest,
 			" (slot ", i, "/", mobiles.size(), " spacing=", snappedf(spacing, 0.1), ")"
 		)
 
@@ -118,7 +123,6 @@ func _is_movable_player_building(building: Variant) -> bool:
 	return true
 
 
-## Worst-case pair: 2 * max(nav_half_extents.xz) + unpack margin + buffer.
 func _building_formation_spacing(mobiles: Array) -> float:
 	var max_he: float = 2.2
 	for b in mobiles:
@@ -131,7 +135,6 @@ func _building_formation_spacing(mobiles: Array) -> float:
 	return max_he * 2.0 + UNPACK_MARGIN + FORMATION_BUFFER
 
 
-## Centered grid around anchor. Does not touch Formation.gd (unit spacing).
 func _building_formation_dests(anchor: Vector3, count: int, spacing: float) -> Array[Vector3]:
 	var out: Array[Vector3] = []
 	if count <= 0:
@@ -140,7 +143,7 @@ func _building_formation_dests(anchor: Vector3, count: int, spacing: float) -> A
 		out.append(anchor)
 		return out
 
-	var cols: int = int(ceili(sqrt(float(count))))
+var cols: int = int(ceili(sqrt(float(count))))
 	var rows: int = int(ceili(float(count) / float(cols)))
 	var i: int = 0
 	for row in range(rows):
