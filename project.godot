@@ -23,6 +23,7 @@ BuildingManager="*res://Scripts/Managers/BuildingManager.gd"
 ResourceManager="*res://Scripts/Managers/ResourceManager.gd"
 NavigationBakeService="*res://Scripts/Systems/NavigationBakeService.gd"
 MatchManager="*res://Scripts/Systems/MatchManager.gd"
+EnvironmentZoneService="*res://Scripts/Systems/EnvironmentZoneService.gd"
 
 [display]
 
