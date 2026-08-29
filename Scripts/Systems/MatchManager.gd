@@ -81,8 +81,8 @@ func _setup_match() -> void:
 	var spawner := EnemySpawner.new()
 	spawner.name = "EnemySpawner"
 	spawner.team_id = 1
-	spawner.spawn_interval = 15.0
-	spawner.first_spawn_delay = 15.0
+	spawner.spawn_interval = 45.0
+	spawner.first_spawn_delay = 45.0
 	spawner.wave_size = 1
 	spawner.max_wave_size = 3
 	spawner.max_units_alive = 6
