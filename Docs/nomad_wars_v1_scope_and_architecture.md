@@ -8,7 +8,7 @@
 
 ---
 
-## 0. CURRENT STATUS (2026-08-28, ветка `nomads-wars-grok`)
+## 0. CURRENT STATUS (2026-08-29, ветка `nomads-wars-grok`)
 
 **Репо:** `Ferrum-t/RTS-Game` → `nomads-wars-grok`  
 **Движок:** Godot 4.7 stable  
@@ -31,37 +31,54 @@
 | Phase 8.1 | MobileTower pack/move/unpack | **ACCEPTED** |
 | Phase 8.2 | DeploymentConfig, transit vuln, unpack AABB, UI | **ACCEPTED** |
 | Stuck | STUCK stays MOBILE, no auto-unpack | **ACCEPTED** |
-| Billboard | Pack/unpack bar faces camera | **ACCEPTED** |
+| Billboard | Pack/unpack bar faces camera (QuadMesh + cam basis) | **ACCEPTED** |
 | Formation-offsets | Grid dests for multi-MOBILE RMB | **ACCEPTED** |
+| **10** | **Environment Zones** (blobs FAVORABLE/DRY/COLD, harvest mult, visual priority) | **ACCEPTED** |
+| **11** | **Enemy AI** (threat retarget units, wave scaling, EnemySoldier_N / EnemyTownCenter names) | **ACCEPTED** |
+| **12** | **Polish v1.0** (debug hotkeys gated, readable building names) | **ACCEPTED** |
+| **+** | **Selection-aware building control** (select TC/WT → Pack/Unpack/RMB only selected; empty = entire caravan) | **ACCEPTED** |
 
 ### Сейчас
 
-**Doc sync (Claude audit 2026-08-28):**
-- `01_WORLD_AND_PLANET.md` **есть** в репо (подтверждено чтением дерева).
-- `05_FACTIONS.md` §37: убран «at least one hero» из MVP; герои = backlog.
-- `05_FACTIONS.md` §10.2: зафиксировано, что в коде сейчас только Raise Entire Settlement (весь караван).
-- `03_ECOSYSTEMS_AND_RESOURCES.md` — в related как *planned*, файла ещё нет.
+**Фазы 10–12 + selection-aware control закрыты (F5 2026-08-29).**
 
-**Caravan move:** RMB по земле при пустом selection юнитов = **все** team-0 MOBILE (Raise Entire Settlement). Raise Settlement (только TC) — после Environment Zones.
+**Caravan / building control (dual-mode):**
+- Пустой selection зданий + RMB по земле → **все** team-0 MOBILE (Raise Entire Settlement, formation-offsets).
+- Выделенные mobile buildings + Pack/Unpack/RMB → **только они**.
+- Pack/Unpack UI: если есть selected buildings → selected; иначе → all DEPLOYED/MOBILE team-0.
+- Raise Settlement (только TC) как *отдельная* команда — всё ещё backlog (после Zones v1.1 / сезонного давления).
+
+**Environment Zones v1.0 (минимальная):**
+- 4 дрейфующих blob (2×FAVORABLE, DRY, COLD), bounce на ±25.5.
+- Множитель добычи: FAVORABLE ×1.5, DRY/COLD ×0.5, вне зон ×1.0; приоритет COLD > DRY > FAVORABLE.
+- Визуал: диски с render_priority + Y-offset, доминирующий цвет = код-приоритет.
+- Только harvest speed; не бой / не скорость юнитов / не production.
+
+**MOBILE combat:** атака off в MOBILE; vuln ×1.5 TC / ×1.3 tower — **сознательный выбор** до баланс-пасса.
 
 **MOBILE unit collision:** tech debt, не блокер.
 
-### Открытые решения (не кодить сейчас)
+### Открытые решения / tech debt (не кодить без отдельного промта)
 
 | ID | Вопрос | Статус |
 |----|--------|--------|
-| MOBILE combat | Атака off бинарно; vuln ×1.5 TC / ×1.3 tower | Сознательный чойс до баланса |
-| A | Selection-aware move зданий | Отложено |
-| Raise TC-only | Raise Settlement vs Raise Entire Settlement | **Сейчас только Entire**; разделить команды после Env Zones |
+| MOBILE combat | Атака off бинарно; vuln ×1.5 / ×1.3 | Сознательный чойс; пересмотр на баланс-пассе |
+| Raise TC-only | Raise Settlement vs Raise Entire Settlement | Код = dual-mode (selected vs all); отдельная «только TC» команда — backlog |
 | C | Unpack vs resources/terrain | Средний |
-| D | Enemy AI vs MOBILE | Отложено |
-| Heroes | Полная система героев | **После v1.0** — lore OK, код не начинать |
+| D | Enemy AI реакция на MOBILE (приоритет) | Частично через threat; углубление — backlog |
+| Heroes | Полная система героев | **После v1.0** |
 | Collision | Unit pass-through MOBILE | Tech debt |
+| Zones v1.1 | Сезонное / фронтальное давление вместо blobs | Следующий контентный кандидат |
+| Balance | Волны / экономика / HP — матч слишком жёсткий к волне 6 | Кандидат на следующий шаг |
 
-### Следующий шаг
+### Следующий шаг (кандидаты)
 
-1. **Environment Zones** — внешнее давление на миграцию.
-2. Мелкий техдолг: debug keys, имена enemy-buildings; (opt) collision / Raise TC-only.
+1. **Баланс-пасс** — волны, стоимость зданий, скорость добычи, HP, чтобы матч был выигрываем при грамотной игре.
+2. **Zones v1.1** — сезонное/миграционное давление (лор: толкать кочевников, не «зелёные кружки»).
+3. Unpack validation (ресурсы/террейн) или Raise TC-only как явная команда.
+4. Tech debt: MOBILE collision, multi-select зданий (Shift).
+
+Порядок выбирает игрок/сессия; без отдельного промта с scope — не начинать.
 
 ---
 
@@ -81,13 +98,15 @@ Phase 6 Core **DONE**. Capture/Steal юнитов / полноценный anima
 ### 1.4 Мобильные поселения
 Town Center DEPLOYED/PACKING/MOBILE/UNPACKING — **DONE**. UI Pack/Unpack — **DONE**.  
 Raise Entire Settlement (весь MOBILE караван) — **DONE** (Formation-offsets).  
-Raise Settlement (только TC) — **после Environment Zones**.
+Selection-aware control (selected buildings only) — **DONE**.  
+Raise Settlement (только TC) как отдельная команда — **backlog** (после Zones v1.1).
 
 ### 1.5 Мобильные башни
 Watchtower + MobileTower cycle — **DONE (8.0–8.2)**.
 
 ### 1.6 Environment Zones
-**Следующий контентный блок.**
+**v1.0 минимальная (blobs + harvest mult) — DONE.**  
+Zones v1.1 (сезонное давление) — кандидат после баланс-пасса.
 
 ### 1.7 Боевые юниты
 Worker, Soldier, Cavalry, SiegeUnit. **Без героев в v1.0.**
@@ -103,6 +122,7 @@ Worker, Soldier, Cavalry, SiegeUnit. **Без героев в v1.0.**
 - **Полноценная система героев** (XP, абилки, ауры, инвентарь).
 - Capture/Steal, animal raid beyond horse node.
 - Raise Settlement (TC only) как отдельная команда от Raise Entire Settlement.
+- Zones v1.1 — сезонное / фронтальное давление.
 - Лёт, магия, кампания, multiplayer.
 - Лошади как лимит миграции, settlement mass, сигналы соседям — `NOMAD_WORLD_BACKLOG.md`.
 - Fire DoT (не часть visual Burning).
@@ -143,6 +163,16 @@ Siphon: `taken = mini(want, available)`.
 ### 3.12 Scope vs lore
 Worldbuilding files (`00`–`06`) are canon for fiction. **Gameplay scope and phase order = this file only.** Lore must not silently add MVP requirements (heroes, extra systems).
 
+### 3.13 Environment Zones v1.0 — DONE
+- Только harvest multiplier.
+- Приоритет типов в точке: COLD > DRY > FAVORABLE.
+- Визуал должен совпадать с доминирующим типом (не аддитивное смешение).
+
+### 3.14 Building selection dual-mode — DONE
+- Empty building selection → Pack/Unpack/RMB = entire team-0 MOBILE caravan.
+- Non-empty selected mobile buildings → only those.
+- Units selection clears buildings and vice versa (как в текущей реализации).
+
 ---
 
 ## 4. Порядок фаз
@@ -151,10 +181,13 @@ Worldbuilding files (`00`–`06`) are canon for fiction. **Gameplay scope and ph
 8b. Building visual states — **DONE**  
 9. Мобильные башни 8.0–8.2 — **DONE**  
 9b. Formation-offsets — **ACCEPTED**  
-**10. Environment Zones ← следующий контент**  
-10b. (optional) Raise Settlement TC-only vs Entire as separate commands  
-11. Enemy AI усиление  
-12. Полировка v1.0 (debug keys, имена, MOBILE combat balance, opt collision)
+**10. Environment Zones v1.0** — **ACCEPTED**  
+10b. (optional) Raise Settlement TC-only vs Entire as separate commands — backlog  
+**11. Enemy AI усиление** — **ACCEPTED**  
+**12. Полировка v1.0** (debug keys, имена) — **ACCEPTED**  
+**+ Selection-aware building control** — **ACCEPTED**  
+
+**Кандидаты после 12:** баланс-пасс · Zones v1.1 · unpack validation · MOBILE collision
 
 ---
 

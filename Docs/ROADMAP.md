@@ -15,16 +15,17 @@ This file is a short pointer only.
 - Polish: attack hysteresis + RVO
 - Phase 8.0–8.2 Watchtower auto-attack, MobileTower cycle, DeploymentConfig / transit vuln / unpack AABB
 - Stuck detection + billboard pack bar
+- Formation-offsets
+- **Environment Zones v1.0** (blobs, harvest mult, visual priority)
+- **Enemy AI strengthen** (threat retarget, wave scaling, names)
+- **v1.0 polish** (debug keys gated, readable names)
+- **Selection-aware building control** (per-building Pack/Unpack/move + entire caravan)
 
-## Active
+## Next candidates
 
-- [ ] **Formation-offsets** (WAITING F5)
-
-## Next content
-
-- Environment Zones
-- Enemy AI strengthening
-- v1.0 polish (debug keys, names, MOBILE combat balance review)
+- Balance pass (waves / economy)
+- Zones v1.1 (seasonal migration pressure)
+- Unpack validation / Raise TC-only command
 
 ## Later
 

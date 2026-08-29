@@ -4,9 +4,19 @@
 
 ## Current Sprint
 
-- [x] Phase 7–8.2, Stuck, Formation-offsets (F5 ACCEPTED)
-- [ ] Confirm progress bar billboard visually (true cam basis fix)
-- [ ] **Environment Zones**
+- [x] Phase 7–8.2, Stuck, Formation-offsets
+- [x] Environment Zones v1.0 (A+B + visual priority)
+- [x] Enemy AI strengthening
+- [x] Polish: debug hotkeys gated, readable names
+- [x] Selection-aware Pack/Unpack/RMB (selected vs all caravan)
+- [x] Billboard pack bar (QuadMesh + camera basis)
+
+## Next candidates (pick one per session)
+
+- [ ] **Balance pass** — waves, building costs, harvest rates, HP so a skilled player can win
+- [ ] **Zones v1.1** — seasonal / frontal pressure (replace pure blobs)
+- [ ] Unpack validation vs resources/terrain
+- [ ] Raise Settlement (TC only) as explicit separate command
 
 ---
 
@@ -18,9 +28,8 @@
 - [ ] **Safe Instance Checks**
 - [ ] **Idle Worker UI Event**
 - [ ] Watchtower ghost shared footprint
-- [ ] Hide debug hotkeys P/M/U/C/R
-- [ ] Readable enemy building names
 - [ ] MOBILE unit↔building physical collision (optional polish)
+- [ ] Multi-select buildings (Shift+click)
 
 ---
 
