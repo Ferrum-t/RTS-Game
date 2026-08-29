@@ -77,15 +77,15 @@ func _setup_match() -> void:
 	if soldier is BaseUnit:
 		EnemyAIComponent.attach_to(soldier as BaseUnit, 24.0)
 
-	# Wave spawner near enemy base — denser pressure than Phase 7 defaults
+	# Wave spawner near enemy base — Balance Pass isolated: slower tempo + lower alive cap
 	var spawner := EnemySpawner.new()
 	spawner.name = "EnemySpawner"
 	spawner.team_id = 1
-	spawner.spawn_interval = 12.0
-	spawner.first_spawn_delay = 8.0
+	spawner.spawn_interval = 15.0
+	spawner.first_spawn_delay = 15.0
 	spawner.wave_size = 1
 	spawner.max_wave_size = 3
-	spawner.max_units_alive = 8
+	spawner.max_units_alive = 6
 	spawner.escalate_after_waves = 3
 	spawner.unit_scene = SOLDIER_SCENE
 	spawner.position = ENEMY_TC_POS + ENEMY_SPAWNER_OFFSET
