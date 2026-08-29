@@ -35,7 +35,7 @@ func _ready() -> void:
 	if siege_scene == null:
 		siege_scene = load("res://Scenes/Units/siege_unit.tscn") as PackedScene
 	print("Barracks ready at: ", global_position)
-	if OS.is_debug_build() and team_id == 0:
+	if DebugFlags.BUILDING_HOTKEYS and OS.is_debug_build() and team_id == 0:
 		print("Barracks debug: C=Cavalry  R=Siege (150W+50S)")
 
 
@@ -48,6 +48,8 @@ func _process(delta: float) -> void:
 
 
 func _unhandled_input(event: InputEvent) -> void:
+	if not DebugFlags.BUILDING_HOTKEYS:
+		return
 	if not OS.is_debug_build():
 		return
 	if team_id != 0 or is_destroyed:
