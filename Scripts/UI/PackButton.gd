@@ -1,7 +1,7 @@
 extends Button
 
-## Pack all team-0 MobileBuildings that are DEPLOYED (TC + Watchtowers).
-## Raise Entire Settlement style — not TC-only.
+## Pack selected player MobileBuildings if any are selected;
+## otherwise pack all team-0 DEPLOYED mobile buildings (Raise Entire Settlement).
 
 
 func _ready() -> void:
@@ -14,32 +14,49 @@ func _process(_delta: float) -> void:
 
 
 func _refresh_enabled() -> void:
-	disabled = _count_packable() == 0
+	disabled = _packable_targets().is_empty()
 
 
 func _on_pressed() -> void:
+	var targets: Array = _packable_targets()
 	var n: int = 0
-	for b in _player_mobile_buildings():
-		if int(b.get("deployment_state")) != DeploymentState.State.DEPLOYED:
-			continue
-		if b.get("is_destroyed") == true:
-			continue
+	for b in targets:
 		if b.has_method("request_pack") and b.request_pack():
 			n += 1
-	print("Pack: started on ", n, " mobile building(s)")
+	var mode: String = "selected" if _has_building_selection() else "all"
+	print("Pack: started on ", n, " mobile building(s) [", mode, "]")
 
 
-func _count_packable() -> int:
-	var c: int = 0
-	for b in _player_mobile_buildings():
+func _packable_targets() -> Array:
+	var out: Array = []
+	for b in _candidate_buildings():
 		if b.get("is_destroyed") == true:
 			continue
 		if int(b.get("deployment_state")) == DeploymentState.State.DEPLOYED:
-			c += 1
-	return c
+			out.append(b)
+	return out
 
 
-func _player_mobile_buildings() -> Array:
+func _candidate_buildings() -> Array:
+	if _has_building_selection():
+		return _selected_buildings()
+	return _all_player_mobile()
+
+
+func _has_building_selection() -> bool:
+	return not _selected_buildings().is_empty()
+
+
+func _selected_buildings() -> Array:
+	var sm: Node = get_tree().get_first_node_in_group("selection_manager")
+	if sm == null:
+		return []
+	if sm.has_method("get_selected_mobile_buildings"):
+		return sm.get_selected_mobile_buildings()
+	return []
+
+
+func _all_player_mobile() -> Array:
 	var out: Array = []
 	var bm: Node = get_node_or_null("/root/BuildingManager")
 	if bm == null:
