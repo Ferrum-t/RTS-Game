@@ -5,17 +5,18 @@ class_name EnemySpawner
 ## Phase 7 — periodic enemy unit waves near enemy base.
 ## Spawns existing unit scenes (Soldier default), team_id=1, attaches EnemyAIComponent.
 ## AI pressure pass: wave size escalates; units get readable names.
+## Balance pass (isolated): slower tempo + lower alive cap only.
 
 @export var unit_scene: PackedScene
 @export var team_id: int = 1
-@export var spawn_interval: float = 12.0
+@export var spawn_interval: float = 15.0
 @export var wave_size: int = 1
 @export var max_wave_size: int = 3
-@export var max_units_alive: int = 8
+@export var max_units_alive: int = 6
 @export var spawn_offset: Vector3 = Vector3(3.0, 0.0, 2.0)
 @export var aggro_radius: float = 22.0
 @export var enabled: bool = true
-@export var first_spawn_delay: float = 8.0
+@export var first_spawn_delay: float = 15.0
 ## After this many waves, spawn count becomes 2; after 2× becomes min(3, max_wave_size).
 @export var escalate_after_waves: int = 3
 
