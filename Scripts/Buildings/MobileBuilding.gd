@@ -19,6 +19,8 @@ var _progress_root: Node3D = null
 var _progress_bg: MeshInstance3D = null
 var _progress_fill: MeshInstance3D = null
 var _range_ring: MeshInstance3D = null
+var _select_ring: MeshInstance3D = null
+var _building_selected: bool = false
 const _BAR_WIDTH: float = 2.2
 const _BAR_HEIGHT: float = 5.2
 const _BAR_THICKNESS: float = 0.16
@@ -36,6 +38,32 @@ func _ready() -> void:
 	deployment.state_changed.connect(_on_deployment_state_changed)
 	_setup_progress_bar()
 	_setup_range_ring()
+	_setup_select_ring()
+
+
+func set_building_selected(on: bool) -> void:
+	_building_selected = on
+	if _select_ring:
+		_select_ring.visible = on
+
+
+func _setup_select_ring() -> void:
+	var ring := MeshInstance3D.new()
+	ring.name = "BuildingSelectRing"
+	var he: float = 2.5
+	if nav_half_extents is Vector3:
+		he = maxf(nav_half_extents.x, nav_half_extents.z) + 0.4
+	ring.mesh = _make_ground_ring_mesh(he, 0.18, 48)
+	var mat := StandardMaterial3D.new()
+	mat.albedo_color = Color(1.0, 0.85, 0.15, 0.85)
+	mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+	mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	mat.cull_mode = BaseMaterial3D.CULL_DISABLED
+	ring.material_override = mat
+	ring.position = Vector3(0.0, 0.08, 0.0)
+	ring.visible = false
+	add_child(ring)
+	_select_ring = ring
 
 
 func _apply_deployment_config() -> void:
@@ -98,7 +126,6 @@ func _on_deployment_state_changed(_old: int, new_state: int) -> void:
 
 
 func _setup_progress_bar() -> void:
-	# Flat quads + camera basis (same idea as HealthBar3D) — no BoxMesh side edge.
 	var root := Node3D.new()
 	root.name = "DeploymentProgressRoot"
 	root.position = Vector3(0.0, _BAR_HEIGHT, 0.0)
@@ -116,9 +143,7 @@ func _setup_progress_bar() -> void:
 	bg_mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
 	bg_mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
 	bg_mat.cull_mode = BaseMaterial3D.CULL_DISABLED
-	bg_mat.billboard_mode = BaseMaterial3D.BILLBOARD_DISABLED
 	bg.material_override = bg_mat
-	bg.position = Vector3(0.0, 0.0, 0.0)
 	root.add_child(bg)
 	_progress_bg = bg
 
@@ -131,9 +156,7 @@ func _setup_progress_bar() -> void:
 	fill_mat.albedo_color = Color(0.15, 0.85, 1.0, 1.0)
 	fill_mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
 	fill_mat.cull_mode = BaseMaterial3D.CULL_DISABLED
-	fill_mat.billboard_mode = BaseMaterial3D.BILLBOARD_DISABLED
 	fill.material_override = fill_mat
-	# Slightly in front of bg so no z-fight
 	fill.position = Vector3(0.0, 0.0, 0.001)
 	root.add_child(fill)
 	_progress_fill = fill
@@ -156,14 +179,12 @@ func _update_progress_bar() -> void:
 	var remaining: float = clampf(deployment.get_transition_progress(), 0.0, 1.0)
 	var done: float = 1.0 - remaining
 	done = maxf(done, 0.02)
-	# Same shrink-from-right pattern as HealthBar3D
 	_progress_fill.scale = Vector3(done, 1.0, 1.0)
 	_progress_fill.position = Vector3(-_BAR_WIDTH * 0.5 * (1.0 - done), 0.0, 0.001)
 	if _progress_bg:
 		_progress_bg.position = Vector3(0.0, 0.0, 0.0)
 
 
-## True billboard: copy camera basis (same as HealthBar3D).
 func _billboard_progress_toward_camera() -> void:
 	var cam: Camera3D = get_viewport().get_camera_3d()
 	if cam == null:
