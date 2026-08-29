@@ -3,6 +3,8 @@ extends Node
 ## Environment Zones v1.0 — Stage A: drifting zone blobs + ground visual.
 ## Stage B (harvest multiplier) is NOT wired here — wait for F5 acceptance of A.
 ## Lore limit: zones affect resource gather rate only (02_GEOGRAPHY §12/§38).
+## Visual: draw order + Y offset + render_priority so overlap shows the same
+## winner as get_multiplier_at() (COLD > DRY > FAVORABLE), not alpha mud.
 
 enum ZoneType {
 	FAVORABLE,
@@ -26,10 +28,19 @@ const _MULT := {
 	ZoneType.COLD: 0.5,
 }
 
+## Solid-enough alpha so a higher-priority disc fully covers a lower one in
+## the intersection, while still seeing units/buildings through the top disc.
 const _COLOR := {
-	ZoneType.FAVORABLE: Color(0.2, 0.85, 0.3, 0.28),
-	ZoneType.DRY: Color(0.95, 0.4, 0.15, 0.28),
-	ZoneType.COLD: Color(0.35, 0.65, 1.0, 0.28),
+	ZoneType.FAVORABLE: Color(0.15, 0.8, 0.25, 0.55),
+	ZoneType.DRY: Color(0.95, 0.38, 0.12, 0.62),
+	ZoneType.COLD: Color(0.25, 0.55, 1.0, 0.68),
+}
+
+## Slight Y stack so depth sort matches priority (FAVORABLE lowest).
+const _Y_OFFSET := {
+	ZoneType.FAVORABLE: 0.04,
+	ZoneType.DRY: 0.055,
+	ZoneType.COLD: 0.07,
 }
 
 ## Playable AABB on XZ (from MatchManager spawn layout ≈ ±20; pad for drift).
@@ -125,7 +136,8 @@ func _move_blobs(delta: float) -> void:
 		blob.position.y = 0.0
 		_bounce_blob(blob)
 		if blob.mesh_instance != null and is_instance_valid(blob.mesh_instance):
-			blob.mesh_instance.global_position = Vector3(blob.position.x, 0.05, blob.position.z)
+			var y: float = float(_Y_OFFSET.get(blob.type, 0.05))
+			blob.mesh_instance.global_position = Vector3(blob.position.x, y, blob.position.z)
 
 
 func _bounce_blob(blob: ZoneBlob) -> void:
@@ -170,7 +182,15 @@ func _build_visuals() -> void:
 		return
 	for child in _visual_root.get_children():
 		child.queue_free()
-	for b in blobs:
+
+	# Draw low priority first, high last → COLD covers DRY covers FAVORABLE
+	# in intersections (same rule as get_multiplier_at).
+	var ordered: Array = blobs.duplicate()
+	ordered.sort_custom(func(a: ZoneBlob, b: ZoneBlob) -> bool:
+		return int(_PRIORITY.get(a.type, 0)) < int(_PRIORITY.get(b.type, 0))
+	)
+
+	for b in ordered:
 		var blob: ZoneBlob = b
 		if blob.type == ZoneType.TRANSITION:
 			continue
@@ -178,13 +198,16 @@ func _build_visuals() -> void:
 		mi.name = "ZoneDisc_%s" % _type_name(blob.type)
 		mi.mesh = _make_ground_disc_mesh(blob.radius, 48)
 		var mat := StandardMaterial3D.new()
-		mat.albedo_color = _COLOR.get(blob.type, Color(1, 1, 1, 0.25))
+		mat.albedo_color = _COLOR.get(blob.type, Color(1, 1, 1, 0.5))
 		mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
 		mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
 		mat.cull_mode = BaseMaterial3D.CULL_DISABLED
-		mat.no_depth_test = false
+		# Higher priority draws later + higher render_priority → no muddy mix.
+		mat.render_priority = int(_PRIORITY.get(blob.type, 0))
+		mat.depth_draw_mode = BaseMaterial3D.DEPTH_DRAW_ALWAYS
 		mi.material_override = mat
-		mi.position = Vector3(blob.position.x, 0.05, blob.position.z)
+		var y: float = float(_Y_OFFSET.get(blob.type, 0.05))
+		mi.position = Vector3(blob.position.x, y, blob.position.z)
 		_visual_root.add_child(mi)
 		blob.mesh_instance = mi
 
