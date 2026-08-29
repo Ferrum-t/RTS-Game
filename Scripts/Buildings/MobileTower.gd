@@ -16,11 +16,13 @@ func _ready() -> void:
 		" pack=", pack_time, "s speed=", mobile_move_speed,
 		" vuln=", vulnerability_multiplier
 	)
-	if OS.is_debug_build() and team_id == 0:
+	if DebugFlags.BUILDING_HOTKEYS and OS.is_debug_build() and team_id == 0:
 		print("[TOWER] debug keys: P=pack  M=move(8,0,5)  U=unpack")
 
 
 func _unhandled_input(event: InputEvent) -> void:
+	if not DebugFlags.BUILDING_HOTKEYS:
+		return
 	if not OS.is_debug_build():
 		return
 	if team_id != 0:
