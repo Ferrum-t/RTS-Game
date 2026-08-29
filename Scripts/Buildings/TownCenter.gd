@@ -26,7 +26,7 @@ func _ready() -> void:
 		worker_scene = load("res://Scenes/Units/worker.tscn") as PackedScene
 	print("TownCenter ready at: ", global_position, " deployment=", deployment_state,
 		" pack=", pack_time, "s vuln=", vulnerability_multiplier)
-	if OS.is_debug_build() and team_id == 0:
+	if DebugFlags.BUILDING_HOTKEYS and OS.is_debug_build() and team_id == 0:
 		print("TownCenter debug keys: P=pack  M=move(8,0,5)  U=unpack")
 
 
@@ -39,6 +39,8 @@ func _process(delta: float) -> void:
 
 
 func _unhandled_input(event: InputEvent) -> void:
+	if not DebugFlags.BUILDING_HOTKEYS:
+		return
 	if not OS.is_debug_build():
 		return
 	if team_id != 0:
