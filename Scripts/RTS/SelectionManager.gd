@@ -13,10 +13,13 @@ const MARKER_VISIBLE_TIME := 0.8
 
 var marker: Node3D = null
 var selected_units: Array[BaseUnit] = []
+## Player MobileBuildings (TC / Watchtower) for individual pack/move/unpack.
+var selected_buildings: Array = []
 var _marker_timer: float = 0.0
 
 
 func _ready() -> void:
+	add_to_group("selection_manager")
 	marker = MARKER_SCENE.instantiate()
 	add_child(marker)
 	marker.visible = false
@@ -40,6 +43,14 @@ func clear_selection() -> void:
 			_disconnect_unit_exit(unit)
 			unit.deselect()
 	selected_units.clear()
+	clear_building_selection()
+
+
+func clear_building_selection() -> void:
+	for b in selected_buildings:
+		if is_instance_valid(b) and b.has_method("set_building_selected"):
+			b.set_building_selected(false)
+	selected_buildings.clear()
 
 
 func add_to_selection(unit: BaseUnit) -> void:
@@ -48,14 +59,44 @@ func add_to_selection(unit: BaseUnit) -> void:
 	if unit in selected_units:
 		return
 
+	clear_building_selection()
 	selected_units.append(unit)
 	unit.select()
 	_connect_unit_exit(unit)
 
 
+func select_building(building: Node) -> void:
+	if building == null or not is_instance_valid(building):
+		return
+	if not (building is MobileBuilding):
+		return
+	if int(building.get("team_id")) != 0:
+		return
+	if building.get("is_destroyed") == true:
+		return
+
+	# Exclusive: units XOR buildings
+	for unit in selected_units:
+		if is_instance_valid(unit):
+			_disconnect_unit_exit(unit)
+			unit.deselect()
+	selected_units.clear()
+
+	clear_building_selection()
+	selected_buildings.append(building)
+	if building.has_method("set_building_selected"):
+		building.set_building_selected(true)
+	print("Selected building: ", building.name, " state=", building.get("deployment_state"))
+
+
 func get_valid_selection() -> Array[BaseUnit]:
 	_prune_selection()
 	return selected_units
+
+
+func get_selected_mobile_buildings() -> Array:
+	_prune_buildings()
+	return selected_buildings
 
 
 func _prune_selection() -> void:
@@ -72,6 +113,18 @@ func _prune_selection() -> void:
 			continue
 		alive.append(unit)
 	selected_units = alive
+	_prune_buildings()
+
+
+func _prune_buildings() -> void:
+	var alive: Array = []
+	for b in selected_buildings:
+		if b == null or not is_instance_valid(b):
+			continue
+		if b.get("is_destroyed") == true:
+			continue
+		alive.append(b)
+	selected_buildings = alive
 
 
 func _connect_unit_exit(unit: BaseUnit) -> void:
@@ -119,11 +172,17 @@ func _unhandled_input(event: InputEvent) -> void:
 
 		if event.button_index == MOUSE_BUTTON_LEFT:
 			clear_selection()
+			# Prefer unit hit
 			for unit in UnitManager.units:
 				if not is_instance_valid(unit):
 					continue
 				if collider == unit:
 					add_to_selection(unit)
+					return
+			# Player mobile building
+			if collider is MobileBuilding and int(collider.get("team_id")) == 0:
+				select_building(collider)
+				return
 
 		elif event.button_index == MOUSE_BUTTON_RIGHT:
 			_prune_selection()
@@ -131,7 +190,8 @@ func _unhandled_input(event: InputEvent) -> void:
 				interaction_manager.handle_right_click(
 					selected_units,
 					collider,
-					result.position
+					result.position,
+					selected_buildings
 				)
 			_place_marker_on_ground(result.position)
 
