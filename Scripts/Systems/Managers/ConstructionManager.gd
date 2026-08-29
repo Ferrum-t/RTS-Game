@@ -2,6 +2,7 @@ extends Node
 
 var current_ghost: GhostBuilding = null
 var current_building_data: BuildingData = null
+var _place_serial: int = 0
 
 
 func start_building(data: BuildingData) -> void:
@@ -54,6 +55,14 @@ func confirm_build() -> void:
 
 	var building = data.building_scene.instantiate()
 
+	# Readable name for logs / AI (avoid @CharacterBody3D@N).
+	_place_serial += 1
+	var base_label: String = str(data.building_name).strip_edges()
+	if base_label.is_empty():
+		base_label = "Building"
+	base_label = base_label.replace(" ", "")
+	building.name = "%s_%d" % [base_label, _place_serial]
+
 	# M6.8 A: set transform BEFORE add_child so BaseBuilding._ready / nav register
 	# see the real placement position (World root is identity → position == global).
 	building.position = position
@@ -73,6 +82,6 @@ func confirm_build() -> void:
 	current_ghost = null
 	current_building_data = null
 
-	print("Building placed: ", data.building_name,
+	print("Building placed: ", building.name,
 		" (cost W:", data.wood, " S:", data.stone, ")",
 		" at ", building.global_position)
