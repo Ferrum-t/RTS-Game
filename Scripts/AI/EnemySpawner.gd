@@ -4,19 +4,25 @@ class_name EnemySpawner
 
 ## Phase 7 — periodic enemy unit waves near enemy base.
 ## Spawns existing unit scenes (Soldier default), team_id=1, attaches EnemyAIComponent.
+## AI pressure pass: wave size escalates; units get readable names.
 
 @export var unit_scene: PackedScene
 @export var team_id: int = 1
 @export var spawn_interval: float = 12.0
 @export var wave_size: int = 1
-@export var max_units_alive: int = 6
+@export var max_wave_size: int = 3
+@export var max_units_alive: int = 8
 @export var spawn_offset: Vector3 = Vector3(3.0, 0.0, 2.0)
 @export var aggro_radius: float = 22.0
 @export var enabled: bool = true
 @export var first_spawn_delay: float = 8.0
+## After this many waves, spawn count becomes 2; after 2× becomes min(3, max_wave_size).
+@export var escalate_after_waves: int = 3
 
 var _timer: float = 0.0
 var _alive: Array[BaseUnit] = []
+var _wave_index: int = 0
+var _spawn_serial: int = 0
 
 
 func _ready() -> void:
@@ -49,13 +55,23 @@ func _prune_alive() -> void:
 	_alive = next
 
 
+func _current_wave_size() -> int:
+	var size: int = wave_size
+	if _wave_index >= escalate_after_waves * 2:
+		size = maxi(size, mini(3, max_wave_size))
+	elif _wave_index >= escalate_after_waves:
+		size = maxi(size, mini(2, max_wave_size))
+	return size
+
+
 func _spawn_wave() -> void:
 	if unit_scene == null:
 		return
 	var room: int = max_units_alive - _alive.size()
 	if room <= 0:
 		return
-	var count: int = mini(wave_size, room)
+	_wave_index += 1
+	var count: int = mini(_current_wave_size(), room)
 	var parent := get_tree().current_scene
 	if parent == null:
 		return
@@ -63,6 +79,7 @@ func _spawn_wave() -> void:
 	if units_parent == null:
 		units_parent = parent
 
+	print("EnemySpawner: wave ", _wave_index, " size=", count, " alive=", _alive.size())
 	for i in range(count):
 		var node := unit_scene.instantiate()
 		if not (node is BaseUnit):
@@ -70,6 +87,8 @@ func _spawn_wave() -> void:
 			continue
 		var unit := node as BaseUnit
 		unit.team_id = team_id
+		_spawn_serial += 1
+		unit.name = "EnemySoldier_%d" % _spawn_serial
 		units_parent.add_child(unit)
 		var jitter := Vector3(float(i) * 1.2, 0.0, float(i % 2) * 1.1)
 		unit.global_position = global_position + spawn_offset + jitter
