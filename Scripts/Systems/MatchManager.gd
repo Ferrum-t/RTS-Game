@@ -46,18 +46,21 @@ func _setup_match() -> void:
 
 	# Player Town Center (team 0)
 	var player_tc: Node3D = TOWN_CENTER_SCENE.instantiate()
+	player_tc.name = "TownCenter"
 	player_tc.team_id = 0
 	player_tc.position = PLAYER_TC_POS
 	scene.add_child(player_tc)
 
 	# Player Watchtower (Phase 8.0) — covers the enemy march onto player TC
 	var player_wt: Node3D = WATCHTOWER_SCENE.instantiate()
+	player_wt.name = "Watchtower"
 	player_wt.team_id = 0
 	player_wt.position = PLAYER_TC_POS + PLAYER_WATCHTOWER_OFFSET
 	scene.add_child(player_wt)
 
-	# Enemy Town Center (team 1)
+	# Enemy Town Center (team 1) — readable name for logs / polish
 	var enemy_tc: Node3D = TOWN_CENTER_SCENE.instantiate()
+	enemy_tc.name = "EnemyTownCenter"
 	enemy_tc.team_id = 1
 	enemy_tc.position = ENEMY_TC_POS
 	scene.add_child(enemy_tc)
@@ -67,20 +70,23 @@ func _setup_match() -> void:
 	if units_parent == null:
 		units_parent = scene
 	var soldier: Node3D = SOLDIER_SCENE.instantiate()
+	soldier.name = "EnemySoldier_0"
 	soldier.team_id = 1
 	units_parent.add_child(soldier)
 	soldier.global_position = ENEMY_TC_POS + ENEMY_SOLDIER_OFFSET
 	if soldier is BaseUnit:
 		EnemyAIComponent.attach_to(soldier as BaseUnit, 24.0)
 
-	# Wave spawner near enemy base
+	# Wave spawner near enemy base — denser pressure than Phase 7 defaults
 	var spawner := EnemySpawner.new()
 	spawner.name = "EnemySpawner"
 	spawner.team_id = 1
-	spawner.spawn_interval = 14.0
-	spawner.first_spawn_delay = 10.0
+	spawner.spawn_interval = 12.0
+	spawner.first_spawn_delay = 8.0
 	spawner.wave_size = 1
-	spawner.max_units_alive = 5
+	spawner.max_wave_size = 3
+	spawner.max_units_alive = 8
+	spawner.escalate_after_waves = 3
 	spawner.unit_scene = SOLDIER_SCENE
 	spawner.position = ENEMY_TC_POS + ENEMY_SPAWNER_OFFSET
 	scene.add_child(spawner)
