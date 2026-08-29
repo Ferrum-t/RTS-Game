@@ -2,7 +2,7 @@ extends Node
 
 class_name EnemyAIComponent
 
-## Phase 7 — lightweight enemy brain.
+## Phase 7 + AI pressure pass.
 ## Does NOT move/attack itself. Issues BaseUnit.replace_order_* only.
 ## Unit execution stays: MovementComponent + CombatComponent + siege path.
 
@@ -14,6 +14,8 @@ enum BrainState {
 }
 
 @export var aggro_radius: float = 22.0
+## Inside this radius units beat buildings even if prefer_buildings.
+@export var threat_radius: float = 12.0
 @export var reeval_interval: float = 0.55
 @export var prefer_buildings: bool = true
 
@@ -76,15 +78,24 @@ func _think() -> void:
 	var target_unit: BaseUnit = _find_priority_unit()
 	var target_building: BaseBuilding = _find_priority_building()
 
-	# Priority: SiegeUnit > buildings (if prefer) > other units > march to TC
+	# 1) Siege always top priority in aggro range
 	if target_unit != null and target_unit is SiegeUnit:
 		_issue_attack_unit(target_unit)
 		return
 
+	# 2) Immediate threat: player unit inside threat_radius → fight, don't tunnel TC
+	if target_unit != null:
+		var d_threat: float = unit.global_position.distance_to(target_unit.global_position)
+		if d_threat <= threat_radius:
+			_issue_attack_unit(target_unit)
+			return
+
+	# 3) Buildings (prefer) — MOBILE / low-HP already scored higher in finder
 	if prefer_buildings and target_building != null:
 		_issue_attack_building(target_building)
 		return
 
+	# 4) Any other unit in aggro
 	if target_unit != null:
 		_issue_attack_unit(target_unit)
 		return
@@ -107,6 +118,7 @@ func _issue_attack_unit(enemy: BaseUnit) -> void:
 		return
 	unit.replace_order_attack(enemy)
 	brain_state = BrainState.CHASE
+	print(unit.name, " -> attack unit ", enemy.name, " (team ", enemy.team_id, ")")
 
 
 func _issue_attack_building(building: BaseBuilding) -> void:
@@ -120,6 +132,7 @@ func _issue_attack_building(building: BaseBuilding) -> void:
 		return
 	unit.replace_order_attack_building(building)
 	brain_state = BrainState.CHASE
+	print(unit.name, " -> attack building ", building.name, " (team ", building.team_id, ")")
 
 
 func _issue_march_to_player_base() -> void:
@@ -128,7 +141,6 @@ func _issue_march_to_player_base() -> void:
 		brain_state = BrainState.IDLE
 		return
 	_march_building = base
-	# March = attack building order (siege/move-in-range already in BaseUnit)
 	var cur := unit.current_order
 	if cur != null and cur.type == Order.Type.ATTACK_BUILDING and cur.target == base:
 		brain_state = BrainState.MARCH
@@ -138,6 +150,7 @@ func _issue_march_to_player_base() -> void:
 		return
 	unit.replace_order_attack_building(base)
 	brain_state = BrainState.MARCH
+	print(unit.name, " -> march to ", base.name)
 
 
 func _find_priority_unit() -> BaseUnit:
@@ -167,7 +180,12 @@ func _find_priority_unit() -> BaseUnit:
 		if other is SiegeUnit:
 			score += 1000.0
 		elif other is Cavalry:
-			score += 50.0
+			score += 80.0
+		elif other is Soldier:
+			score += 40.0
+		# Workers still valid but lower
+		if dist <= threat_radius:
+			score += 200.0
 		if score > best_score:
 			best_score = score
 			best = other
@@ -194,7 +212,7 @@ func _find_priority_building() -> BaseBuilding:
 		if building.is_destroyed or building.health <= 0:
 			continue
 		var dist := origin.distance_to(building.global_position)
-		if dist > aggro_radius * 1.35:
+		if dist > aggro_radius * 1.5:
 			continue
 		if not TeamRules.can_attack_building(unit, building):
 			continue
@@ -203,6 +221,20 @@ func _find_priority_building() -> BaseBuilding:
 			score += 200.0
 		elif building is Barracks:
 			score += 120.0
+		elif building is Watchtower or building is MobileTower:
+			score += 90.0
+		# Soft bias: vulnerable transit (MOBILE / packing) — not full AI-vs-MOBILE system
+		if building is MobileBuilding:
+			var mb := building as MobileBuilding
+			var st: int = mb.deployment_state
+			if st == DeploymentState.State.MOBILE \
+				or st == DeploymentState.State.PACKING \
+				or st == DeploymentState.State.UNPACKING:
+				score += 150.0
+		# Prefer wounded structures slightly
+		var max_h: float = float(building.max_health) if building.max_health > 0 else 1.0
+		var hp_frac: float = float(building.health) / max_h
+		score += (1.0 - hp_frac) * 60.0
 		if score > best_score:
 			best_score = score
 			best = building
