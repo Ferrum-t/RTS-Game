@@ -142,8 +142,7 @@ func _building_formation_dests(anchor: Vector3, count: int, spacing: float) -> A
 	if count == 1:
 		out.append(anchor)
 		return out
-
-var cols: int = int(ceili(sqrt(float(count))))
+	var cols: int = int(ceili(sqrt(float(count))))
 	var rows: int = int(ceili(float(count) / float(cols)))
 	var i: int = 0
 	for row in range(rows):
