@@ -4,7 +4,7 @@ class_name BuildingCombatComponent
 
 ## Phase 8.0 — building auto-attack.
 ## Acquire: scan UnitManager.units on a timer. No Area3D, no PhysicsQuery.
-## Damage: frozen BaseUnit.damage(amount) contract.
+## Damage: BaseUnit.take_damage(amount) contract.
 ## Does not issue Orders and does not touch Movement / Harvest / Match.
 
 @export var attack_range: float = 14.0
@@ -140,7 +140,7 @@ func _strike(b: BaseBuilding, unit: BaseUnit) -> void:
 		"[TOWER] ", b.name, " hits ", unit.name, " for ", attack_damage,
 		" dmg (HP ", hp_after, "/", unit.max_health, ")"
 	)
-	unit.damage(attack_damage)
+	unit.take_damage(attack_damage)
 	if not is_instance_valid(unit) or unit.unit_state == BaseUnit.UnitState.DEAD:
 		_clear_target("killed")
 
