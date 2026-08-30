@@ -11,7 +11,7 @@ func start_building(data: BuildingData) -> void:
 
 	var cost: Dictionary = data.get_cost_dict()
 	var rm := get_node_or_null("/root/ResourceManager")
-	if rm and not rm.can_afford(cost):
+	if rm and not rm.can_afford(cost, 0):
 		print("Construction: not enough resources for ", data.building_name,
 			" (need W:", data.wood, " S:", data.stone, " G:", data.gold, " F:", data.food, ")")
 		return
@@ -39,36 +39,54 @@ func confirm_build() -> void:
 		return
 
 	var data := current_building_data
-	var cost: Dictionary = data.get_cost_dict()
-	var rm := get_node_or_null("/root/ResourceManager")
-
-	if rm:
-		if not rm.spend(cost):
-			print("Construction: not enough resources to place ", data.building_name)
-			return
-
 	var position := current_ghost.global_position
 
-	if data.building_scene == null:
-		push_error("Construction: building_scene is null")
+	var building := place_building_for_team(data, position, 0)
+	if building == null:
 		return
 
-	var building = data.building_scene.instantiate()
+	current_ghost.queue_free()
+	current_ghost = null
+	current_building_data = null
 
-	# Readable name for logs / AI (avoid @CharacterBody3D@N).
+
+## Stage 1 — programmatic placement used by player UI and Economic AI.
+## Same cost / instantiate / nav path; team_id owns the building and stock spend.
+func place_building_for_team(data: BuildingData, world_pos: Vector3, team_id: int) -> Node:
+	if data == null:
+		return null
+	if data.building_scene == null:
+		push_error("Construction: building_scene is null")
+		return null
+
+	var cost: Dictionary = data.get_cost_dict()
+	var rm := get_node_or_null("/root/ResourceManager")
+	if rm:
+		if not rm.spend(cost, team_id):
+			print(
+				"Construction: team ", team_id,
+				" cannot afford ", data.building_name,
+				" (need W:", data.wood, " S:", data.stone, ")"
+			)
+			return null
+
+	var building = data.building_scene.instantiate()
 	_place_serial += 1
 	var base_label: String = str(data.building_name).strip_edges()
 	if base_label.is_empty():
 		base_label = "Building"
 	base_label = base_label.replace(" ", "")
 	building.name = "%s_%d" % [base_label, _place_serial]
+	if "team_id" in building:
+		building.team_id = team_id
 
-	# M6.8 A: set transform BEFORE add_child so BaseBuilding._ready / nav register
-	# see the real placement position (World root is identity → position == global).
-	building.position = position
-	get_tree().current_scene.add_child(building)
+	building.position = world_pos
+	var scene := get_tree().current_scene
+	if scene == null:
+		building.queue_free()
+		return null
+	scene.add_child(building)
 
-	# M6.8 B: defensive footprint sync after node is in tree (live global_position).
 	var nav := get_node_or_null("/root/NavigationBakeService")
 	if nav != null and nav.has_method("update_building_position"):
 		nav.update_building_position(building)
@@ -78,10 +96,10 @@ func confirm_build() -> void:
 			he = building.nav_half_extents
 		nav.register_building(building, he)
 
-	current_ghost.queue_free()
-	current_ghost = null
-	current_building_data = null
-
-	print("Building placed: ", building.name,
+	print(
+		"Building placed: ", building.name,
+		" team=", team_id,
 		" (cost W:", data.wood, " S:", data.stone, ")",
-		" at ", building.global_position)
+		" at ", building.global_position
+	)
+	return building
