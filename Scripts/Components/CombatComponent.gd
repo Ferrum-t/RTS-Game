@@ -112,7 +112,7 @@ func _strike(target: BaseUnit) -> void:
 		return
 
 	print(owner.name, " hits ", target.name, " for ", attack_damage, " dmg (HP ", max(target.health - attack_damage, 0), "/", target.max_health, ")")
-	target.damage(attack_damage)
+	target.take_damage(attack_damage)
 
 	if not is_instance_valid(target) or target.unit_state == BaseUnit.UnitState.DEAD:
 		_in_melee = false
