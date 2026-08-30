@@ -8,7 +8,7 @@
 
 ---
 
-## 0. CURRENT STATUS (2026-08-29, ветка `nomads-wars-grok`)
+## 0. CURRENT STATUS (2026-08-30, ветка `nomads-wars-grok`)
 
 **Репо:** `Ferrum-t/RTS-Game` → `nomads-wars-grok`  
 **Движок:** Godot 4.7 stable  
@@ -40,43 +40,52 @@
 
 ### Сейчас
 
-**Фазы 10–12 + selection-aware control закрыты (F5 2026-08-29).**
+**Фазы 10–12 + selection-aware control закрыты.**
 
-**Caravan / building control (dual-mode):**
-- Пустой selection зданий + RMB по земле → **все** team-0 MOBILE (Raise Entire Settlement, formation-offsets).
-- Выделенные mobile buildings + Pack/Unpack/RMB → **только они**.
-- Pack/Unpack UI: если есть selected buildings → selected; иначе → all DEPLOYED/MOBILE team-0.
-- Raise Settlement (только TC) как *отдельная* команда — всё ещё backlog (после Zones v1.1 / сезонного давления).
+**Balance Pass (изолированный темп спавна) — в процессе, пауза для design-sync:**
 
-**Environment Zones v1.0 (минимальная):**
-- 4 дрейфующих blob (2×FAVORABLE, DRY, COLD), bounce на ±25.5.
-- Множитель добычи: FAVORABLE ×1.5, DRY/COLD ×0.5, вне зон ×1.0; приоритет COLD > DRY > FAVORABLE.
-- Визуал: диски с render_priority + Y-offset, доминирующий цвет = код-приоритет.
-- Только harvest speed; не бой / не скорость юнитов / не production.
+| Интервал | Результат F5 |
+|----------|----------------|
+| 15s | TC ~волна 9; всё ещё «не успеваю» |
+| 30s | VICTORY на волне 5 с армией; промежутки субъективно длинные; AFK-хвост не сдан |
+| 45s | VICTORY рано; worker-rush слишком безопасен |
+| 20s | **ещё не прогнан** |
 
-**MOBILE combat:** атака off в MOBILE; vuln ×1.5 TC / ×1.3 tower — **сознательный выбор** до баланс-пасса.
+`MatchManager` задаёт `spawn_interval` / `first_spawn_delay` / `max_units_alive` при `EnemySpawner.new()` — дублирует defaults скрипта (tech debt: один источник конфига). Сейчас оба файла держат **30**.
 
-**MOBILE unit collision:** tech debt, не блокер.
+**Design vision записан (не implementation):**
+- `Docs/12_PROGRESSION_AND_TIER_SYSTEM.md` — тиры Аул/Орда/Каганат → мобильность; Места Силы; авиарий/магия как структура ролей; симметричный AI как принцип; Building Health Bar как дешёвый изолированный polish.
+- `DESIGN_DEPLOYMENT_EFFICIENCY.md` §8 — provisional таблица tier×mobility (T2/T3 **не** кодить до закрытия T1 balance + Zones v1.1).
+
+**Caravan / building control (dual-mode):** без изменений (selected vs entire caravan).
+
+**Environment Zones v1.0:** без изменений (blobs + harvest only).
+
+**MOBILE combat:** attack off; vuln ×1.5 / ×1.3 — сознательный выбор до отдельного баланс-милестоуна.
 
 ### Открытые решения / tech debt (не кодить без отдельного промта)
 
 | ID | Вопрос | Статус |
 |----|--------|--------|
-| MOBILE combat | Атака off бинарно; vuln ×1.5 / ×1.3 | Сознательный чойс; пересмотр на баланс-пассе |
-| Raise TC-only | Raise Settlement vs Raise Entire Settlement | Код = dual-mode (selected vs all); отдельная «только TC» команда — backlog |
+| MOBILE combat | Attack off; vuln ×1.5 / ×1.3 | Сознательный чойс |
+| Raise TC-only | Separate command | Backlog |
 | C | Unpack vs resources/terrain | Средний |
-| D | Enemy AI реакция на MOBILE (приоритет) | Частично через threat; углубление — backlog |
-| Heroes | Полная система героев | **После v1.0** |
+| D | Enemy AI vs MOBILE | Частично |
+| Heroes | Full system | **После v1.0** |
 | Collision | Unit pass-through MOBILE | Tech debt |
-| Zones v1.1 | Сезонное / фронтальное давление вместо blobs | Следующий контентный кандидат |
-| Balance | Волны / экономика / HP — матч слишком жёсткий к волне 6 | Кандидат на следующий шаг |
+| Zones v1.1 | Сезонное давление | После balance |
+| Balance | Wave tempo midpoint (20s?) + AFK | **Paused mid-pass** |
+| Spawner config | MatchManager overrides EnemySpawner defaults | Tech debt — single source later |
+| T2/T3 / Places of Power / air / magic | Vision in `12_PROGRESSION…` | **NOT v1.0** |
+| Building HP bar | Billboard on damage only | Cheap parallel candidate |
+| Full economic enemy AI | Same pipeline as player | Post-v1.0 principle only |
 
 ### Следующий шаг (кандидаты)
 
-1. **Баланс-пасс** — волны, стоимость зданий, скорость добычи, HP, чтобы матч был выигрываем при грамотной игре.
-2. **Zones v1.1** — сезонное/миграционное давление (лор: толкать кочевников, не «зелёные кружки»).
-3. Unpack validation (ресурсы/террейн) или Raise TC-only как явная команда.
-4. Tech debt: MOBILE collision, multi-select зданий (Shift).
+1. **Дожать Balance Pass** — interval **20** + честный AFK-хвост после волны 5 (одна переменная).
+2. **Building Health Bar** — изолированный polish (паттерн unit HealthBar3D).
+3. **Zones v1.1** — сезонное давление.
+4. Только потом — T2 mobility row из `12_PROGRESSION…` / §8 deployment efficiency.
 
 Порядок выбирает игрок/сессия; без отдельного промта с scope — не начинать.
 
@@ -109,10 +118,14 @@ Watchtower + MobileTower cycle — **DONE (8.0–8.2)**.
 Zones v1.1 (сезонное давление) — кандидат после баланс-пасса.
 
 ### 1.7 Боевые юниты
-Worker, Soldier, Cavalry, SiegeUnit. **Без героев в v1.0.**
+Worker, Soldier, Cavalry, SiegeUnit. **Без героев в v1.0.**  
+**Без T2/T3 upgrade chain, Places of Power, air roster, magic production в v1.0** (vision: `12_PROGRESSION_AND_TIER_SYSTEM.md`).
 
 ### 1.8 Герои
-**Не v1.0.** Lore (§23–26 в `05_FACTIONS.md`) может описывать архетипы; реализация — backlog §2.
+**Не v1.0.** Lore может описывать архетипы; реализация — backlog §2.
+
+### 1.9 Progression tiers
+**v1.0 = T1 only** (current content). T2 Орда / T3 Каганат — post balance + Zones v1.1; see `12_PROGRESSION_AND_TIER_SYSTEM.md`.
 
 ---
 
@@ -121,10 +134,13 @@ Worker, Soldier, Cavalry, SiegeUnit. **Без героев в v1.0.**
 - Остальные 3 фракции.
 - **Полноценная система героев** (XP, абилки, ауры, инвентарь).
 - Capture/Steal, animal raid beyond horse node.
-- Raise Settlement (TC only) как отдельная команда от Raise Entire Settlement.
+- Raise Settlement (TC only) as separate command.
 - Zones v1.1 — сезонное / фронтальное давление.
-- Лёт, магия, кампания, multiplayer.
-- Лошади как лимит миграции, settlement mass, сигналы соседям — `NOMAD_WORLD_BACKLOG.md`.
+- **T2/T3 tier upgrades** (mobility table + structural unlocks).
+- Places of Power + Spirit Sanctuary; magic units; air (falcon / eagle / serpent).
+- Full economic enemy AI (shared Order/Resource pipeline).
+- Лёт, кампания, multiplayer.
+- Лошади как лимит миграции, settlement mass — `NOMAD_WORLD_BACKLOG.md`.
 - Fire DoT (не часть visual Burning).
 - `03_ECOSYSTEMS_AND_RESOURCES.md` (world doc still planned).
 
@@ -134,7 +150,7 @@ Worker, Soldier, Cavalry, SiegeUnit. **Без героев в v1.0.**
 
 ### 3.1 Order — DONE (M8.1)
 ### 3.2 DeploymentState — DONE (Phase 4)
-### 3.3 Stats `base × tier × deployment` — DONE. Efficiency tables не включены.
+### 3.3 Stats `base × tier × deployment` — DONE. Efficiency / tier tables not filled for T2+.
 ### 3.4 Building mover ≠ unit MovementComponent — DONE
 ### 3.5 NavigationBakeService — DONE (footprint off on MOBILE, on on UNPACKING)
 ### 3.6 Horses — DONE (Phase 5)
@@ -159,9 +175,10 @@ Siphon: `taken = mini(want, available)`.
 1. Философия — `MOBILE_SETTLEMENTS.md` / world docs
 2. Механический контракт — `DESIGN_DEPLOYMENT_EFFICIENCY.md`
 3. Баланс-цифры — только после прототипов
+4. Progression vision — `12_PROGRESSION_AND_TIER_SYSTEM.md`
 
 ### 3.12 Scope vs lore
-Worldbuilding files (`00`–`06`) are canon for fiction. **Gameplay scope and phase order = this file only.** Lore must not silently add MVP requirements (heroes, extra systems).
+Worldbuilding files are canon for fiction. **Gameplay scope and phase order = this file only.** Lore must not silently add MVP requirements (heroes, T2/T3, magic, air).
 
 ### 3.13 Environment Zones v1.0 — DONE
 - Только harvest multiplier.
@@ -187,14 +204,15 @@ Worldbuilding files (`00`–`06`) are canon for fiction. **Gameplay scope and ph
 **12. Полировка v1.0** (debug keys, имена) — **ACCEPTED**  
 **+ Selection-aware building control** — **ACCEPTED**  
 
-**Кандидаты после 12:** баланс-пасс · Zones v1.1 · unpack validation · MOBILE collision
+**Кандидаты после 12:** дожать balance (20s + AFK) · Building HP bar · Zones v1.1 · T2 mobility (vision only until then)
 
 ---
 
 ## 5. Как работать с этим документом и с Grok
 
 - Единственный источник правды по **gameplay scope** — **этот файл**.
-- World lore: `00_WORLD_FOUNDATION.md` … `06_CULTURES_AND_WAY_OF_LIFE.md` (и planned `03_…`).
+- World lore: `00_WORLD_FOUNDATION.md` … `11_WORLD_CONFLICT.md`.
+- Progression vision: `12_PROGRESSION_AND_TIER_SYSTEM.md`.
 - Операционно: `TODO.md`, `GROK_WORKLOG.md`, `CURRENT_STATE.md`.
 - Дизайн механик: `MOBILE_SETTLEMENTS.md`, `DESIGN_DEPLOYMENT_EFFICIENCY.md`.
 - Будущее вне фаз: `NOMAD_WORLD_BACKLOG.md`.
@@ -204,4 +222,4 @@ Worldbuilding files (`00`–`06`) are canon for fiction. **Gameplay scope and ph
 1. Grok действует **по конкретному промту**: scope, файлы, запреты.
 2. «Готово» = **реальный F5-лог** или (для docs) **чтение файла после commit**.
 3. Замороженные контракты (§3) не рефакторить «заодно».
-4. Не создавать второй roadmap. Lore doc не расширяет MVP-список.
+4. Не создавать второй roadmap. Lore / vision doc не расширяет MVP-список.

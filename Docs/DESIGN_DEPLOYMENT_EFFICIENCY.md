@@ -2,9 +2,9 @@
 
 **Project:** Nomad Wars  
 **Status:** Design Spec (mechanical contract)  
-**Date:** 2026-08-27  
+**Date:** 2026-08-27 (tier table filled 2026-08-30 — still provisional)  
 **Scope:** How deployment state affects building capabilities  
-**Not for implementation in Phase 8.1**
+**Related vision:** `12_PROGRESSION_AND_TIER_SYSTEM.md` (T1–T3 names + mobility row)
 
 ---
 
@@ -37,7 +37,7 @@ Combat, Production, Range, Attack Speed, Vision etc. must read **resolved** valu
 They must not hardcode `if mobile: ...`.
 
 `BuildingDamageRules` currently only applies `DamageType` multipliers.
-Deployment modifiers for incoming/outgoing damage belong in the same resolution path later (Phase 8.2+).
+Deployment modifiers for incoming/outgoing damage belong in the same resolution path later.
 
 ---
 
@@ -47,11 +47,13 @@ Deployment modifiers for incoming/outgoing damage belong in the same resolution 
 |------------|----------------------------------|----------|--------|------------|
 | DEPLOYED   | Fully functional camp            | No       | Full   | Full       |
 | PACKING    | Transition → mobile              | No       | Reduced / limited | Off |
-| MOBILE     | Caravan / on the move            | Yes      | Reduced | Off / limited |
+| MOBILE     | Caravan / on the move            | Yes      | Reduced / off (current v1.0: attack off) | Off / limited |
 | UNPACKING  | Transition → deployed            | No       | Reduced / limited | Off |
 
 PACKING and UNPACKING are **distinct** from MOBILE.
 They create a tactical vulnerability window.
+
+**v1.0 conscious choice:** MOBILE combat attack **off**; transit vuln TC ×1.5 / tower ×1.3. Revisit only on a dedicated balance milestone (`12_PROGRESSION…` tier row may soften vuln later).
 
 ---
 
@@ -91,15 +93,14 @@ Exact rules for TC production while MOBILE are still open design decisions.
 
 ## 6. What is explicitly out of scope for now
 
-- Concrete % tables (T1 40%, T2 70% …)
 - Horse-based transport capacity
 - Settlement mass / density / inertia
-- Full aul raise (all buildings at once)
 - Migration signals to enemies
 - Vision changes while mobile
 - Cancel/interrupt rules during PACKING (to be decided later)
+- Implementing T2/T3 upgrade UI / costs (see `12_PROGRESSION_AND_TIER_SYSTEM.md`)
 
-These live in backlog / future docs.
+These live in backlog / vision docs.
 
 ---
 
@@ -107,17 +108,35 @@ These live in backlog / future docs.
 
 | Phase | Goal |
 |-------|------|
-| 8.1   | MobileTower physical + nav + combat cycle works in DEPLOYED |
-| 8.2   | Wire `deployment_overrides` into combat/production (small controlled experiment) |
-| later | TC-specific rules, Tier reduction of penalties, horses, mass |
+| 8.1–8.2 | MobileTower + DeploymentConfig / transit vuln — **DONE** |
+| v1.0 | Binary MOBILE combat off + fixed vuln — **DONE** (conscious) |
+| later | Fill `tier_modifiers` from §8 table (T2 first); TC-specific MOBILE production rules |
+| later | Season resistance while migrating (needs Zones v1.1) |
 
 ---
 
-## 8. Open design questions (do not answer with code yet)
+## 8. Tier × mobility table (PROVISIONAL — do not implement until T1 balance is closed)
+
+From vision doc `12_PROGRESSION_AND_TIER_SYSTEM.md` §3. Names: T1 Аул / T2 Орда / T3 Каганат.
+
+| Parameter | T1 Aul | T2 Horde | T3 Kaganate |
+|-----------|--------|----------|-------------|
+| pack/unpack time (× base) | 1.0 | 0.7 | 0.4 |
+| mobile move_speed (× base) | 1.0 | 1.3 | 1.6 |
+| vulnerability_multiplier (transit) | current (1.5 / 1.3) | −20% | −40% |
+| tower range / dmg (DEPLOYED) | base | +15% | +30% |
+| resistance to seasonal zone penalty | none | partial | immunity while migrating |
+
+**MVP:** only T1 column behavior as currently coded. T2/T3 rows are design targets for post–v1.0 (or late v1.x after Zones v1.1), not silent scope expansion.
+
+---
+
+## 9. Open design questions (do not answer with code yet)
 
 - TC Worker production while MOBILE: 0% or strongly reduced?
-- Does MOBILE tower keep shooting (reduced) or stop completely?
+- After balance: does MOBILE tower keep reduced shooting or stay fully off?
 - Can PACKING be cancelled? Until which point?
 - Does MOBILE building remain a NavMesh obstacle or is footprint cleared?  
   (Current code clears footprint on MOBILE — keep as contract unless changed intentionally.)
-- How is the efficiency penalty communicated to the player?
+- How is the efficiency / tier bonus communicated to the player?
+- Exact numeric costs for tier upgrade (must not import WC3 tables blindly).
