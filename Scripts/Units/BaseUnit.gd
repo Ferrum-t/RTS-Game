@@ -106,7 +106,8 @@ func _setup_health_bar() -> void:
 		return
 	add_child(health_bar)
 	health_bar.position = Vector3(0.0, health_bar_height, 0.0)
-	health_bar.set_health(health, max_health)
+	health_bar.setup(max_health)
+	health_bar.set_health(health)
 
 
 func _physics_process(delta: float) -> void:
@@ -352,7 +353,7 @@ func take_damage(amount: int, _source: Node = null) -> void:
 		return
 	health = maxi(0, health - amount)
 	if health_bar:
-		health_bar.set_health(health, max_health)
+		health_bar.set_health(health)
 	if health <= 0:
 		die()
 
@@ -373,7 +374,7 @@ func set_selected(value: bool) -> void:
 
 
 func replace_order_move(pos: Vector3) -> void:
-	current_order = Order.move_to(pos)
+	current_order = Order.new(Order.Type.MOVE, null, {"pos": pos})
 	move_target = pos
 	harvest_target = null
 	attack_target = null
@@ -391,7 +392,7 @@ func replace_order_harvest(resource: BaseResource) -> void:
 		return
 	if resource == null or not is_instance_valid(resource):
 		return
-	current_order = Order.harvest(resource)
+	current_order = Order.new(Order.Type.HARVEST, resource)
 	harvest_target = resource
 	attack_target = null
 	attack_building_target = null
@@ -404,7 +405,7 @@ func replace_order_harvest(resource: BaseResource) -> void:
 func replace_order_attack(enemy: BaseUnit) -> void:
 	if enemy == null or not is_instance_valid(enemy):
 		return
-	current_order = Order.attack_unit(enemy)
+	current_order = Order.new(Order.Type.ATTACK, enemy)
 	attack_target = enemy
 	attack_building_target = null
 	harvest_target = null
@@ -417,7 +418,7 @@ func replace_order_attack(enemy: BaseUnit) -> void:
 func replace_order_attack_building(building: BaseBuilding) -> void:
 	if building == null or not is_instance_valid(building):
 		return
-	current_order = Order.attack_building(building)
+	current_order = Order.new(Order.Type.ATTACK_BUILDING, building)
 	attack_building_target = building
 	attack_target = null
 	harvest_target = null
