@@ -3,50 +3,63 @@
 ## Status
 
 **Document type:** Design Vision / Progression Design  
-**Status:** DESIGN VISION — **NOT MVP**, except items explicitly marked otherwise  
-**Scope:** How base development (tiers) interacts with nomad mobility, magic sites, air units, and long-term AI symmetry  
+**Status:** DESIGN VISION — **does not expand v1.0 by itself**  
+**Scope:** Tiers (Аул / Орда / Каганат), Places of Power, air/magic roles, and the **architectural principle** of a symmetric economic opponent  
 **Current MVP faction:** Turan  
-**Canon level:** Structure and roles are intentional; **exact costs/HP/DPS are NOT locked** — calibrate via F5 like wave interval.
+**Canon level:** Structure and roles are intentional; **exact costs/HP/DPS are NOT locked**.
 
-> **Gameplay scope authority remains** `nomad_wars_v1_scope_and_architecture.md`.  
-> This file records vision so it is not lost and does **not** expand v1.0 implementation obligations.
+> **Gameplay scope authority:** `nomad_wars_v1_scope_and_architecture.md` only.  
+> Path on disk: `Docs/12_PROGRESSION_AND_TIER_SYSTEM.md` (no `Docs/World/` subfolder in this repo).
+
+**Product decision (2026-08-31):**  
+Whether v1.0 stays **T1-only** or grows to **T1+T2** is **deferred** until **Stage 1** (Simple Economic AI Opponent, T1 only) is playtested. Do not implement T2/T3/Places/air/magic because this document exists.
 
 ---
 
-## 1. Design intent
+## 0. Why this document exists (identity problem)
 
-Classic RTS (e.g. Alliance in WC3) uses tier progression mainly for **stronger walls and heavier units**.
+Wave-based `EnemySpawner` as the main pressure source reads as **Tower Defense**, even when Order/Resource/Combat pipelines are shared. That is a product-identity problem, not a cosmetic one.
 
-Nomad Wars tier progression must also upgrade **the quality of migration**:
+Correct direction: replace (or demote) pure wave pressure with an opponent that **gathers, builds, trains, and attacks** through the same systems as the player.
+
+**Wrong direction:** doing that *and* T2+T3 *and* Places of Power *and* air *and* magic *and* zone redesign *at once*. One variable at a time.
+
+---
+
+## 1. Design intent — tiers and nomad identity
+
+Classic RTS tier (e.g. WC3 Alliance) mainly unlocks **stronger walls and heavier units**.
+
+Nomad Wars tier must also upgrade **migration quality**:
 
 - faster pack / unpack;
 - faster caravan movement;
 - reduced transit vulnerability;
 - (later) resistance to seasonal / zone penalties while migrating.
 
-**Places of Power** create map pressure: magic production is tied to controllable nodes, so seasons and migration force relocation — same identity as mobile settlements.
+**Places of Power** gate magic production to map nodes so climate and migration matter — same identity as mobile settlements.
 
 ---
 
 ## 2. Tier structure (Turan names)
 
-Names align with lore (`05_FACTIONS.md` / steppe-Turkic theme).
-
 | Tier | Name | Economy unlock (structure) | Nomad identity |
 |------|------|----------------------------|----------------|
-| **T1** | **Аул (Aul)** | Basic gather (wood / food / gold as present in code); basic military | Slow pack/unpack; slow caravan; vulnerable to seasons |
-| **T2** | **Орда (Horde)** | Horses as resource; cavalry; improved logistics | Pack/unpack faster; caravan faster; partial season resist |
-| **T3** | **Каганат (Kaganate)** | Magic roster, siege depth, air | Near-instant deploy; armored caravan; strong season resist while moving |
+| **T1** | **Аул (Aul)** | Basic gather; basic military | Slow pack/unpack; slow caravan; vulnerable to seasons |
+| **T2** | **Орда (Horde)** | Horses; cavalry; logistics | Faster pack/move; partial season resist |
+| **T3** | **Каганат (Kaganate)** | Magic, deep siege, air | Near-instant deploy; armored caravan; strong season resist while moving |
 
-**MVP v1.0:** only **T1** content that already exists in code (TC, Worker, Barracks line, Watchtower, Soldier/Cavalry/Siege, Zones v1.0 harvest).  
-**T2 / T3:** after Environment Zones v1.1 and a completed T1 balance cycle — not parallel to unfinished Balance Pass.
+**Until Stage 1 result:** treat shipping content as **T1 only** (what already exists in code).  
+**T2 / T3:** only after an explicit scope decision post–Stage 1 (and preferably after Zones readability / v1.1 pressure is honest).
+
+Do **not** import WC3 gold/lumber tables; calibrate numbers via F5 on the current economy (TC ~500 HP, Soldier ~150 HP, wood/stone/horses).
 
 ---
 
 ## 3. Tier → mobility (mechanical contract)
 
-Uses existing architecture: `BaseBuilding.get_current_stat()` = `base × tier_modifiers × deployment_overrides`  
-(`DESIGN_DEPLOYMENT_EFFICIENCY.md` §2). Filling the table is **not** a new subsystem.
+Hook already exists: `BaseBuilding.get_current_stat()` = `base × tier_modifiers × deployment_overrides`  
+(`DESIGN_DEPLOYMENT_EFFICIENCY.md`). Not a new subsystem.
 
 **Provisional multipliers** (experiment targets — not code-locked):
 
@@ -54,143 +67,152 @@ Uses existing architecture: `BaseBuilding.get_current_stat()` = `base × tier_mo
 |-----------|--------|----------|-------------|
 | pack/unpack time (× base) | 1.0 | 0.7 | 0.4 |
 | mobile move_speed (× base) | 1.0 | 1.3 | 1.6 |
-| vulnerability_multiplier (transit) | current (TC 1.5 / tower 1.3) | −20% of current | −40% of current |
+| vulnerability_multiplier (transit) | current (TC 1.5 / tower 1.3) | −20% | −40% |
 | tower range / dmg (DEPLOYED) | base | +15% | +30% |
-| resistance to seasonal zone penalty | none | partial | immunity while migrating (MOBILE/PACKING/UNPACKING) |
+| resistance to seasonal zone penalty | none | partial | immunity while migrating |
 
-Principles (from `DESIGN_DEPLOYMENT_EFFICIENCY.md` §5):
-
-1. Mobility has opportunity cost.  
-2. Must not be pure punishment.  
-3. Tier reduces **mobility penalties**, not only raw power.  
-4. Player must **feel** the effect (UI / clear feedback).
-
-Concrete % validated only after T1 balance is stable.
+Principles: mobility has cost; not pure punishment; tier reduces **penalties**, not only raw power; player must **feel** it.
 
 ---
 
 ## 4. Structural unlocks (roles — not costs)
 
-Do **not** copy WC3 gold/lumber numbers. Current economy uses different orders of magnitude (TC ~500 HP, Soldier ~150 HP, wood/stone/horses). Exact costs come from F5, same method as wave interval.
-
-### 4.1 Buildings (role unlock by tier)
+### 4.1 Buildings
 
 | Building | Tier | Role |
 |----------|------|------|
-| Town Center (main tent) | T1+ | Workers, drop-off, tier upgrade hub |
-| Barracks (warrior camp) | T1 | Melee / basic infantry |
-| Watchtower | T1+ | Mobile defense; scales with tier table §3 |
-| Stables / paddocks | T2 | Horse economy + cavalry gate |
-| Spirit Sanctuary (Святилище духов) | T2/T3 | Magic unit production — **only near a Place of Power** |
-| Wind Spire (Гнездо Ветров) | T2/T3 | Air production |
-| Siege workshop (or Barracks T3 branch) | T3 | Heavy siege |
+| Town Center | T1+ | Workers, drop-off, future tier hub |
+| Barracks | T1 | Infantry |
+| Watchtower | T1+ | Mobile defense |
+| Stables | T2 | Horse economy + cavalry gate |
+| Spirit Sanctuary | T2/T3 | Magic units — **only near Place of Power** |
+| Wind Spire | T2/T3 | Air production |
+| Siege workshop | T3 | Heavy siege |
 
-### 4.2 Units (roles)
+### 4.2 Units
 
 | Unit | Tier | Role |
 |------|------|------|
-| Worker (shepherd) | T1 | Gather, build, pack |
-| Light infantry | T1 | Fast melee |
+| Worker | T1 | Gather, build, pack |
+| Light infantry / Soldier | T1 | Melee |
 | Archer | T1 | Ranged |
-| Steppe rider | T2 | Cavalry + charge identity |
-| Shaman of Winds | T2/T3 | Support heal / move-speed aura |
-| Storm caster | T2/T3 | Temporary local zone / slow |
-| Falcon scout | T2 | Cheap air vision, no (or minimal) attack |
+| Steppe rider / Cavalry | T2 | Cavalry |
+| Shaman of Winds | T2/T3 | Support |
+| Storm caster | T2/T3 | Zone / control |
+| Falcon scout | T2 | Air vision |
 | Eagle riders | T3 | Flying melee |
-| Wind serpent | T3 | Air siege vs static bases |
-| Siege ballista (or equivalent) | T3 | Building damage; optional fire-on-move with speed penalty |
+| Wind serpent | T3 | Air siege |
+| Siege unit | T3 | Building damage |
 
-Existing code units (Worker, Soldier, Cavalry, SiegeUnit) map to **T1 / early T2 roles** until renamed or split.
+Existing code units map to **T1 / early T2 roles** until renamed.
 
 ---
 
 ## 5. Places of Power (Места Силы)
 
-- Map nodes (e.g. Балбалы / spirit nodes): **not destroyable**; **controllable**.
-- **Spirit Sanctuary** may be built or **unpacked only inside** the node radius.
-- If climate / zones make the node unfavorable, the player must **migrate** to another node to keep training mages.
-- Ties migration pressure to magic access (same story as `04_HISTORY_AND_ORIGIN.md` / migration competition).
+- Controllable, non-destroyable map nodes.
+- Spirit Sanctuary build/unpack only inside node radius.
+- Unfavorable climate → player must migrate to keep magic production.
 
-**Implementation:** not v1.0. After Zones v1.1 design is real enough to place nodes.
+**Not Stage 1. Not automatic v1.0.** After zone pressure is readable.
 
 ---
 
 ## 6. Magic and air (vision only)
 
-- Magic is **spatially gated** (Places of Power), not a free global tech tree only.
-- Air identity for Turan: falconry / wind — scout → heavy flyers → air siege.
-- Full magic combat rules, mana economy, and flying navigation: **post–v1.0**.
-
-See also `10_MAGIC_AND_TECHNOLOGY.md` for lore tone; **this file** owns progression unlock structure.
+Spatially gated magic; Turan air = falconry / wind (scout → heavy → air siege).  
+Full rules post–Stage 1 decision and post–v1.0 core loop.
 
 ---
 
-## 7. Symmetric enemy AI (principle, not milestone)
+## 7. Symmetric economic AI — principle + Stage 1 experiment
 
-Long-term product goal: multiplayer-shaped skirmish. Enemy should use the **same** ResourceManager / BuildingManager / Order pipeline as the player — not permanent special-case spawn rules.
+### 7.1 Long-term principle
 
-**Now:** `EnemySpawner` + `EnemyAIComponent` remain the v1.0 pressure tool (wave tests / match loop).
+Multiplayer-shaped skirmish: enemy uses the **same** ResourceManager / BuildingManager / Order / Production / Combat / Movement pipeline as the player. Avoid permanent enemy-only shortcuts that block that future.
 
-**Rule:** do not add hard-coded "enemy-only" shortcuts that block a future full-economy AI. Prefer shared systems.
+### 7.2 Stage 1 — Simple Economic AI Opponent (T1 only) — **next code experiment**
 
-Full economic opponent AI is a **major** post-v1.0 effort (studio-scale), not a balance-pass item.
+**Goal:** test the thesis *"replacing waves with a real economy opponent makes this feel like RTS, not TD."*
+
+**In scope:**
+
+- Opponent uses **player systems** (not `EnemySpawner` as the primary pressure).
+- Threshold-based rules only (not "smart" AI):
+  - Keep N workers on wood/stone
+  - Build Barracks when resources allow
+  - Train Soldier while Barracks free
+  - Attack player TC when army size ≥ K
+- **No AI migration** in Stage 1 (no PACKING→MOBILE→UNPACKING for the enemy). AI base stays put. Migration AI is a **later** milestone (needs zone evaluation + same uncertainty as the player).
+
+**Out of scope for Stage 1:**
+
+- Tier system / T2 / T3
+- Places of Power, air, magic
+- Building Health Bar (optional parallel polish only)
+- Environment Zones redesign
+- Further wave-interval tuning as the *main* balance work
+
+**F5 criterion:**
+
+> Match feels like *"me vs opponent economy"*, not *"me vs wave timer"*.  
+> Opponent visibly builds and grows an army; units are not only spawned ready-made on a clock.
+
+**After Stage 1:**
+
+- If T1 + economic opponent already feels like the intended RTS → keep **v1.0 = T1-only** and push toward release discipline.
+- If still thin → then **T2 earlier** becomes an evidence-based decision, not a paper argument.
+
+### 7.3 Wave spawner role
+
+`EnemySpawner` / `EnemyAIComponent` → **Pressure Test Mode** (debug / fallback / optional mode), **not** the final marketed gameplay loop.
+
+Stop further wave-number calibration as the primary product goal until Stage 1 has a result.
+
+### 7.4 Known risks (do not ignore)
+
+1. **AI migration ≠ attack** — do not list migrate next to gather/attack as same difficulty; Stage 1 excludes it.  
+2. **Perf** — two full economies may hit nav/unit counts sooner (`TODO`: Staggered Nav Updates).  
+3. **Zone readability** — if blobs are not understood, migration pressure fails from the *environment* side of the same loop; treat zone clarity as same-class identity issue, parallel priority after Stage 1 starts.  
+4. **Art production** — real schedule bottleneck may be concept→rig→anim per unit, not code; production test on one worker remains a parallel product risk check.
 
 ---
 
 ## 8. Heroes
 
-- **Not v1.0** (`LORE_MVP_SCOPE_OVERRIDE.md`).
-- Architecture already composition-ready (`BaseUnit` + components). No premature Effect/Modifier system required before a real hero design is in front of us.
-- Future: HeroComponent (XP/levels), AbilityComponent, optional Inventory / Aura — layered on existing Order/Combat pipelines.
+**Not v1.0** (`LORE_MVP_SCOPE_OVERRIDE.md`). Composition-ready later; no premature Effect system required now.
 
 ---
 
-## 9. Isolated cheap polish (may be v1.0 if scheduled)
+## 9. Isolated cheap polish
 
-### Building Health Bar
-
-When a building is damaged, show a billboard HP bar (same pattern as unit `HealthBar3D`: visible only if `ratio < 1` and HP > 0). Applies to **all** buildings (TC, Watchtower, Barracks, …), not only mobile pack bars.
-
-- Does not change damage formula, deployment, or economy numbers.
-- Safe parallel milestone when Balance Pass is paused or between wave tests.
+**Building Health Bar** — billboard on damage only (unit `HealthBar3D` pattern). All buildings. Does not change combat formulas. Optional parallel when not blocking Stage 1.
 
 ---
 
-## 10. What v1.0 does / does not include
+## 10. Suggested order (Claude consensus 2026-08-31)
 
-| Include in v1.0 | Explicitly not v1.0 |
-|-----------------|---------------------|
-| T1 playable Turan core already in code | T2/T3 upgrade chain |
-| Mobile settlement + dual-mode caravan control | Places of Power + Spirit Sanctuary |
-| Zones v1.0 harvest blobs | Seasonal zone resistance by tier |
-| Wave / pressure tuning (Balance Pass) | Full economic enemy AI |
-| Optional: Building Health Bar | Air units, magic roster, heroes |
+1. **Stage 1:** Simple Economic AI Opponent, T1 only, no AI migration.  
+2. Optional parallel: Building Health Bar; art production spike on one worker.  
+3. Zone readability / Zones v1.1 (seasonal front) — same identity family as "why migrate".  
+4. **Then** decide v1.0 = T1-only vs T1+T2 from play evidence.  
+5. Only then: T2 mobility row, Places of Power, air/magic, AI migration, heroes.
 
 ---
 
-## 11. Suggested order after current pause
+## 11. Related documents
 
-1. Finish **Balance Pass** isolation (wave tempo midpoint + AFK criterion) — one variable at a time.  
-2. Optional parallel: **Building Health Bar**.  
-3. Zones v1.1 (seasonal pressure) — so migration has external reason.  
-4. Then design-spec → implement **T2** mobility row only (fill `tier_modifiers` / deployment tables).  
-5. Later: Places of Power, magic/air, symmetric AI, heroes.
-
----
-
-## 12. Related documents
-
-* `nomad_wars_v1_scope_and_architecture.md` — gameplay scope authority  
-* `LORE_MVP_SCOPE_OVERRIDE.md` — lore must not expand MVP  
+* `nomad_wars_v1_scope_and_architecture.md` — scope authority (§0 Product Scope Under Review)  
+* `LORE_MVP_SCOPE_OVERRIDE.md` — heroes / lore must not expand MVP  
 * `DESIGN_DEPLOYMENT_EFFICIENCY.md` — deployment × tier contract  
-* `MOBILE_SETTLEMENTS.md` — philosophy of mobility cost  
-* `08_MIGRATION_AND_NOMADISM.md` — migration lore  
-* `10_MAGIC_AND_TECHNOLOGY.md` — magic/tech fiction  
-* `NOMAD_WORLD_BACKLOG.md` — other future logistics ideas  
+* `MOBILE_SETTLEMENTS.md` — mobility philosophy  
+* `08_MIGRATION_AND_NOMADISM.md` / `10_MAGIC_AND_TECHNOLOGY.md`  
+* `NOMAD_WORLD_BACKLOG.md`
 
 ---
 
-## 13. Final principle
+## 12. Final principles
 
-For nomads, **tier is not only bigger armies**.  
-Tier is **how well the aul can move, arrive, and adapt** when the world forces the next camp.
+1. For nomads, **tier is how well the aul moves and adapts**, not only army size.  
+2. **One experiment at a time** — Stage 1 AI before rewriting v1.0 to T1+T2.  
+3. Waves are a **test tool**; the product identity is **RTS vs economy**, under migration pressure from a readable world.
