@@ -18,12 +18,17 @@ const _UI_MESH_NAMES: Array[String] = [
 	"DeploymentProgressBar",
 	"DeploymentProgressBg",
 	"AttackRangeRing",
+	"HealthBar3D",
+	"SelectionRing",
 ]
+
+const HEALTH_BAR_SCENE := preload("res://Scenes/UI/HealthBar3D.tscn")
 
 @export var team_id: int = 0
 @export var max_health: int = 500
 ## Half-extents of footprint used for NavMesh obstruction (XZ)
 @export var nav_half_extents: Vector3 = Vector3(2.2, 1.0, 2.2)
+@export var health_bar_height: float = 3.2
 
 @export var tier: int = 1 # 1..3
 @export var tier_modifiers: Array[Dictionary] = [
@@ -50,6 +55,7 @@ var base_max_health: int = 500
 var health: int = 500
 var is_destroyed: bool = false
 var lootable: LootableComponent = null
+var health_bar: HealthBar3D = null
 
 ## Phase 6.2 — presentation only; DESTROYED mirrors is_destroyed / die().
 var visual_state: int = VisualState.INTACT
@@ -74,6 +80,9 @@ func get_current_stat(stat_name: String, base_value: float) -> float:
 func recompute_stats() -> void:
 	max_health = int(get_current_stat("max_health", float(base_max_health)))
 	health = mini(health, max_health)
+	if health_bar:
+		health_bar.setup(max_health)
+		health_bar.set_health(health)
 	_refresh_visual_state()
 
 
@@ -101,6 +110,7 @@ func _ready() -> void:
 	if nav:
 		nav.register_building(self, nav_half_extents)
 
+	_setup_health_bar()
 	_capture_visual_base_albedo()
 	_refresh_visual_state()
 
@@ -111,6 +121,20 @@ func _setup_lootable() -> void:
 	lootable.loot_ratio = loot_ratio
 	add_child(lootable)
 	lootable.setup(self)
+
+
+func _setup_health_bar() -> void:
+	if HEALTH_BAR_SCENE == null:
+		return
+	health_bar = HEALTH_BAR_SCENE.instantiate() as HealthBar3D
+	if health_bar == null:
+		return
+	health_bar.name = "HealthBar3D"
+	add_child(health_bar)
+	health_bar.position = Vector3(0.0, health_bar_height, 0.0)
+	health_bar.bar_width = 3.0
+	health_bar.setup(max_health)
+	health_bar.set_health(health)
 
 
 func _exit_tree() -> void:
@@ -138,6 +162,8 @@ func damage(amount: int, attacker_team_id: int = -1) -> void:
 				" → ", final_amount, " (state=", deployment_state, ")"
 			)
 	health -= final_amount
+	if health_bar:
+		health_bar.set_health(health)
 	if lootable != null and attacker_team_id >= 0 and final_amount > 0:
 		var looted: Dictionary = lootable.extract_loot(float(final_amount), attacker_team_id)
 		_raid_damage_total += final_amount
@@ -165,6 +191,8 @@ func die() -> void:
 		return
 	is_destroyed = true
 	health = 0
+	if health_bar:
+		health_bar.set_health(0)
 	_refresh_visual_state()
 	if is_lootable and _raid_damage_total > 0:
 		print(
