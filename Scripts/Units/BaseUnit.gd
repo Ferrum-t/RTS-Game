@@ -280,12 +280,17 @@ func _siege_hold_and_strike(delta: float, building: BaseBuilding) -> void:
 	if _building_attack_timer > 0.0:
 		return
 	_building_attack_timer = attack_cooldown
-	if building.has_method("apply_damage"):
+	# Prefer official BaseBuilding.damage path so die()/queue_free runs
+	if building.has_method("damage"):
+		building.damage(attack_damage, team_id)
+	elif building.has_method("apply_damage"):
 		building.apply_damage(attack_damage, self)
 	elif building.has_method("take_damage"):
 		building.take_damage(attack_damage, self)
 	else:
 		building.health = maxi(0, building.health - attack_damage)
+		if building.health <= 0 and building.has_method("die"):
+			building.die()
 
 
 func _clear_building_attack() -> void:
