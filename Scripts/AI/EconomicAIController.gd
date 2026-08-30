@@ -3,8 +3,7 @@ extends Node
 class_name EconomicAIController
 
 ## Stage 1 — threshold economic AI for one team (default team 1).
-## DECISION only: harvest / build / produce / attack threshold.
-## EXECUTION via ResourceManager, ConstructionManager, TownCenter/Barracks, Order/EnemyAIComponent.
+## DECISION only. EXECUTION via shared systems.
 
 @export var team_id: int = 1
 @export var desired_worker_count: int = 4
@@ -55,27 +54,23 @@ func _think() -> void:
 	if tc == null:
 		return
 
-	# Workers first
 	if workers.size() < desired_worker_count and tc is TownCenter:
 		var tcn := tc as TownCenter
 		if not tcn.is_training and tcn.is_deployed():
 			if tcn.try_train_worker():
 				print("[AI_ECO] training Worker")
 
-	# Barracks
 	var barracks := _team_barracks()
 	if barracks == null:
 		_try_build_barracks(tc)
 		return
 
-	# Soldiers
 	if barracks is Barracks:
 		var b := barracks as Barracks
 		if not b.is_training:
 			if b.try_train_soldier():
 				print("[AI_ECO] training Soldier")
 
-	# Attack
 	soldiers = _team_soldiers()
 	if soldiers.size() >= attack_threshold:
 		if not _attack_issued:
@@ -132,14 +127,11 @@ func _pick_resource_for_worker(u: BaseUnit) -> BaseResource:
 		need_stone = true
 	var best: BaseResource = null
 	var best_d := INF
-	var scene := get_tree().current_scene
-	if scene == null:
-		return null
-	for n in scene.get_children():
+	for n in u.get_tree().get_nodes_in_group("Resource"):
 		if not (n is BaseResource):
 			continue
 		var r := n as BaseResource
-		if r.amount_left <= 0:
+		if r.resource_amount <= 0:
 			continue
 		var is_stone := int(r.resource_type) == BaseResource.Type.STONE
 		if need_stone and not is_stone:
@@ -152,9 +144,8 @@ func _pick_resource_for_worker(u: BaseUnit) -> BaseResource:
 			best = r
 	if best != null:
 		return best
-	# fallback any resource
-	for n in scene.get_children():
-		if n is BaseResource and (n as BaseResource).amount_left > 0:
+	for n in u.get_tree().get_nodes_in_group("Resource"):
+		if n is BaseResource and (n as BaseResource).resource_amount > 0:
 			return n as BaseResource
 	return null
 
@@ -202,26 +193,16 @@ func _team_barracks() -> BaseBuilding:
 
 func _team_workers() -> Array:
 	var out: Array = []
-	var um := get_node_or_null("/root/UnitManager")
-	var list: Array = um.units if um != null else []
-	if list.is_empty():
-		var scene := get_tree().current_scene
-		if scene:
-			for n in scene.get_nodes_in_group("Unit"):
-				list.append(n)
-	for u in list:
-		if u is Worker and int(u.team_id) == team_id:
-			if u.unit_state != BaseUnit.UnitState.DEAD:
-				out.append(u)
+	for n in get_tree().get_nodes_in_group("Unit"):
+		if n is Worker and int(n.team_id) == team_id:
+			if n.unit_state != BaseUnit.UnitState.DEAD:
+				out.append(n)
 	return out
 
 
 func _team_soldiers() -> Array:
 	var out: Array = []
-	var scene := get_tree().current_scene
-	if scene == null:
-		return out
-	for n in scene.get_nodes_in_group("Unit"):
+	for n in get_tree().get_nodes_in_group("Unit"):
 		if not (n is BaseUnit):
 			continue
 		var u := n as BaseUnit

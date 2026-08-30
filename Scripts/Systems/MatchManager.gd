@@ -1,9 +1,8 @@
 extends Node
 
 ## M9 — Playable Match Loop.
-## Owns match state only. Does not drive movement, orders, harvest, or combat.
-## Phase 7: wires EnemyAIComponent + EnemySpawner for team 1.
-## Phase 8.0: also spawns a player Watchtower on the enemy approach path.
+## Stage 1: Economic AI opponent (T1) is default pressure source.
+## EnemySpawner remains available as Pressure Test Mode (disabled by default).
 
 enum MatchState {
 	PLAYING,
@@ -13,6 +12,10 @@ enum MatchState {
 
 var state: MatchState = MatchState.PLAYING
 
+## true = Economic AI (Stage 1). false = classic wave Pressure Test Mode.
+@export var use_economic_ai: bool = true
+@export var pressure_test_waves: bool = false
+
 var _player_had_building: bool = false
 var _enemy_had_building: bool = false
 var _result_label: Label = null
@@ -20,14 +23,15 @@ var _result_label: Label = null
 const TOWN_CENTER_SCENE := preload("res://Scenes/Buildings/TownCenter.tscn")
 const WATCHTOWER_SCENE := preload("res://Scenes/Buildings/Watchtower.tscn")
 const SOLDIER_SCENE := preload("res://Scenes/Units/soldier.tscn")
+const WORKER_SCENE := preload("res://Scenes/Units/worker.tscn")
 
-## Near existing Workers at (7,0,0) / (10,0,0)
 const PLAYER_TC_POS := Vector3(2.0, 0.0, -2.0)
-## Approach side of player TC (toward enemy +Z) so F5 [TOWER] logs fire on march.
 const PLAYER_WATCHTOWER_OFFSET := Vector3(0.0, 0.0, 6.0)
-## Far from player start
 const ENEMY_TC_POS := Vector3(-18.0, 0.0, 12.0)
-const ENEMY_SOLDIER_OFFSET := Vector3(3.5, 0.0, 0.0)
+const ENEMY_WORKER_OFFSETS := [
+	Vector3(2.5, 0.0, 1.0),
+	Vector3(3.5, 0.0, -1.0),
+]
 const ENEMY_SPAWNER_OFFSET := Vector3(2.0, 0.0, 4.0)
 
 
@@ -44,56 +48,70 @@ func _setup_match() -> void:
 	if scene == null:
 		return
 
-	# Player Town Center (team 0)
 	var player_tc: Node3D = TOWN_CENTER_SCENE.instantiate()
 	player_tc.name = "TownCenter"
 	player_tc.team_id = 0
 	player_tc.position = PLAYER_TC_POS
 	scene.add_child(player_tc)
 
-	# Player Watchtower (Phase 8.0) — covers the enemy march onto player TC
 	var player_wt: Node3D = WATCHTOWER_SCENE.instantiate()
 	player_wt.name = "Watchtower"
 	player_wt.team_id = 0
 	player_wt.position = PLAYER_TC_POS + PLAYER_WATCHTOWER_OFFSET
 	scene.add_child(player_wt)
 
-	# Enemy Town Center (team 1) — readable name for logs / polish
 	var enemy_tc: Node3D = TOWN_CENTER_SCENE.instantiate()
 	enemy_tc.name = "EnemyTownCenter"
 	enemy_tc.team_id = 1
 	enemy_tc.position = ENEMY_TC_POS
 	scene.add_child(enemy_tc)
 
-	# Enemy Soldier (team 1) + AI brain
 	var units_parent: Node = scene.get_node_or_null("Units")
 	if units_parent == null:
 		units_parent = scene
-	var soldier: Node3D = SOLDIER_SCENE.instantiate()
-	soldier.name = "EnemySoldier_0"
-	soldier.team_id = 1
-	units_parent.add_child(soldier)
-	soldier.global_position = ENEMY_TC_POS + ENEMY_SOLDIER_OFFSET
-	if soldier is BaseUnit:
-		EnemyAIComponent.attach_to(soldier as BaseUnit, 24.0)
 
-	# Wave spawner — Balance Pass: midpoint tempo 30s, max_alive 6
-	# (values set here; EnemySpawner.gd defaults match — single source intent)
-	var spawner := EnemySpawner.new()
-	spawner.name = "EnemySpawner"
-	spawner.team_id = 1
-	spawner.spawn_interval = 30.0
-	spawner.first_spawn_delay = 30.0
-	spawner.wave_size = 1
-	spawner.max_wave_size = 3
-	spawner.max_units_alive = 6
-	spawner.escalate_after_waves = 3
-	spawner.unit_scene = SOLDIER_SCENE
-	spawner.position = ENEMY_TC_POS + ENEMY_SPAWNER_OFFSET
-	scene.add_child(spawner)
+	if use_economic_ai:
+		var i := 0
+		for off in ENEMY_WORKER_OFFSETS:
+			var w: Node3D = WORKER_SCENE.instantiate()
+			w.name = "AIWorker_%d" % i
+			if w is BaseUnit:
+				(w as BaseUnit).team_id = 1
+			units_parent.add_child(w)
+			w.global_position = ENEMY_TC_POS + off
+			i += 1
+
+		var eco := EconomicAIController.new()
+		eco.name = "EconomicAIController"
+		eco.team_id = 1
+		scene.add_child(eco)
+		print("MATCH: PLAYING Stage1 Economic AI (team1 TC+workers, waves OFF)")
+	else:
+		var soldier: Node3D = SOLDIER_SCENE.instantiate()
+		soldier.name = "EnemySoldier_0"
+		if soldier is BaseUnit:
+			(soldier as BaseUnit).team_id = 1
+		units_parent.add_child(soldier)
+		soldier.global_position = ENEMY_TC_POS + Vector3(3.5, 0.0, 0.0)
+		if soldier is BaseUnit:
+			EnemyAIComponent.attach_to(soldier as BaseUnit, 24.0)
+
+		var spawner := EnemySpawner.new()
+		spawner.name = "EnemySpawner"
+		spawner.team_id = 1
+		spawner.enabled = pressure_test_waves
+		spawner.spawn_interval = 30.0
+		spawner.first_spawn_delay = 30.0
+		spawner.wave_size = 1
+		spawner.max_wave_size = 3
+		spawner.max_units_alive = 6
+		spawner.escalate_after_waves = 3
+		spawner.unit_scene = SOLDIER_SCENE
+		spawner.position = ENEMY_TC_POS + ENEMY_SPAWNER_OFFSET
+		scene.add_child(spawner)
+		print("MATCH: PLAYING Pressure Test (waves=", pressure_test_waves, ")")
 
 	_ensure_result_label()
-	print("MATCH: PLAYING (player TC+Watchtower team 0, enemy TC+Soldier+AI team 1)")
 
 
 func _process(_delta: float) -> void:
