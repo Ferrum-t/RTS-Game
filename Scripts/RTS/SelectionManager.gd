@@ -41,7 +41,7 @@ func clear_selection() -> void:
 	for unit in selected_units:
 		if is_instance_valid(unit):
 			_disconnect_unit_exit(unit)
-			unit.deselect()
+			unit.set_selected(false)
 	selected_units.clear()
 	clear_building_selection()
 
@@ -61,7 +61,7 @@ func add_to_selection(unit: BaseUnit) -> void:
 
 	clear_building_selection()
 	selected_units.append(unit)
-	unit.select()
+	unit.set_selected(true)
 	_connect_unit_exit(unit)
 
 
@@ -79,7 +79,7 @@ func select_building(building: Node) -> void:
 	for unit in selected_units:
 		if is_instance_valid(unit):
 			_disconnect_unit_exit(unit)
-			unit.deselect()
+			unit.set_selected(false)
 	selected_units.clear()
 
 	clear_building_selection()
@@ -109,7 +109,7 @@ func _prune_selection() -> void:
 			continue
 		if not TeamRules.can_select(unit):
 			_disconnect_unit_exit(unit)
-			unit.deselect()
+			unit.set_selected(false)
 			continue
 		alive.append(unit)
 	selected_units = alive
