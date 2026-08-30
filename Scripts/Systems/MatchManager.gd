@@ -77,12 +77,13 @@ func _setup_match() -> void:
 	if soldier is BaseUnit:
 		EnemyAIComponent.attach_to(soldier as BaseUnit, 24.0)
 
-	# Wave spawner near enemy base — Balance Pass isolated: slower tempo + lower alive cap
+	# Wave spawner — Balance Pass: midpoint tempo 30s, max_alive 6
+	# (values set here; EnemySpawner.gd defaults match — single source intent)
 	var spawner := EnemySpawner.new()
 	spawner.name = "EnemySpawner"
 	spawner.team_id = 1
-	spawner.spawn_interval = 45.0
-	spawner.first_spawn_delay = 45.0
+	spawner.spawn_interval = 30.0
+	spawner.first_spawn_delay = 30.0
 	spawner.wave_size = 1
 	spawner.max_wave_size = 3
 	spawner.max_units_alive = 6
