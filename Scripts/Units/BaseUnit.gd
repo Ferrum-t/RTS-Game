@@ -54,6 +54,7 @@ var harvest : HarvestComponent
 var combat : CombatComponent
 var health_bar: HealthBar3D = null
 var nav_agent: NavigationAgent3D = null
+var _selection_ring: MeshInstance3D = null
 
 var last_move_end_reason: String = ""
 var _building_attack_timer: float = 0.0
@@ -94,6 +95,7 @@ func _ready() -> void:
 	combat.attack_cooldown = attack_cooldown
 
 	_setup_health_bar()
+	_setup_selection_ring()
 
 	print(name, " ready at ", global_position)
 
@@ -108,6 +110,28 @@ func _setup_health_bar() -> void:
 	health_bar.position = Vector3(0.0, health_bar_height, 0.0)
 	health_bar.setup(max_health)
 	health_bar.set_health(health)
+
+
+func _setup_selection_ring() -> void:
+	_selection_ring = MeshInstance3D.new()
+	_selection_ring.name = "SelectionRing"
+	var torus := TorusMesh.new()
+	torus.inner_radius = 0.55
+	torus.outer_radius = 0.72
+	torus.rings = 12
+	torus.ring_segments = 24
+	_selection_ring.mesh = torus
+	var mat := StandardMaterial3D.new()
+	mat.albedo_color = Color(0.2, 1.0, 0.3, 0.85)
+	mat.emission_enabled = true
+	mat.emission = Color(0.15, 0.9, 0.25)
+	mat.emission_energy_multiplier = 1.2
+	mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+	mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	_selection_ring.material_override = mat
+	_selection_ring.position = Vector3(0.0, 0.05, 0.0)
+	_selection_ring.visible = false
+	add_child(_selection_ring)
 
 
 func _physics_process(delta: float) -> void:
@@ -371,6 +395,8 @@ func die() -> void:
 
 func set_selected(value: bool) -> void:
 	selected = value
+	if _selection_ring != null and is_instance_valid(_selection_ring):
+		_selection_ring.visible = value
 
 
 func replace_order_move(pos: Vector3) -> void:
@@ -383,7 +409,7 @@ func replace_order_move(pos: Vector3) -> void:
 	if harvest:
 		harvest.reset()
 	if movement:
-		movement.move_to(pos)
+		movement.set_target(pos)
 	unit_state = UnitState.MOVING
 
 
