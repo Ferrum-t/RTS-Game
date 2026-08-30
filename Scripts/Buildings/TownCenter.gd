@@ -80,8 +80,8 @@ func try_train_worker() -> bool:
 		return false
 
 	var cost: Dictionary = ResourceManager.make_cost(worker_cost_wood)
-	if not rm.spend(cost):
-		print("TownCenter: not enough wood for Worker (need ", worker_cost_wood, ")")
+	if not rm.spend(cost, team_id):
+		print("TownCenter: not enough wood for Worker (need ", worker_cost_wood, ") team=", team_id)
 		return false
 
 	is_training = true
@@ -104,9 +104,11 @@ func _finish_training() -> void:
 		units_parent = get_tree().current_scene
 
 	units_parent.add_child(unit)
+	if unit is BaseUnit:
+		(unit as BaseUnit).team_id = team_id
 	unit.global_position = global_position + spawn_offset
 
-	print("TownCenter: Worker trained at ", unit.global_position)
+	print("TownCenter: Worker trained team=", team_id, " at ", unit.global_position)
 	_pending_scene = null
 
 

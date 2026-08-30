@@ -80,8 +80,8 @@ func try_train_soldier() -> bool:
 		return false
 
 	var cost: Dictionary = ResourceManager.make_cost(soldier_cost_wood)
-	if not rm.spend(cost):
-		print("Barracks: not enough wood for Soldier (need ", soldier_cost_wood, ")")
+	if not rm.spend(cost, team_id):
+		print("Barracks: not enough wood for Soldier (need ", soldier_cost_wood, ") team=", team_id)
 		return false
 
 	is_training = true
@@ -107,21 +107,17 @@ func try_train_cavalry() -> bool:
 	var cost: Dictionary = ResourceManager.make_cost(
 		cavalry_cost_wood, 0, 0, 0, cavalry_cost_horses
 	)
-	if not rm.can_afford(cost):
+	if not rm.can_afford(cost, team_id):
 		print(
 			"Barracks: not enough resources for Cavalry (need W:",
 			cavalry_cost_wood,
 			" Horses:",
 			cavalry_cost_horses,
-			" have W:",
-			rm.wood,
-			" H:",
-			rm.horses,
 			")"
 		)
 		return false
 
-	if not rm.spend(cost):
+	if not rm.spend(cost, team_id):
 		return false
 
 	is_training = true
@@ -153,21 +149,17 @@ func try_train_siege() -> bool:
 		return false
 
 	var cost: Dictionary = ResourceManager.make_cost(siege_cost_wood, siege_cost_stone)
-	if not rm.can_afford(cost):
+	if not rm.can_afford(cost, team_id):
 		print(
 			"Barracks: not enough resources for Siege (need W:",
 			siege_cost_wood,
 			" S:",
 			siege_cost_stone,
-			" have W:",
-			rm.wood,
-			" S:",
-			rm.stone,
 			")"
 		)
 		return false
 
-	if not rm.spend(cost):
+	if not rm.spend(cost, team_id):
 		return false
 
 	is_training = true
