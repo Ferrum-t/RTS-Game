@@ -1,17 +1,17 @@
 [gd_scene format=3 uid="uid://blxw0veepytk3"]
 
-[ext_resource type="Script" path="res://Scripts/Systems/Managers/GameManager.gd" id="1_kuxid"]
-[ext_resource type="Script" path="res://Scripts/World.gd" id="1_lp0bp"]
-[ext_resource type="Script" path="res://Scripts/Camera/camera_rts.gd" id="2_ouhkt"]
-[ext_resource type="Script" path="res://Scripts/RTS/SelectionManager.gd" id="3_5jr8x"]
-[ext_resource type="Script" path="res://Scripts/Systems/Managers/InteractionManager.gd" id="4_ng1ea"]
-[ext_resource type="PackedScene" path="res://Scenes/UI/SelectionBox.tscn" id="5_27jhl"]
-[ext_resource type="PackedScene" path="res://Scenes/Units/worker.tscn" id="5_hveh7"]
-[ext_resource type="Script" path="res://Scripts/Systems/Managers/CommandManager.gd" id="7_kjd5s"]
-[ext_resource type="PackedScene" path="res://Scenes/Resorces/Tree.tscn" id="10_ng1ea"]
-[ext_resource type="PackedScene" path="res://Scenes/Resorces/Stone.tscn" id="11_stone"]
-[ext_resource type="PackedScene" path="res://Scenes/Resorces/HorseHerd.tscn" id="12_horse"]
-[ext_resource type="PackedScene" path="res://Scenes/UI/ui.tscn" id="15_0phyg"]
+[ext_resource type="Script" uid="uid://bc5v8urtpgmia" path="res://Scripts/Systems/Managers/GameManager.gd" id="1_kuxid"]
+[ext_resource type="Script" uid="uid://c5eg4svg4lqrb" path="res://Scripts/World.gd" id="1_lp0bp"]
+[ext_resource type="Script" uid="uid://cq426y3xkwwyb" path="res://Scripts/Camera/camera_rts.gd" id="2_ouhkt"]
+[ext_resource type="Script" uid="uid://u61hpptia8qo" path="res://Scripts/RTS/SelectionManager.gd" id="3_5jr8x"]
+[ext_resource type="Script" uid="uid://ml2jlymdywqp" path="res://Scripts/Systems/Managers/InteractionManager.gd" id="4_ng1ea"]
+[ext_resource type="PackedScene" uid="uid://cbpl1yxfa0pmr" path="res://Scenes/UI/SelectionBox.tscn" id="5_27jhl"]
+[ext_resource type="PackedScene" uid="uid://c0ue6jlv400cv" path="res://Scenes/Units/worker.tscn" id="5_hveh7"]
+[ext_resource type="Script" uid="uid://bx815rivswsmy" path="res://Scripts/Systems/Managers/CommandManager.gd" id="7_kjd5s"]
+[ext_resource type="PackedScene" uid="uid://dehogsm5jd85s" path="res://Scenes/Resorces/Tree.tscn" id="10_ng1ea"]
+[ext_resource type="PackedScene" uid="uid://brdb78ja5f3oi" path="res://Scenes/Resorces/Stone.tscn" id="11_stone"]
+[ext_resource type="PackedScene" uid="uid://chorseherd001" path="res://Scenes/Resorces/HorseHerd.tscn" id="12_horse"]
+[ext_resource type="PackedScene" uid="uid://ctoqn17qfadcq" path="res://Scenes/UI/ui.tscn" id="15_0phyg"]
 
 [sub_resource type="PlaneMesh" id="PlaneMesh_f2orf"]
 size = Vector2(100, 100)
@@ -22,84 +22,80 @@ size = Vector3(100, 2, 100)
 [sub_resource type="NavigationMesh" id="NavigationMesh_map"]
 vertices = PackedVector3Array(-50, 0, -50, 50, 0, -50, 50, 0, 50, -50, 0, 50)
 polygons = [PackedInt32Array(3, 0, 1, 2), PackedInt32Array(3, 0, 2, 3)]
-agent_radius = 0.5
-agent_height = 1.5
 agent_max_climb = 0.3
-agent_max_slope = 45.0
 
-[node name="World" type="Node3D"]
+[node name="World" type="Node3D" unique_id=797149412]
 script = ExtResource("1_lp0bp")
 
-[node name="Managers" type="Node" parent="."]
+[node name="Managers" type="Node" parent="." unique_id=906254205]
 
-[node name="GameManager" type="Node" parent="Managers"]
+[node name="GameManager" type="Node" parent="Managers" unique_id=899919257]
 script = ExtResource("1_kuxid")
 
-[node name="SelectionManager" type="Node" parent="Managers" node_paths=PackedStringArray("camera", "ground", "selection_box", "interaction_manager")]
+[node name="SelectionManager" type="Node" parent="Managers" unique_id=1349402150 node_paths=PackedStringArray("camera", "ground", "selection_box", "interaction_manager")]
 script = ExtResource("3_5jr8x")
 camera = NodePath("../../CameraRig/CameraPivot/CameraTilt/Camera3D")
 ground = NodePath("../../Ground2")
 selection_box = NodePath("../../UI/SelectionBox")
 interaction_manager = NodePath("../InteractionManager")
 
-[node name="CommandManager" type="Node" parent="Managers"]
+[node name="CommandManager" type="Node" parent="Managers" unique_id=1440098177]
 script = ExtResource("7_kjd5s")
 
-[node name="InteractionManager" type="Node" parent="Managers" node_paths=PackedStringArray("command_manager")]
+[node name="InteractionManager" type="Node" parent="Managers" unique_id=426129488 node_paths=PackedStringArray("command_manager")]
 script = ExtResource("4_ng1ea")
 command_manager = NodePath("../CommandManager")
 
-[node name="CameraRig" type="Node3D" parent="." node_paths=PackedStringArray("camera")]
+[node name="CameraRig" type="Node3D" parent="." unique_id=282822203 node_paths=PackedStringArray("camera")]
 script = ExtResource("2_ouhkt")
 camera = NodePath("CameraPivot/CameraTilt/Camera3D")
 
-[node name="CameraPivot" type="Node3D" parent="CameraRig"]
+[node name="CameraPivot" type="Node3D" parent="CameraRig" unique_id=2129709358]
 
-[node name="CameraTilt" type="Node3D" parent="CameraRig/CameraPivot"]
+[node name="CameraTilt" type="Node3D" parent="CameraRig/CameraPivot" unique_id=353692807]
 transform = Transform3D(1, 0, 0, 0, 0.57357645, 0.81915206, 0, -0.81915206, 0.57357645, 0, 0, 0)
 
-[node name="Camera3D" type="Camera3D" parent="CameraRig/CameraPivot/CameraTilt"]
+[node name="Camera3D" type="Camera3D" parent="CameraRig/CameraPivot/CameraTilt" unique_id=1781013988]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 25, 0)
 current = true
 
-[node name="Ground2" type="StaticBody3D" parent="."]
-collision_layer = 1
+[node name="Ground2" type="StaticBody3D" parent="." unique_id=1030255354]
 collision_mask = 0
 
-[node name="MeshInstance3D" type="MeshInstance3D" parent="Ground2"]
+[node name="MeshInstance3D" type="MeshInstance3D" parent="Ground2" unique_id=1639269703]
 mesh = SubResource("PlaneMesh_f2orf")
 
-[node name="CollisionShape3D" type="CollisionShape3D" parent="Ground2"]
+[node name="CollisionShape3D" type="CollisionShape3D" parent="Ground2" unique_id=526196337]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -1, 0)
 shape = SubResource("BoxShape3D_f2orf")
 
-[node name="NavigationRegion3D" type="NavigationRegion3D" parent="."]
+[node name="NavigationRegion3D" type="NavigationRegion3D" parent="." unique_id=159477144]
 navigation_mesh = SubResource("NavigationMesh_map")
 
-[node name="Units" type="Node3D" parent="."]
+[node name="Units" type="Node3D" parent="." unique_id=1468272970]
 
-[node name="Worker" parent="Units" instance=ExtResource("5_hveh7")]
+[node name="Worker" parent="Units" unique_id=1455233495 instance=ExtResource("5_hveh7")]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 7, 0, 0)
 
-[node name="Worker2" parent="Units" instance=ExtResource("5_hveh7")]
+[node name="Worker2" parent="Units" unique_id=1758318803 instance=ExtResource("5_hveh7")]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 10, 0, 0)
 
-[node name="Tree" parent="." instance=ExtResource("10_ng1ea")]
+[node name="Tree" parent="." unique_id=1425628717 instance=ExtResource("10_ng1ea")]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, -12)
 
-[node name="Stone" parent="." instance=ExtResource("11_stone")]
+[node name="Stone" parent="." unique_id=699500347 instance=ExtResource("11_stone")]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 8, 0, -10)
 
-[node name="HorseHerd" parent="." instance=ExtResource("12_horse")]
+[node name="HorseHerd" parent="." unique_id=1305925390 instance=ExtResource("12_horse")]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -6, 0, -8)
 
-[node name="HorseHerd2" parent="." instance=ExtResource("12_horse")]
+[node name="HorseHerd2" parent="." unique_id=871684878 instance=ExtResource("12_horse")]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 12, 0, -14)
 
-[node name="Resources" type="Node" parent="."]
+[node name="Resources" type="Node" parent="." unique_id=1666807211]
 
-[node name="UI" type="CanvasLayer" parent="."]
+[node name="UI" type="CanvasLayer" parent="." unique_id=546026759]
 
-[node name="SelectionBox" parent="UI" instance=ExtResource("5_27jhl")]
+[node name="SelectionBox" parent="UI" unique_id=2141814975 instance=ExtResource("5_27jhl")]
 
-[node name="UI" parent="UI" instance=ExtResource("15_0phyg")]
+[node name="UI" parent="UI" unique_id=856444482 instance=ExtResource("15_0phyg")]
