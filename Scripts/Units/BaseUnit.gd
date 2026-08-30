@@ -99,67 +99,51 @@ func _ready() -> void:
 
 
 func _setup_health_bar() -> void:
+	if HEALTH_BAR_SCENE == null:
+		return
 	health_bar = HEALTH_BAR_SCENE.instantiate() as HealthBar3D
+	if health_bar == null:
+		return
 	add_child(health_bar)
 	health_bar.position = Vector3(0.0, health_bar_height, 0.0)
-	health_bar.setup(max_health)
-
-
-func _exit_tree() -> void:
-	UnitManager.unregister_unit(self)
+	health_bar.set_health(health, max_health)
 
 
 func _physics_process(delta: float) -> void:
+	if unit_state == UnitState.DEAD:
+		return
+
 	if not is_on_floor():
 		velocity.y -= GRAVITY * delta
 	else:
 		velocity.y = 0.0
 
 	match unit_state:
-		UnitState.IDLE:
-			update_idle(delta)
 		UnitState.MOVING:
 			update_moving(delta)
 		UnitState.HARVESTING:
 			update_harvesting(delta)
 		UnitState.RETURNING:
 			update_return(delta)
-		UnitState.BUILDING:
-			update_build(delta)
 		UnitState.ATTACKING:
 			update_attacking(delta)
-		UnitState.DEAD:
+		_:
 			pass
 
-	if global_position.y < 0.0:
-		global_position.y = 0.0
-		velocity.y = 0.0
-
-
-func update_idle(_delta: float) -> void:
-	velocity.x = 0.0
-	velocity.z = 0.0
 	move_and_slide()
 
 
 func update_moving(delta: float) -> void:
+	if movement == null:
+		return
 	movement.update(delta)
-
 	match movement.status:
 		MovementComponent.Status.ARRIVED:
-			last_move_end_reason = "ARRIVED"
-			current_order = Order.none()
-			unit_state = UnitState.IDLE
-		MovementComponent.Status.BLOCKED:
-			last_move_end_reason = "BLOCKED"
+			last_move_end_reason = "arrived"
 			current_order = Order.none()
 			unit_state = UnitState.IDLE
 		MovementComponent.Status.FAILED:
-			last_move_end_reason = "FAILED"
-			current_order = Order.none()
-			unit_state = UnitState.IDLE
-		MovementComponent.Status.CANCELLED:
-			last_move_end_reason = "CANCELLED"
+			last_move_end_reason = "failed"
 			current_order = Order.none()
 			unit_state = UnitState.IDLE
 		_:
@@ -238,7 +222,6 @@ func update_attacking_building(delta: float) -> void:
 	else:
 		_siege_stuck_time = 0.0
 
-	# Hysteresis: enter at building_attack_range, leave only past exit_range
 	if _siege_in_range:
 		if dist > exit_range:
 			_siege_in_range = false
@@ -247,46 +230,37 @@ func update_attacking_building(delta: float) -> void:
 			return
 
 	var in_range := dist <= building_attack_range
-	# Soft stuck near building edge still counts as enter once
-	if not in_range and dist <= building_attack_range + 2.5 and _siege_stuck_time >= 0.35:
+	if not in_range and _siege_stuck_time > 0.8 and dist <= building_attack_range + 1.5:
 		in_range = true
 
-	if not in_range:
-		var stand := maxf(building_attack_range * 0.9, 5.0)
-		var approach := building.global_position
-		if to_b.length() > 0.1:
-			approach = building.global_position - to_b.normalized() * stand
-		approach.y = 0.0
-		movement.ensure_moving_to(approach, APPROACH_RETARGET_DIST)
-		movement.update(delta)
+	if in_range:
+		_siege_in_range = true
+		_siege_hold_and_strike(delta, building)
 		return
 
-	_siege_in_range = true
-	_siege_hold_and_strike(delta, building)
+	# Approach building
+	var approach := building.global_position
+	if to_b.length() > 0.1:
+		approach = building.global_position - to_b.normalized() * (building_attack_range * 0.7)
+	approach.y = 0.0
+	movement.ensure_moving_to(approach, APPROACH_RETARGET_DIST)
+	movement.update(delta)
 
 
 func _siege_hold_and_strike(delta: float, building: BaseBuilding) -> void:
-	if movement:
+	if movement and movement.status == MovementComponent.Status.MOVING:
 		movement.cancel()
 	velocity = Vector3.ZERO
-	_siege_stuck_time = 0.0
-
 	_building_attack_timer -= delta
 	if _building_attack_timer > 0.0:
 		return
 	_building_attack_timer = attack_cooldown
-
-	var raw_dmg: int = attack_damage
-	var mod_dmg: int = BuildingDamageRules.modified_building_damage(raw_dmg, damage_type)
-	print(
-		name, " hits building ", building.name,
-		" for ", raw_dmg, " dmg → modified ", mod_dmg,
-		" (HP ", max(building.health - mod_dmg, 0), "/", building.max_health, ")"
-	)
-	building.damage(mod_dmg, team_id)
-
-	if not is_instance_valid(building) or building.is_destroyed or building.health <= 0:
-		_clear_building_attack()
+	if building.has_method("apply_damage"):
+		building.apply_damage(attack_damage, self)
+	elif building.has_method("take_damage"):
+		building.take_damage(attack_damage, self)
+	else:
+		building.health = maxi(0, building.health - attack_damage)
 
 
 func _clear_building_attack() -> void:
@@ -346,11 +320,11 @@ func update_return(delta: float) -> void:
 
 	var rm := get_node_or_null("/root/ResourceManager")
 	if rm:
-		rm.add_wood(deposited_wood)
-		rm.add_stone(deposited_stone)
-		rm.add_gold(deposited_gold)
-		rm.add_food(deposited_food)
-		rm.add_horses(deposited_horses)
+		rm.add_wood(deposited_wood, team_id)
+		rm.add_stone(deposited_stone, team_id)
+		rm.add_gold(deposited_gold, team_id)
+		rm.add_food(deposited_food, team_id)
+		rm.add_horses(deposited_horses, team_id)
 
 	print(
 		name,
@@ -373,192 +347,85 @@ func update_return(delta: float) -> void:
 		unit_state = UnitState.IDLE
 
 
-func update_build(_delta: float) -> void:
-	pass
-
-
-## M8.1 — single dispatch entry for player/AI intent.
-func replace_order(order: Order) -> void:
-	if order == null:
-		order = Order.none()
-
-	match order.type:
-		Order.Type.NONE:
-			current_order = Order.none()
-		Order.Type.MOVE:
-			var dest: Vector3 = order.target as Vector3
-			current_order = order
-			set_move_target(dest)
-		Order.Type.HARVEST:
-			var resource: BaseResource = order.target as BaseResource
-			if resource == null or not is_instance_valid(resource):
-				return
-			if not can_gather:
-				return
-			if not TeamRules.can_harvest(self, resource):
-				return
-			current_order = order
-			set_harvest_target(resource)
-		Order.Type.ATTACK:
-			var enemy: BaseUnit = order.target as BaseUnit
-			if not TeamRules.can_attack(self, enemy):
-				return
-			current_order = order
-			set_attack_target(enemy)
-		Order.Type.ATTACK_BUILDING:
-			var building: BaseBuilding = order.target as BaseBuilding
-			var ok := TeamRules.can_attack_building(self, building)
-			if not ok:
-				return
-			current_order = order
-			set_attack_building_target(building)
-		Order.Type.BUILD:
-			var b: BaseBuilding = order.target as BaseBuilding
-			if b == null or not is_instance_valid(b):
-				return
-			current_order = order
-			set_build_target(b)
-
-
-func replace_order_move(destination: Vector3) -> void:
-	replace_order(Order.new(Order.Type.MOVE, destination))
-
-
-func replace_order_harvest(resource: BaseResource) -> void:
-	replace_order(Order.new(Order.Type.HARVEST, resource))
-
-
-func replace_order_attack(enemy: BaseUnit) -> void:
-	replace_order(Order.new(Order.Type.ATTACK, enemy))
-
-
-func replace_order_attack_building(building: BaseBuilding) -> void:
-	replace_order(Order.new(Order.Type.ATTACK_BUILDING, building))
-
-
-func replace_order_build(building: BaseBuilding) -> void:
-	replace_order(Order.new(Order.Type.BUILD, building))
-
-
-func set_move_target(target: Vector3) -> void:
-	move_target = target
-	unit_state = UnitState.MOVING
-	harvest_target = null
-	attack_target = null
-	attack_building_target = null
-	return_target = null
-	_building_attack_timer = 0.0
-	_siege_stuck_time = 0.0
-	_siege_in_range = false
-	last_move_end_reason = ""
-	if harvest:
-		harvest.reset()
-	if combat:
-		combat.reset()
-	if movement:
-		movement.request_move(target)
-
-
-func set_harvest_target(resource: BaseResource) -> void:
-	if not can_gather:
-		return
-	harvest_target = resource
-	attack_target = null
-	attack_building_target = null
-	return_target = null
-	_building_attack_timer = 0.0
-	_siege_in_range = false
-	unit_state = UnitState.HARVESTING
-	if combat:
-		combat.reset()
-	if harvest:
-		harvest.reset()
-	if movement:
-		movement.cancel()
-
-
-func set_build_target(building: BaseBuilding) -> void:
-	build_target = building
-	attack_target = null
-	attack_building_target = null
-	unit_state = UnitState.BUILDING
-
-
-func set_attack_target(enemy: BaseUnit) -> void:
-	if not TeamRules.can_attack(self, enemy):
-		return
-	attack_target = enemy
-	attack_building_target = null
-	harvest_target = null
-	return_target = null
-	_building_attack_timer = 0.0
-	_siege_in_range = false
-	unit_state = UnitState.ATTACKING
-	if harvest:
-		harvest.reset()
-	if combat:
-		combat.reset()
-	print(name, " -> attack ", enemy.name)
-
-
-func set_attack_building_target(building: BaseBuilding) -> void:
-	if not TeamRules.can_attack_building(self, building):
-		return
-	attack_building_target = building
-	attack_target = null
-	harvest_target = null
-	return_target = null
-	_building_attack_timer = 0.0
-	_siege_stuck_time = 0.0
-	_siege_in_range = false
-	_siege_last_pos = global_position
-	unit_state = UnitState.ATTACKING
-	if current_order == null or current_order.type != Order.Type.ATTACK_BUILDING:
-		current_order = Order.new(Order.Type.ATTACK_BUILDING, building)
-	if harvest:
-		harvest.reset()
-	if combat:
-		combat.reset()
-	if movement:
-		movement.cancel()
-	print(name, " -> attack building ", building.name, " (team ", building.team_id, ")")
-
-
-func select() -> void:
-	selected = true
-	if has_node("SelectionRing"):
-		$SelectionRing.visible = true
-	print(name, " selected (HP ", health, "/", max_health, ")")
-
-
-func deselect() -> void:
-	selected = false
-	if has_node("SelectionRing"):
-		$SelectionRing.visible = false
-	print(name, " deselected")
-
-
-func damage(amount: int) -> void:
+func take_damage(amount: int, _source: Node = null) -> void:
 	if unit_state == UnitState.DEAD:
 		return
-	health -= amount
+	health = maxi(0, health - amount)
 	if health_bar:
-		health_bar.set_health(health)
+		health_bar.set_health(health, max_health)
 	if health <= 0:
-		health = 0
 		die()
 
 
 func die() -> void:
 	unit_state = UnitState.DEAD
 	current_order = Order.none()
-	attack_building_target = null
-	_siege_in_range = false
+	velocity = Vector3.ZERO
 	if movement:
 		movement.cancel()
+	print(name, " died")
+	UnitManager.unregister_unit(self)
+	queue_free()
+
+
+func set_selected(value: bool) -> void:
+	selected = value
+
+
+func replace_order_move(pos: Vector3) -> void:
+	current_order = Order.move_to(pos)
+	move_target = pos
+	harvest_target = null
+	attack_target = null
+	attack_building_target = null
+	return_target = null
 	if harvest:
 		harvest.reset()
-	if combat:
-		combat.reset()
-	print(name, " died")
-	queue_free()
+	if movement:
+		movement.move_to(pos)
+	unit_state = UnitState.MOVING
+
+
+func replace_order_harvest(resource: BaseResource) -> void:
+	if not can_gather:
+		return
+	if resource == null or not is_instance_valid(resource):
+		return
+	current_order = Order.harvest(resource)
+	harvest_target = resource
+	attack_target = null
+	attack_building_target = null
+	return_target = null
+	if harvest:
+		harvest.reset()
+	unit_state = UnitState.HARVESTING
+
+
+func replace_order_attack(enemy: BaseUnit) -> void:
+	if enemy == null or not is_instance_valid(enemy):
+		return
+	current_order = Order.attack_unit(enemy)
+	attack_target = enemy
+	attack_building_target = null
+	harvest_target = null
+	return_target = null
+	if harvest:
+		harvest.reset()
+	unit_state = UnitState.ATTACKING
+
+
+func replace_order_attack_building(building: BaseBuilding) -> void:
+	if building == null or not is_instance_valid(building):
+		return
+	current_order = Order.attack_building(building)
+	attack_building_target = building
+	attack_target = null
+	harvest_target = null
+	return_target = null
+	_siege_in_range = false
+	_siege_stuck_time = 0.0
+	_siege_last_pos = global_position
+	_building_attack_timer = 0.0
+	if harvest:
+		harvest.reset()
+	unit_state = UnitState.ATTACKING
