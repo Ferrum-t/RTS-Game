@@ -1,10 +1,10 @@
 extends Button
 
-## Trains Cavalry from the first Barracks (100 wood + 1 horse).
-## Same path as Barracks debug KEY_C → try_train_cavalry().
+## Trains Cavalry from the player's Barracks (100 wood + 1 horse).
 
 const COST_WOOD := 100
 const COST_HORSES := 1
+const PLAYER_TEAM := 0
 
 
 func _ready() -> void:
@@ -22,7 +22,8 @@ func _on_resources_changed() -> void:
 	if rm == null:
 		return
 	disabled = not rm.can_afford(
-		ResourceManager.make_cost(COST_WOOD, 0, 0, 0, COST_HORSES)
+		ResourceManager.make_cost(COST_WOOD, 0, 0, 0, COST_HORSES),
+		PLAYER_TEAM
 	)
 
 
@@ -34,12 +35,10 @@ func _on_pressed() -> void:
 
 	var barracks = null
 	if bm.has_method("get_first_barracks"):
-		barracks = bm.get_first_barracks()
-	elif "barracks_list" in bm and not bm.barracks_list.is_empty():
-		barracks = bm.barracks_list[0]
+		barracks = bm.get_first_barracks(PLAYER_TEAM)
 
 	if barracks == null:
-		print("Train Cavalry: build a Barracks first")
+		print("Train Cavalry: build a Barracks first (your team)")
 		return
 
 	if barracks.has_method("try_train_cavalry"):
