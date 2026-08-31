@@ -11,7 +11,7 @@ func _ready() -> void:
 	attack_damage = 20
 	attack_range = 2.2
 	attack_cooldown = 0.9
-	move_speed = 4.5
+	move_speed = 2.25
 	health_bar_height = 1.8
 	damage_type = DamageType.Type.MELEE
 
