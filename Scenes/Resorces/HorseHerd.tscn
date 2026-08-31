@@ -17,7 +17,7 @@ albedo_color = Color(0.55, 0.38, 0.22, 1)
 collision_layer = 1
 collision_mask = 1
 script = ExtResource("1_horse")
-resource_amount = 200
+resource_amount = 600
 
 [node name="MeshInstance3D" type="MeshInstance3D" parent="."]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.7, 0)
