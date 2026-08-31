@@ -20,10 +20,11 @@
 - Created **`Docs/TECH_DEBT.md`**.
 - **TD-01 (open):** AI construction does **not** share player `Ghost.can_build` / collision validation. AI uses `tc + barracks_offset` → `place_building_for_team` (cost/team only). Hand-tuned offset works for Stage 1; not a shared placement pipeline. Fix sketch: shared `can_place` + AI site sampling.
 - **TD-02 (open, design):** After Barracks, wood=0 while stone high → spam `not enough wood for Soldier`. Heuristic `stone < 50 ? stone : wood` is correct for itself but not demand-driven. **Next step after Stage 1 = AI Economy 1.5** (BUILDING_GOAL → PRODUCTION_GOAL → RESOURCE_REQUIREMENT → WORKER_ASSIGNMENT), **not T2**. See `TECH_DEBT.md`.
+- **TD-03 (open, do not fix Stage 1):** After Enemy TC destroy, workers keep inventory (no drop-off). Barracks/soldiers can theoretically keep going. OK while match ends on TC; revisit when victory conditions change.
 
 ### Next
 
-- Further GPT audit items → TD-03+ in `TECH_DEBT.md`.
+- Further GPT audit items → TD-04+ in `TECH_DEBT.md`.
 - Do not claim “same placement pipeline” until TD-01 closed.
 - Prefer Economy 1.5 over T2 content when Stage 1 is closed.
 
