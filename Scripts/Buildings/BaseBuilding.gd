@@ -24,6 +24,11 @@ const _UI_MESH_NAMES: Array[String] = [
 
 const HEALTH_BAR_SCENE := preload("res://Scenes/UI/HealthBar3D.tscn")
 
+## Trained units land on a ring around the building (no stacking).
+const SPAWN_RING_SLOTS := 8
+const SPAWN_RING_RADIUS := 3.6
+const SPAWN_RING_STEP := 1.15
+
 @export var team_id: int = 0
 @export var max_health: int = 500
 ## Half-extents of footprint used for NavMesh obstruction (XZ)
@@ -67,6 +72,9 @@ var _visual_base_captured: bool = false
 var _raid_loot_total: Dictionary = {}
 var _raid_damage_total: int = 0
 
+## Serial index for ring spawn slots (Barracks / TownCenter training).
+var _spawn_serial: int = 0
+
 
 func get_current_stat(stat_name: String, base_value: float) -> float:
 	var value := base_value
@@ -84,6 +92,21 @@ func recompute_stats() -> void:
 		health_bar.setup(max_health)
 		health_bar.set_health(health)
 	_refresh_visual_state()
+
+
+## Next free world position on expanding rings around this building.
+func next_spawn_position() -> Vector3:
+	var slot: int = _spawn_serial % SPAWN_RING_SLOTS
+	var ring: int = int(_spawn_serial / SPAWN_RING_SLOTS)
+	_spawn_serial += 1
+	var angle: float = float(slot) * TAU / float(SPAWN_RING_SLOTS)
+	# Odd rings rotated half-slot so positions interleave.
+	if ring % 2 == 1:
+		angle += TAU / float(SPAWN_RING_SLOTS) * 0.5
+	var radius: float = SPAWN_RING_RADIUS + float(ring) * SPAWN_RING_STEP
+	var pos := global_position + Vector3(cos(angle) * radius, 0.0, sin(angle) * radius)
+	pos.y = 0.0
+	return pos
 
 
 func _ready() -> void:
