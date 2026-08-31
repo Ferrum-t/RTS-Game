@@ -24,6 +24,10 @@ const _UI_MESH_NAMES: Array[String] = [
 
 const HEALTH_BAR_SCENE := preload("res://Scenes/UI/HealthBar3D.tscn")
 
+## Grid around rally so successive trainees do not fight for one pixel.
+const RALLY_GRID_COLS := 4
+const RALLY_SLOT_SPACING := 2.2
+
 @export var team_id: int = 0
 @export var max_health: int = 500
 ## Half-extents of footprint used for NavMesh obstruction (XZ)
@@ -75,6 +79,8 @@ var _raid_damage_total: int = 0
 ## World-space rally (absolute). Player can move with RMB while building selected.
 var rally_point: Vector3 = Vector3.ZERO
 var _rally_initialized: bool = false
+## Next grid index around rally for trained units.
+var _rally_slot: int = 0
 
 
 func get_current_stat(stat_name: String, base_value: float) -> float:
@@ -110,10 +116,28 @@ func get_rally_point() -> Vector3:
 	return rally_point
 
 
+## Unique stand position in a grid around the rally (no two trainees share one target).
+func next_rally_destination() -> Vector3:
+	var center := get_rally_point()
+	var i: int = _rally_slot
+	_rally_slot += 1
+	var cols: int = RALLY_GRID_COLS
+	var spacing: float = RALLY_SLOT_SPACING
+	@warning_ignore("integer_division")
+	var row: int = i / cols
+	var col: int = i % cols
+	var ox: float = (float(col) - float(cols - 1) * 0.5) * spacing
+	var oz: float = float(row) * spacing
+	var dest := center + Vector3(ox, 0.0, oz)
+	dest.y = 0.0
+	return dest
+
+
 func set_rally_point(world_pos: Vector3) -> void:
 	rally_point = world_pos
 	rally_point.y = 0.0
 	_rally_initialized = true
+	_rally_slot = 0
 	print(name, " rally set → ", rally_point)
 
 
@@ -123,6 +147,7 @@ func _init_default_rally() -> void:
 	rally_point = global_position + default_rally_offset
 	rally_point.y = 0.0
 	_rally_initialized = true
+	_rally_slot = 0
 
 
 func _ready() -> void:
