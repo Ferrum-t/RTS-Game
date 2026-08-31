@@ -20,13 +20,14 @@ const _UI_MESH_NAMES: Array[String] = [
 	"AttackRangeRing",
 	"HealthBar3D",
 	"SelectionRing",
+	"RallyFlag",
 ]
 
 const HEALTH_BAR_SCENE := preload("res://Scenes/UI/HealthBar3D.tscn")
 
 ## Grid around rally so successive trainees do not fight for one pixel.
 const RALLY_GRID_COLS := 4
-const RALLY_SLOT_SPACING := 2.2
+const RALLY_SLOT_SPACING := 2.5
 
 @export var team_id: int = 0
 @export var max_health: int = 500
@@ -35,9 +36,9 @@ const RALLY_SLOT_SPACING := 2.2
 @export var health_bar_height: float = 3.2
 
 ## WC-style: units appear at door, then walk to rally.
-@export var spawn_offset: Vector3 = Vector3(3.0, 0.0, 0.0)
-## Default rally relative to building when never set by player.
-@export var default_rally_offset: Vector3 = Vector3(6.0, 0.0, 0.0)
+@export var spawn_offset: Vector3 = Vector3(3.5, 0.0, 0.0)
+## Default rally well clear of building footprint / unit grid.
+@export var default_rally_offset: Vector3 = Vector3(12.0, 0.0, 0.0)
 
 @export var tier: int = 1 # 1..3
 @export var tier_modifiers: Array[Dictionary] = [
@@ -81,6 +82,9 @@ var rally_point: Vector3 = Vector3.ZERO
 var _rally_initialized: bool = false
 ## Next grid index around rally for trained units.
 var _rally_slot: int = 0
+## Visible rally flag (player buildings only, when selected).
+var _rally_flag: Node3D = null
+var _building_selected: bool = false
 
 
 func get_current_stat(stat_name: String, base_value: float) -> float:
@@ -138,16 +142,92 @@ func set_rally_point(world_pos: Vector3) -> void:
 	rally_point.y = 0.0
 	_rally_initialized = true
 	_rally_slot = 0
+	_update_rally_flag()
 	print(name, " rally set → ", rally_point)
+
+
+func set_building_selected(value: bool) -> void:
+	_building_selected = value
+	if _rally_flag != null and is_instance_valid(_rally_flag):
+		_rally_flag.visible = value and team_id == 0
+		if value:
+			_update_rally_flag()
 
 
 func _init_default_rally() -> void:
 	if _rally_initialized:
+		_update_rally_flag()
 		return
 	rally_point = global_position + default_rally_offset
 	rally_point.y = 0.0
 	_rally_initialized = true
 	_rally_slot = 0
+	_update_rally_flag()
+
+
+func _setup_rally_flag() -> void:
+	if team_id != 0:
+		return
+	if _rally_flag != null:
+		return
+
+	_rally_flag = Node3D.new()
+	_rally_flag.name = "RallyFlag"
+	_rally_flag.top_level = true
+	add_child(_rally_flag)
+
+	# Pole
+	var pole := MeshInstance3D.new()
+	var cyl := CylinderMesh.new()
+	cyl.top_radius = 0.05
+	cyl.bottom_radius = 0.07
+	cyl.height = 2.6
+	pole.mesh = cyl
+	pole.position = Vector3(0.0, 1.3, 0.0)
+	var pole_mat := StandardMaterial3D.new()
+	pole_mat.albedo_color = Color(0.32, 0.22, 0.12)
+	pole.material_override = pole_mat
+	_rally_flag.add_child(pole)
+
+	# Banner
+	var cloth := MeshInstance3D.new()
+	var box := BoxMesh.new()
+	box.size = Vector3(1.35, 0.75, 0.04)
+	cloth.mesh = box
+	cloth.position = Vector3(0.72, 2.15, 0.0)
+	var flag_mat := StandardMaterial3D.new()
+	flag_mat.albedo_color = Color(0.95, 0.78, 0.12)
+	flag_mat.emission_enabled = true
+	flag_mat.emission = Color(0.95, 0.7, 0.1)
+	flag_mat.emission_energy_multiplier = 1.0
+	cloth.material_override = flag_mat
+	_rally_flag.add_child(cloth)
+
+	# Ground disc so flag is easy to spot from top-down
+	var disc_mi := MeshInstance3D.new()
+	var disc := CylinderMesh.new()
+	disc.top_radius = 0.45
+	disc.bottom_radius = 0.45
+	disc.height = 0.06
+	disc_mi.mesh = disc
+	disc_mi.position = Vector3(0.0, 0.03, 0.0)
+	var disc_mat := StandardMaterial3D.new()
+	disc_mat.albedo_color = Color(0.15, 0.55, 0.95, 0.75)
+	disc_mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+	disc_mat.emission_enabled = true
+	disc_mat.emission = Color(0.2, 0.5, 1.0)
+	disc_mat.emission_energy_multiplier = 0.6
+	disc_mi.material_override = disc_mat
+	_rally_flag.add_child(disc_mi)
+
+	_rally_flag.visible = false
+
+
+func _update_rally_flag() -> void:
+	if _rally_flag == null or not is_instance_valid(_rally_flag):
+		return
+	var p := get_rally_point()
+	_rally_flag.global_position = p
 
 
 func _ready() -> void:
@@ -175,6 +255,7 @@ func _ready() -> void:
 		nav.register_building(self, nav_half_extents)
 
 	_setup_health_bar()
+	_setup_rally_flag()
 	_capture_visual_base_albedo()
 	_refresh_visual_state()
 	call_deferred("_init_default_rally")
