@@ -19,7 +19,6 @@ var _progress_root: Node3D = null
 var _progress_bg: MeshInstance3D = null
 var _progress_fill: MeshInstance3D = null
 var _range_ring: MeshInstance3D = null
-var _select_ring: MeshInstance3D = null
 const _BAR_WIDTH: float = 2.2
 const _BAR_HEIGHT: float = 5.2
 const _BAR_THICKNESS: float = 0.16
@@ -37,32 +36,11 @@ func _ready() -> void:
 	deployment.state_changed.connect(_on_deployment_state_changed)
 	_setup_progress_bar()
 	_setup_range_ring()
-	_setup_select_ring()
 
 
 func set_building_selected(on: bool) -> void:
+	# BaseBuilding handles yellow select ring + rally flag.
 	super.set_building_selected(on)
-	if _select_ring:
-		_select_ring.visible = on
-
-
-func _setup_select_ring() -> void:
-	var ring := MeshInstance3D.new()
-	ring.name = "BuildingSelectRing"
-	var he: float = 2.5
-	if nav_half_extents is Vector3:
-		he = maxf(nav_half_extents.x, nav_half_extents.z) + 0.4
-	ring.mesh = _make_ground_ring_mesh(he, 0.18, 48)
-	var mat := StandardMaterial3D.new()
-	mat.albedo_color = Color(1.0, 0.85, 0.15, 0.85)
-	mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
-	mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
-	mat.cull_mode = BaseMaterial3D.CULL_DISABLED
-	ring.material_override = mat
-	ring.position = Vector3(0.0, 0.08, 0.0)
-	ring.visible = false
-	add_child(ring)
-	_select_ring = ring
 
 
 func _apply_deployment_config() -> void:
