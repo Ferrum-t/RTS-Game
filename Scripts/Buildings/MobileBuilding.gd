@@ -20,7 +20,6 @@ var _progress_bg: MeshInstance3D = null
 var _progress_fill: MeshInstance3D = null
 var _range_ring: MeshInstance3D = null
 var _select_ring: MeshInstance3D = null
-var _building_selected: bool = false
 const _BAR_WIDTH: float = 2.2
 const _BAR_HEIGHT: float = 5.2
 const _BAR_THICKNESS: float = 0.16
@@ -42,7 +41,7 @@ func _ready() -> void:
 
 
 func set_building_selected(on: bool) -> void:
-	_building_selected = on
+	super.set_building_selected(on)
 	if _select_ring:
 		_select_ring.visible = on
 
