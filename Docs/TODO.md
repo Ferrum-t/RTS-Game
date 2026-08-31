@@ -22,12 +22,14 @@ Wave Balance Pass is **paused** (15/30/45 data kept; Pressure Test Mode only). D
 ## Next
 
 - [ ] Stage 1 polish / remaining GPT audit items (see `TECH_DEBT.md`)
+- [ ] **Preferred after Stage 1 close: AI Economy 1.5** (goal → resource demand → worker assign) — **before T2**
 - [ ] Optional: Zone readability / Zones v1.1 seasonal front
 - [ ] Post–Stage 1: decide v1.0 = T1-only vs T1+T2 (update scope §0)
 
 ## Technical Debt
 
-- [ ] **TD-01** AI build skips player `can_build` / collision — see `Docs/TECH_DEBT.md`
+- [ ] **TD-01** AI build skips player `can_build` / collision — `Docs/TECH_DEBT.md`
+- [ ] **TD-02** AI harvest = stone<50?stone:wood (not demand-driven) → Economy 1.5 — `Docs/TECH_DEBT.md`
 - [ ] EnemySpawner config single source (MatchManager overrides)
 - [ ] Staggered Nav Updates (more urgent with dual economy)
 - [ ] Aggro leashing, data-driven stats, multi-select buildings, MOBILE collision
