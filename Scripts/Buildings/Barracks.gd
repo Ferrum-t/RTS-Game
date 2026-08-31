@@ -192,7 +192,7 @@ func _finish_training() -> void:
 	units_parent.add_child(unit)
 	if unit is BaseUnit:
 		(unit as BaseUnit).team_id = team_id
-	unit.global_position = global_position + spawn_offset
+	unit.global_position = next_spawn_position()
 
 	var label := "unit"
 	if unit is SiegeUnit:
