@@ -2,7 +2,28 @@
 
 Ветка: `nomads-wars-grok`
 
-**Scope:** только `Docs/nomad_wars_v1_scope_and_architecture.md`
+**Scope:** только `Docs/nomad_wars_v1_scope_and_architecture.md`  
+**Tech debt:** `Docs/TECH_DEBT.md`
+
+---
+
+## 2026-08-31 — Stage 1 F5 + GPT audit start
+
+### Code
+
+- Rally: door + farther default offset (12), grid slots, flag on select, RMB set rally.
+- Yellow `BuildingSelectRing` on all `BaseBuilding` (Barracks included).
+- **AI attack spam fixed:** `EconomicAIController` issues army attack **once** at threshold; late joiners get AI only if missing component (`attack reinforcements +N`). Reset when army < threshold.
+
+### Docs
+
+- Created **`Docs/TECH_DEBT.md`**.
+- **TD-01 (open):** AI construction does **not** share player `Ghost.can_build` / collision validation. AI uses `tc + barracks_offset` → `place_building_for_team` (cost/team only). Hand-tuned offset works for Stage 1; not a shared placement pipeline. Fix sketch: shared `can_place` + AI site sampling.
+
+### Next
+
+- Further GPT audit items → TD-02+ in `TECH_DEBT.md` as they arrive.
+- Do not claim “same placement pipeline” until TD-01 closed.
 
 ---
 
