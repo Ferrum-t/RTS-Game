@@ -3,6 +3,7 @@ extends BaseBuilding
 class_name Barracks
 
 ## Military production. Soldiers + Cavalry + SiegeUnit.
+## Spawn at door, walk to rally (WC-style).
 
 @export var soldier_scene: PackedScene
 @export var soldier_cost_wood: int = 80
@@ -17,8 +18,6 @@ class_name Barracks
 @export var siege_cost_wood: int = 150
 @export var siege_cost_stone: int = 50
 @export var siege_train_time: float = 8.0
-
-@export var spawn_offset: Vector3 = Vector3(3.0, 0.0, 0.0)
 
 var is_training: bool = false
 var train_timer: float = 0.0
@@ -190,9 +189,16 @@ func _finish_training() -> void:
 		units_parent = get_tree().current_scene
 
 	units_parent.add_child(unit)
+	var door := get_door_position()
+	unit.global_position = door
+
 	if unit is BaseUnit:
-		(unit as BaseUnit).team_id = team_id
-	unit.global_position = next_spawn_position()
+		var bu := unit as BaseUnit
+		bu.team_id = team_id
+		var dest := get_rally_point()
+		# Tiny scatter so a queue does not sit in one pixel
+		dest += Vector3(randf_range(-0.7, 0.7), 0.0, randf_range(-0.7, 0.7))
+		bu.replace_order_move(dest)
 
 	var label := "unit"
 	if unit is SiegeUnit:
@@ -201,5 +207,5 @@ func _finish_training() -> void:
 		label = "Cavalry"
 	elif unit is Soldier:
 		label = "Soldier"
-	print("Barracks: ", label, " trained at ", unit.global_position)
+	print("Barracks: ", label, " trained at door ", door, " → rally ", get_rally_point())
 	_pending_scene = null
