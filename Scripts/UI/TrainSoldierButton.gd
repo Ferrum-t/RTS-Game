@@ -1,8 +1,9 @@
 extends Button
 
-## Trains a Soldier from the first Barracks (80 wood).
+## Trains a Soldier from the player's Barracks (80 wood).
 
 const COST_WOOD := 80
+const PLAYER_TEAM := 0
 
 
 func _ready() -> void:
@@ -19,7 +20,7 @@ func _on_resources_changed() -> void:
 	var rm := get_node_or_null("/root/ResourceManager")
 	if rm == null:
 		return
-	disabled = not rm.can_afford(ResourceManager.make_cost(COST_WOOD))
+	disabled = not rm.can_afford(ResourceManager.make_cost(COST_WOOD), PLAYER_TEAM)
 
 
 func _on_pressed() -> void:
@@ -30,12 +31,10 @@ func _on_pressed() -> void:
 
 	var barracks = null
 	if bm.has_method("get_first_barracks"):
-		barracks = bm.get_first_barracks()
-	elif "barracks_list" in bm and not bm.barracks_list.is_empty():
-		barracks = bm.barracks_list[0]
+		barracks = bm.get_first_barracks(PLAYER_TEAM)
 
 	if barracks == null:
-		print("Train Soldier: build a Barracks first")
+		print("Train Soldier: build a Barracks first (your team)")
 		return
 
 	if barracks.has_method("try_train_soldier"):
