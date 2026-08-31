@@ -6,7 +6,7 @@ class_name BaseResource
 enum Type { WOOD = 0, STONE = 1, GOLD = 2, FOOD = 3, HORSES = 4 }
 
 @export var resource_type: Type = Type.WOOD
-@export var resource_amount: int = 1500
+@export var resource_amount: int = 2500
 ## NavMesh carve half-extents (XZ). Keeps paths outside physics shape.
 @export var nav_half_extents: Vector3 = Vector3(1.0, 1.0, 1.0)
 
