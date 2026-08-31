@@ -24,16 +24,16 @@ const _UI_MESH_NAMES: Array[String] = [
 
 const HEALTH_BAR_SCENE := preload("res://Scenes/UI/HealthBar3D.tscn")
 
-## Trained units land on a ring around the building (no stacking).
-const SPAWN_RING_SLOTS := 8
-const SPAWN_RING_RADIUS := 3.6
-const SPAWN_RING_STEP := 1.15
-
 @export var team_id: int = 0
 @export var max_health: int = 500
 ## Half-extents of footprint used for NavMesh obstruction (XZ)
 @export var nav_half_extents: Vector3 = Vector3(2.2, 1.0, 2.2)
 @export var health_bar_height: float = 3.2
+
+## WC-style: units appear at door, then walk to rally.
+@export var spawn_offset: Vector3 = Vector3(3.0, 0.0, 0.0)
+## Default rally relative to building when never set by player.
+@export var default_rally_offset: Vector3 = Vector3(6.0, 0.0, 0.0)
 
 @export var tier: int = 1 # 1..3
 @export var tier_modifiers: Array[Dictionary] = [
@@ -72,8 +72,9 @@ var _visual_base_captured: bool = false
 var _raid_loot_total: Dictionary = {}
 var _raid_damage_total: int = 0
 
-## Serial index for ring spawn slots (Barracks / TownCenter training).
-var _spawn_serial: int = 0
+## World-space rally (absolute). Player can move with RMB while building selected.
+var rally_point: Vector3 = Vector3.ZERO
+var _rally_initialized: bool = false
 
 
 func get_current_stat(stat_name: String, base_value: float) -> float:
@@ -94,19 +95,34 @@ func recompute_stats() -> void:
 	_refresh_visual_state()
 
 
-## Next free world position on expanding rings around this building.
-func next_spawn_position() -> Vector3:
-	var slot: int = _spawn_serial % SPAWN_RING_SLOTS
-	var ring: int = int(_spawn_serial / SPAWN_RING_SLOTS)
-	_spawn_serial += 1
-	var angle: float = float(slot) * TAU / float(SPAWN_RING_SLOTS)
-	# Odd rings rotated half-slot so positions interleave.
-	if ring % 2 == 1:
-		angle += TAU / float(SPAWN_RING_SLOTS) * 0.5
-	var radius: float = SPAWN_RING_RADIUS + float(ring) * SPAWN_RING_STEP
-	var pos := global_position + Vector3(cos(angle) * radius, 0.0, sin(angle) * radius)
+## Single exit point (door) in front of the building.
+func get_door_position() -> Vector3:
+	var pos := global_position + spawn_offset
 	pos.y = 0.0
 	return pos
+
+
+func get_rally_point() -> Vector3:
+	if not _rally_initialized:
+		var p := global_position + default_rally_offset
+		p.y = 0.0
+		return p
+	return rally_point
+
+
+func set_rally_point(world_pos: Vector3) -> void:
+	rally_point = world_pos
+	rally_point.y = 0.0
+	_rally_initialized = true
+	print(name, " rally set → ", rally_point)
+
+
+func _init_default_rally() -> void:
+	if _rally_initialized:
+		return
+	rally_point = global_position + default_rally_offset
+	rally_point.y = 0.0
+	_rally_initialized = true
 
 
 func _ready() -> void:
@@ -136,6 +152,7 @@ func _ready() -> void:
 	_setup_health_bar()
 	_capture_visual_base_albedo()
 	_refresh_visual_state()
+	call_deferred("_init_default_rally")
 
 
 func _setup_lootable() -> void:
