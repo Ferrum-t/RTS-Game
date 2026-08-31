@@ -4,7 +4,8 @@ extends Node
 ## Runtime buildings register footprints → debounced NavigationMesh rebake.
 
 const DEBOUNCE_SEC := 0.08
-const MAP_HALF := 50.0
+## Must match visual ground half-extent (World plane ~200×200 → half 100).
+const MAP_HALF := 100.0
 const AGENT_RADIUS := 1.1
 const AGENT_HEIGHT := 1.5
 const DEFAULT_BUILDING_HALF := 2.2
