@@ -106,7 +106,7 @@ func _finish_training() -> void:
 	units_parent.add_child(unit)
 	if unit is BaseUnit:
 		(unit as BaseUnit).team_id = team_id
-	unit.global_position = global_position + spawn_offset
+	unit.global_position = next_spawn_position()
 
 	print("TownCenter: Worker trained team=", team_id, " at ", unit.global_position)
 	_pending_scene = null
