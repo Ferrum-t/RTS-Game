@@ -2,7 +2,8 @@
 
 **Source of truth:** `Docs/nomad_wars_v1_scope_and_architecture.md` §0  
 **Vision (not auto-MVP):** `Docs/12_PROGRESSION_AND_TIER_SYSTEM.md`  
-**Lore vs MVP:** `Docs/LORE_MVP_SCOPE_OVERRIDE.md`
+**Lore vs MVP:** `Docs/LORE_MVP_SCOPE_OVERRIDE.md`  
+**Tech debt detail:** `Docs/TECH_DEBT.md`
 
 ## Current Sprint
 
@@ -15,16 +16,18 @@ Wave Balance Pass is **paused** (15/30/45 data kept; Pressure Test Mode only). D
 - [x] Phases 7–12, Zones v1.0, selection-aware control
 - [x] Doc vision `12_PROGRESSION_AND_TIER_SYSTEM.md` (tiers + Stage 1 definition)
 - [x] Scope §0 Product Scope Under Active Review (2026-08-31)
+- [x] Stage 1 economic loop playable (gather → Barracks → Soldiers → attack; VICTORY/DEFEAT)
+- [x] Door + rally + flag; building select ring; attack-issue once at threshold (TD decision-layer spam fixed)
 
 ## Next
 
-- [ ] **Stage 1 Economic AI** — shared systems; gather → Barracks → Soldier → attack at army size K; no migrate
-- [ ] Optional: Building Health Bar
-- [ ] Zone readability / Zones v1.1 seasonal front
+- [ ] Stage 1 polish / remaining GPT audit items (see `TECH_DEBT.md`)
+- [ ] Optional: Zone readability / Zones v1.1 seasonal front
 - [ ] Post–Stage 1: decide v1.0 = T1-only vs T1+T2 (update scope §0)
 
 ## Technical Debt
 
+- [ ] **TD-01** AI build skips player `can_build` / collision — see `Docs/TECH_DEBT.md`
 - [ ] EnemySpawner config single source (MatchManager overrides)
 - [ ] Staggered Nav Updates (more urgent with dual economy)
 - [ ] Aggro leashing, data-driven stats, multi-select buildings, MOBILE collision
