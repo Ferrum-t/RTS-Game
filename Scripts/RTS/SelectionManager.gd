@@ -13,7 +13,7 @@ const MARKER_VISIBLE_TIME := 0.8
 
 var marker: Node3D = null
 var selected_units: Array[BaseUnit] = []
-## Player MobileBuildings (TC / Watchtower) for individual pack/move/unpack.
+## Player buildings (TC / Watchtower / Barracks) for pack/move/rally.
 var selected_buildings: Array = []
 var _marker_timer: float = 0.0
 
@@ -68,7 +68,7 @@ func add_to_selection(unit: BaseUnit) -> void:
 func select_building(building: Node) -> void:
 	if building == null or not is_instance_valid(building):
 		return
-	if not (building is MobileBuilding):
+	if not (building is BaseBuilding):
 		return
 	if int(building.get("team_id")) != 0:
 		return
@@ -179,8 +179,8 @@ func _unhandled_input(event: InputEvent) -> void:
 				if collider == unit:
 					add_to_selection(unit)
 					return
-			# Player mobile building
-			if collider is MobileBuilding and int(collider.get("team_id")) == 0:
+			# Player building (TC, Watchtower, Barracks…)
+			if collider is BaseBuilding and int(collider.get("team_id")) == 0:
 				select_building(collider)
 				return
 
