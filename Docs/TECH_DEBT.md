@@ -4,7 +4,7 @@
 **Last updated:** 2026-08-31  
 **Related:** `Docs/TODO.md`, `Docs/GROK_WORKLOG.md`, GPT audit vs Stage 1 report
 
-This file is the durable list of **real architectural gaps** (not cosmetics). Revisit before claiming “AI uses the same placement pipeline as the player” or expanding AI construction.
+This file is the durable list of **real architectural gaps** (not cosmetics). Revisit before claiming “AI uses the same placement pipeline as the player” or expanding AI construction / economy.
 
 ---
 
@@ -84,9 +84,102 @@ calculated position (hardcoded offset)
 
 ---
 
-## TD-02 — (reserved)
+## TD-02 — Primitive AI harvest heuristic (stone floor, not demand-driven)
 
-Further GPT/Stage 1 audit items can be appended here as TD-02, TD-03, …
+| Field | Value |
+|--------|--------|
+| **Severity** | Design / Stage 1.5 — **not a code bug** |
+| **Status** | Open (accepted Stage 1 limitation) |
+| **Area** | EconomicAIController worker assignment |
+| **Discovered** | 2026-08-31 (F5 log + GPT audit) |
+
+### What the log shows
+
+After Barracks completes:
+
+```
+wood=100 stone=450
+  → Barracks cost 100W + 50S
+wood=0   stone=400
+```
+
+Then repeatedly:
+
+```
+Barracks: not enough wood for Soldier (need 80) team=1
+```
+
+Wood recovers only gradually while stone stock is already huge.
+
+### Current algorithm (implementation is correct relative to itself)
+
+In `EconomicAIController._pick_resource_for_worker`:
+
+```
+Stone stock < 50  → prefer stone nodes
+Stone stock >= 50 → prefer non-stone (wood path)
+```
+
+Workers are **not** told “next production needs 80 wood”. They only see a static stone floor.
+
+So after a big stone buffer exists, assignment *should* go to wood — but:
+
+1. Barracks just drained **all** wood in one spend.
+2. Workers may still be mid-trip on stone (orders not interrupted).
+3. There is no **goal stack** that says: production target = Soldier → deficit = wood → assign N workers to wood until `can_afford(Soldier)`.
+
+Result: idle decision layer keeps trying `try_train_soldier` every tick while economy is wood-starved; looks broken in the log, but matches the heuristic.
+
+### Verdict
+
+- **Not** a bug in spend/train/team stockpiles.
+- **Is** too primitive for a convincing opponent once Barracks exists.
+- Next product step should be **AI Economy 1.5**, **not T2 content**.
+
+### Target model (Economy 1.5)
+
+```
+BUILDING_GOAL          e.g. ensure Barracks exists
+    ↓
+PRODUCTION_GOAL        e.g. soldiers until attack_threshold
+    ↓
+RESOURCE_REQUIREMENT   e.g. Soldier cost → wood deficit 80
+    ↓
+WORKER_ASSIGNMENT      assign idle (and optionally reassign) to cover deficit
+```
+
+Replace:
+
+```
+stone < 50 ? stone : wood
+```
+
+with demand derived from the active goal (train Worker / train Soldier / save for Barracks / maintain buffer).
+
+### Minimal incremental options (if we patch before full 1.5)
+
+1. After Barracks exists and `wood < soldier_cost`: force all idle workers to wood (ignore stone floor).
+2. Soft reassign: if wood deficit and worker is harvesting stone with bag empty, cancel → wood.
+3. Log once: `[AI_ECO] wood deficit for Soldier need=80 have=…` to separate “trying” from spam.
+
+Full goal stack is preferred long-term so Horses / multi-building costs don’t need special cases forever.
+
+### Code anchors
+
+- `Scripts/AI/EconomicAIController.gd` → `_pick_resource_for_worker`, `_assign_idle_workers`, `_think` train/build order
+- Soldier / Barracks costs in building & unit data / try_train_* 
+
+### Explicit non-goals for this TD
+
+- Player economy changes
+- T2 units/buildings
+- Perfect WC-level build orders
+
+---
+
+## TD-03 — (reserved)
+
+Further GPT/Stage 1 audit items → TD-03+
 
 ---
 
