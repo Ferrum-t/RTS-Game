@@ -16,7 +16,7 @@ enum UnitState
 
 
 @export var team_id: int = 0
-@export var move_speed := 4.0
+@export var move_speed := 2.0
 @export var max_health := 100
 @export var deposit_distance := 3.5
 @export var attack_damage := 10
