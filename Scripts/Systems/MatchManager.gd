@@ -25,9 +25,10 @@ const WATCHTOWER_SCENE := preload("res://Scenes/Buildings/Watchtower.tscn")
 const SOLDIER_SCENE := preload("res://Scenes/Units/soldier.tscn")
 const WORKER_SCENE := preload("res://Scenes/Units/worker.tscn")
 
-const PLAYER_TC_POS := Vector3(2.0, 0.0, -2.0)
+## Bases spread on 200×200 map. Target TC–TC distance ~75 (was ~24).
+const PLAYER_TC_POS := Vector3(28.0, 0.0, -22.0)
 const PLAYER_WATCHTOWER_OFFSET := Vector3(0.0, 0.0, 6.0)
-const ENEMY_TC_POS := Vector3(-18.0, 0.0, 12.0)
+const ENEMY_TC_POS := Vector3(-28.0, 0.0, 28.0)
 const ENEMY_WORKER_OFFSETS := [
 	Vector3(2.5, 0.0, 1.0),
 	Vector3(3.5, 0.0, -1.0),
@@ -85,7 +86,11 @@ func _setup_match() -> void:
 		eco.name = "EconomicAIController"
 		eco.team_id = 1
 		scene.add_child(eco)
+		var dx: float = ENEMY_TC_POS.x - PLAYER_TC_POS.x
+		var dz: float = ENEMY_TC_POS.z - PLAYER_TC_POS.z
+		var tc_dist: float = sqrt(dx * dx + dz * dz)
 		print("MATCH: PLAYING Stage1 Economic AI (team1 TC+workers, waves OFF)")
+		print("MAP: PlayerTC=", PLAYER_TC_POS, " EnemyTC=", ENEMY_TC_POS, " distance=", snappedf(tc_dist, 0.1))
 	else:
 		var soldier: Node3D = SOLDIER_SCENE.instantiate()
 		soldier.name = "EnemySoldier_0"
