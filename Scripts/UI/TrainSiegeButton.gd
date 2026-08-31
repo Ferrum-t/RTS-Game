@@ -1,9 +1,10 @@
 extends Button
 
-## Trains a SiegeUnit from the first Barracks (150 wood + 50 stone).
+## Trains a SiegeUnit from the player's Barracks (150 wood + 50 stone).
 
 const COST_WOOD := 150
 const COST_STONE := 50
+const PLAYER_TEAM := 0
 
 
 func _ready() -> void:
@@ -20,7 +21,10 @@ func _on_resources_changed() -> void:
 	var rm := get_node_or_null("/root/ResourceManager")
 	if rm == null:
 		return
-	disabled = not rm.can_afford(ResourceManager.make_cost(COST_WOOD, COST_STONE))
+	disabled = not rm.can_afford(
+		ResourceManager.make_cost(COST_WOOD, COST_STONE),
+		PLAYER_TEAM
+	)
 
 
 func _on_pressed() -> void:
@@ -31,12 +35,10 @@ func _on_pressed() -> void:
 
 	var barracks = null
 	if bm.has_method("get_first_barracks"):
-		barracks = bm.get_first_barracks()
-	elif "barracks_list" in bm and not bm.barracks_list.is_empty():
-		barracks = bm.barracks_list[0]
+		barracks = bm.get_first_barracks(PLAYER_TEAM)
 
 	if barracks == null:
-		print("Train Siege: build a Barracks first")
+		print("Train Siege: build a Barracks first (your team)")
 		return
 
 	if barracks.has_method("try_train_siege"):
