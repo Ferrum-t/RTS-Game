@@ -4,7 +4,7 @@
 **Last updated:** 2026-08-31  
 **Related:** `Docs/TODO.md`, `Docs/GROK_WORKLOG.md`, GPT audit vs Stage 1 report
 
-This file is the durable list of **real architectural gaps** (not cosmetics). Revisit before claiming “AI uses the same placement pipeline as the player” or expanding AI construction / economy.
+This file is the durable list of **real architectural gaps** (not cosmetics). Revisit before claiming “AI uses the same placement pipeline as the player” or expanding AI construction / economy / victory rules.
 
 ---
 
@@ -177,9 +177,77 @@ Full goal stack is preferred long-term so Horses / multi-building costs don’t 
 
 ---
 
-## TD-03 — (reserved)
+## TD-03 — Residual AI economy after Town Center death
 
-Further GPT/Stage 1 audit items → TD-03+
+| Field | Value |
+|--------|--------|
+| **Severity** | Design / victory-rules coupling — **do not fix in Stage 1** |
+| **Status** | Open (accepted Stage 1 behavior) |
+| **Area** | Match end / harvest drop-off / production without TC |
+| **Discovered** | 2026-08-31 (F5 log + GPT audit) |
+
+### What the log shows
+
+```
+EnemyTownCenter destroyed
+AIWorker_0 — no own-team Town Center found, keeping inventory
+```
+
+Correct for current rules: deposit target is team TC; TC is gone → worker keeps bag.
+
+### Mechanical chain that remains possible
+
+```
+AI TC destroyed
+    ↓
+AI workers still alive (no auto-despawn)
+    ↓
+Barracks still alive
+    ↓
+Soldiers can still be trained (if stockpile / queue allows)
+    ↓
+Combat AI can still fight
+```
+
+There is **no** automatic “economy dead” or “faction eliminated” gate on worker/Barracks merely because TC died. Drop-off is broken; production and army are not necessarily.
+
+### Why Stage 1 is fine
+
+Current match end (observed in F5): victory/defeat when the decisive buildings are gone (TC destroy path ends the match via `MatchManager`). Party stops before residual AI economy matters.
+
+### When this becomes a real problem
+
+Any **richer victory condition**, for example:
+
+- “Destroy all military production” but not TC-only
+- “Kill all units” while buildings remain
+- Timed / score / migration objectives where TC loss ≠ instant end
+- Multiple TCs / rebuild TC from Barracks fantasy
+
+Then residual Barracks + stockpile + workers can look like a cheesy partial survival or soft lock (workers never deposit).
+
+### Possible future policies (pick when victory design changes)
+
+1. **Hard eliminate team** when last TC dies: stop `EconomicAIController` for that team, cancel training, optional worker despawn or convert to neutral.
+2. **Soft economy death:** no train without TC; workers idle; Barracks inert until new TC.
+3. **Alternate drop-off:** deposit at Barracks / any team building (changes economy design).
+4. **Rebuild path:** allow TC reconstruct — then residual workers are intentional.
+
+### Explicit decision for now
+
+**Do not implement a fix in Stage 1.** Document only. Revisit when victory conditions leave “TC destroy = match over”.
+
+### Code anchors
+
+- Worker return / deposit when no team TC (log line above)
+- `EconomicAIController._team_town_center()` early-outs vs `_team_barracks()` still training
+- `MatchManager` win/loss triggers
+
+---
+
+## TD-04 — (reserved)
+
+Further GPT/Stage 1 audit items → TD-04+
 
 ---
 
