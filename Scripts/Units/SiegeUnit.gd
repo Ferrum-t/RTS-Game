@@ -12,7 +12,7 @@ func _ready() -> void:
 	attack_range = 2.8
 	attack_cooldown = 1.4
 	building_attack_range = 7.0
-	move_speed = 1.5
+	move_speed = 1.8
 	health_bar_height = 1.5
 	can_gather = false
 	damage_type = DamageType.Type.SIEGE
