@@ -4,11 +4,11 @@ class_name TownCenter
 
 ## Economy hub. Trains Workers only while DEPLOYED.
 ## Phase 8.2: DeploymentConfig preset_town_center().
+## Spawn at door, walk to rally (WC-style).
 
 @export var worker_scene: PackedScene
 @export var worker_cost_wood: int = 50
 @export var worker_train_time: float = 3.0
-@export var spawn_offset: Vector3 = Vector3(3.0, 0.0, 0.0)
 
 var is_training: bool = false
 var train_timer: float = 0.0
@@ -104,11 +104,17 @@ func _finish_training() -> void:
 		units_parent = get_tree().current_scene
 
 	units_parent.add_child(unit)
-	if unit is BaseUnit:
-		(unit as BaseUnit).team_id = team_id
-	unit.global_position = next_spawn_position()
+	var door := get_door_position()
+	unit.global_position = door
 
-	print("TownCenter: Worker trained team=", team_id, " at ", unit.global_position)
+	if unit is BaseUnit:
+		var bu := unit as BaseUnit
+		bu.team_id = team_id
+		var dest := get_rally_point()
+		dest += Vector3(randf_range(-0.7, 0.7), 0.0, randf_range(-0.7, 0.7))
+		bu.replace_order_move(dest)
+
+	print("TownCenter: Worker trained team=", team_id, " door=", door, " → rally ", get_rally_point())
 	_pending_scene = null
 
 
