@@ -55,16 +55,27 @@ func get_nearest_town_center(from_position: Vector3, team_filter: int = -1):
 			nearest = tc
 	return nearest
 
-func get_first_barracks():
+## team_filter < 0 → any; otherwise only matching team_id.
+func get_first_barracks(team_filter: int = -1):
 	for b in barracks_list:
-		if b != null and is_instance_valid(b):
-			return b
+		if b == null or not is_instance_valid(b):
+			continue
+		if b.get("is_destroyed") == true:
+			continue
+		if team_filter >= 0 and int(b.team_id) != team_filter:
+			continue
+		return b
 	return null
 
-func get_first_watchtower():
+func get_first_watchtower(team_filter: int = -1):
 	for w in watchtowers_list:
-		if w != null and is_instance_valid(w):
-			return w
+		if w == null or not is_instance_valid(w):
+			continue
+		if w.get("is_destroyed") == true:
+			continue
+		if team_filter >= 0 and int(w.team_id) != team_filter:
+			continue
+		return w
 	return null
 
 func get_all_buildings() -> Array:
