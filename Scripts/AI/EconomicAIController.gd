@@ -13,6 +13,7 @@ class_name EconomicAIController
 
 var _timer: float = 0.0
 var _barracks_data: BuildingData = null
+## True after we first crossed attack_threshold; reset when army falls below.
 var _attack_issued: bool = false
 
 
@@ -74,10 +75,18 @@ func _think() -> void:
 	soldiers = _team_soldiers()
 	if soldiers.size() >= attack_threshold:
 		if not _attack_issued:
+			# First time army crosses threshold — one decision, one log line.
 			print("[AI_ECO] attack threshold reached army=", soldiers.size())
 			_attack_issued = true
-		_issue_army_attack(soldiers)
+			var n: int = _attach_ai_to_army(soldiers)
+			print("[AI_ECO] attack issued on ", n, " soldiers")
+		else:
+			# Late-trained soldiers after the wave started: attach only if missing AI.
+			var n: int = _attach_ai_to_army(soldiers)
+			if n > 0:
+				print("[AI_ECO] attack reinforcements +", n)
 	else:
+		# Army collapsed below threshold — allow a future re-issue.
 		_attack_issued = false
 
 
@@ -150,15 +159,25 @@ func _pick_resource_for_worker(u: BaseUnit) -> BaseResource:
 	return null
 
 
-func _issue_army_attack(soldiers: Array) -> void:
+## Attach EnemyAIComponent only to soldiers that lack it. Returns how many were newly attached.
+func _attach_ai_to_army(soldiers: Array) -> int:
+	var newly: int = 0
 	for s in soldiers:
 		if not (s is BaseUnit):
 			continue
 		var u := s as BaseUnit
 		if u.unit_state == BaseUnit.UnitState.DEAD:
 			continue
+		var had_ai := false
+		for c in u.get_children():
+			if c is EnemyAIComponent:
+				had_ai = true
+				break
+		if had_ai:
+			continue
 		EnemyAIComponent.attach_to(u, 24.0)
-	print("[AI_ECO] attack issued on ", soldiers.size(), " soldiers")
+		newly += 1
+	return newly
 
 
 func _team_town_center() -> BaseBuilding:
