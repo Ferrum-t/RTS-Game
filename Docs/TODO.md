@@ -29,7 +29,8 @@ Wave Balance Pass is **paused** (15/30/45 data kept; Pressure Test Mode only). D
 ## Technical Debt
 
 - [ ] **TD-01** AI build skips player `can_build` / collision — `Docs/TECH_DEBT.md`
-- [ ] **TD-02** AI harvest = stone<50?stone:wood (not demand-driven) → Economy 1.5 — `Docs/TECH_DEBT.md`
+- [ ] **TD-02** AI harvest heuristic → Economy 1.5 — `Docs/TECH_DEBT.md`
+- [ ] **TD-03** Residual AI (workers/Barracks) after TC death — Stage 1 OK, revisit with new victory rules — `Docs/TECH_DEBT.md`
 - [ ] EnemySpawner config single source (MatchManager overrides)
 - [ ] Staggered Nav Updates (more urgent with dual economy)
 - [ ] Aggro leashing, data-driven stats, multi-select buildings, MOBILE collision
