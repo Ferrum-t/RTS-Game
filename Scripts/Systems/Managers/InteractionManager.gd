@@ -61,11 +61,23 @@ func handle_right_click(
 		command_manager.issue_move(selected_units, world_position)
 		return
 
-	# Buildings selected → move only those MOBILE ones (individual control).
+	# Buildings selected → rally (production) or move (mobile).
 	if not selected_buildings.is_empty():
 		if collider is BaseUnit or collider is BaseResource or collider is BaseBuilding:
 			return
-		_try_move_mobile_list(selected_buildings, world_position)
+		var mobiles: Array = []
+		for b in selected_buildings:
+			if b == null or not is_instance_valid(b):
+				continue
+			# MOBILE caravan buildings still move on RMB.
+			if _is_movable_player_building(b):
+				mobiles.append(b)
+				continue
+			# Deployed TC / Barracks / static buildings with rally → set rally.
+			if b.has_method("set_rally_point"):
+				b.set_rally_point(world_position)
+		if not mobiles.is_empty():
+			_try_move_mobile_list(mobiles, world_position)
 		return
 
 	# Nothing selected → whole caravan (all player MOBILE).
