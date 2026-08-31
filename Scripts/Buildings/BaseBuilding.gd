@@ -20,6 +20,7 @@ const _UI_MESH_NAMES: Array[String] = [
 	"AttackRangeRing",
 	"HealthBar3D",
 	"SelectionRing",
+	"BuildingSelectRing",
 	"RallyFlag",
 ]
 
@@ -85,6 +86,8 @@ var _rally_slot: int = 0
 ## Visible rally flag (player buildings only, when selected).
 var _rally_flag: Node3D = null
 var _building_selected: bool = false
+## Yellow ground ring when selected (Barracks, TC, towers…).
+var _select_ring: MeshInstance3D = null
 
 
 func get_current_stat(stat_name: String, base_value: float) -> float:
@@ -148,6 +151,8 @@ func set_rally_point(world_pos: Vector3) -> void:
 
 func set_building_selected(value: bool) -> void:
 	_building_selected = value
+	if _select_ring != null and is_instance_valid(_select_ring):
+		_select_ring.visible = value
 	if _rally_flag != null and is_instance_valid(_rally_flag):
 		_rally_flag.visible = value and team_id == 0
 		if value:
@@ -163,6 +168,31 @@ func _init_default_rally() -> void:
 	_rally_initialized = true
 	_rally_slot = 0
 	_update_rally_flag()
+
+
+func _setup_select_ring() -> void:
+	if _select_ring != null:
+		return
+	_select_ring = MeshInstance3D.new()
+	_select_ring.name = "BuildingSelectRing"
+	var he: float = maxf(nav_half_extents.x, nav_half_extents.z) + 0.45
+	var torus := TorusMesh.new()
+	torus.inner_radius = he
+	torus.outer_radius = he + 0.28
+	torus.rings = 10
+	torus.ring_segments = 36
+	_select_ring.mesh = torus
+	var mat := StandardMaterial3D.new()
+	mat.albedo_color = Color(1.0, 0.85, 0.15, 0.9)
+	mat.emission_enabled = true
+	mat.emission = Color(0.95, 0.8, 0.15)
+	mat.emission_energy_multiplier = 1.1
+	mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+	mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	_select_ring.material_override = mat
+	_select_ring.position = Vector3(0.0, 0.08, 0.0)
+	_select_ring.visible = false
+	add_child(_select_ring)
 
 
 func _setup_rally_flag() -> void:
@@ -255,6 +285,7 @@ func _ready() -> void:
 		nav.register_building(self, nav_half_extents)
 
 	_setup_health_bar()
+	_setup_select_ring()
 	_setup_rally_flag()
 	_capture_visual_base_albedo()
 	_refresh_visual_state()
