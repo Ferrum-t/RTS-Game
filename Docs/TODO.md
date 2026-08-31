@@ -3,34 +3,36 @@
 **Source of truth:** `Docs/nomad_wars_v1_scope_and_architecture.md` §0  
 **Vision (not auto-MVP):** `Docs/12_PROGRESSION_AND_TIER_SYSTEM.md`  
 **Lore vs MVP:** `Docs/LORE_MVP_SCOPE_OVERRIDE.md`  
-**Tech debt detail:** `Docs/TECH_DEBT.md`
+**Tech debt detail:** `Docs/TECH_DEBT.md`  
+**Live status:** `Docs/CURRENT_STATE.md`
 
 ## Current Sprint
 
-**Active:** **Stage 1 — Simple Economic AI Opponent (T1 only, no AI migration)**
+**Stage 1 — Simple Economic AI Opponent:** **practically confirmed (F5)**. Formal sign-off optional.
 
-Wave Balance Pass is **paused** (15/30/45 data kept; Pressure Test Mode only). Do not prioritize further interval tuning until Stage 1 F5 result.
+Wave Balance Pass remains **paused** (Pressure Test Mode only).
 
 ### Done
 
-- [x] Phases 7–12, Zones v1.0, selection-aware control
+- [x] Phases 7–12, Zones v1.0 visuals, selection-aware control
 - [x] Doc vision `12_PROGRESSION_AND_TIER_SYSTEM.md` (tiers + Stage 1 definition)
-- [x] Scope §0 Product Scope Under Active Review (2026-08-31)
-- [x] Stage 1 economic loop playable (gather → Barracks → Soldiers → attack; VICTORY/DEFEAT)
-- [x] Door + rally + flag; building select ring; attack-issue once at threshold (TD decision-layer spam fixed)
+- [x] Stage 1 economic loop (gather → Barracks → Soldiers → attack; VICTORY/DEFEAT)
+- [x] Door + rally + flag; building select ring; attack-issue once at threshold
+- [x] GPT audit documented (TD-01…04); CURRENT_STATE synced
 
 ## Next
 
-- [ ] Stage 1 polish / remaining GPT audit items (see `TECH_DEBT.md`)
-- [ ] **Preferred after Stage 1 close: AI Economy 1.5** (goal → resource demand → worker assign) — **before T2**
-- [ ] Optional: Zone readability / Zones v1.1 seasonal front
+- [ ] **AI Economy 1.5** (goal → resource demand → worker assign) — **before T2** (TD-02)
+- [ ] Optional: TD-01 shared `can_place` for AI builds
+- [ ] Optional: Zone Stage B (harvest multiplier) — **not** AI-driven yet
 - [ ] Post–Stage 1: decide v1.0 = T1-only vs T1+T2 (update scope §0)
 
 ## Technical Debt
 
-- [ ] **TD-01** AI build skips player `can_build` / collision — `Docs/TECH_DEBT.md`
+- [ ] **TD-01** AI build skips player `can_build` — `Docs/TECH_DEBT.md`
 - [ ] **TD-02** AI harvest heuristic → Economy 1.5 — `Docs/TECH_DEBT.md`
-- [ ] **TD-03** Residual AI (workers/Barracks) after TC death — Stage 1 OK, revisit with new victory rules — `Docs/TECH_DEBT.md`
+- [ ] **TD-03** Residual AI after TC death — Stage 1 OK — `Docs/TECH_DEBT.md`
+- [ ] **TD-04** TeamRules `UNIT_STATE_DEAD := 6` fragile — `Docs/TECH_DEBT.md`
 - [ ] EnemySpawner config single source (MatchManager overrides)
 - [ ] Staggered Nav Updates (more urgent with dual economy)
 - [ ] Aggro leashing, data-driven stats, multi-select buildings, MOBILE collision
