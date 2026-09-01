@@ -41,11 +41,33 @@ No log after a code commit → item stays **open** even if the patch looks corre
 
 When a symptom is clear (example: irreversible `stone < 50 ? stone : wood`):
 
-1. **First** — smallest change that removes the failure mode (dual floor / alternate).  
+1. **First** — smallest change that removes the **observed** failure mode (e.g. dual floor / alternate).  
 2. **F5** against written criteria.  
-3. **Only then** — larger model (BUILDING_GOAL → REQUIREMENT → DEFICIT → assign) if still needed.
+3. **Only then** — larger model (BUILDING_GOAL → REQUIREMENT → DEFICIT → assign) **if F5 shows the narrow fix is not enough**.
 
 **Rule:** do not build Economy 1.5 (or any big framework) on top of an unfixed structural hole or an unproven hypothesis.
+
+### §3 amendment — symptom ≠ license for full system
+
+Finding a bug that *looks like* it needs a full architecture is **not** sufficient reason to jump straight to designing that architecture.
+
+| Step | Required |
+|------|----------|
+| 1 | Minimal **narrow** fix for the **exact defect in the log** (not the whole problem class) |
+| 2 | F5 of that narrow fix |
+| 3 | Only if F5 proves the hole is still structural → design the larger system |
+
+Diagnosing the same hole in two logs justifies a **targeted** fix and measurement. It does **not** automatically justify the **maximum** solution volume.
+
+Skipping the cheap check and going straight to the fullest model is the same anti-pattern as “several variables in one patch” — applied to **feature scope** instead of numbers.
+
+**Project example (AI harvest):**
+
+- Defect: `stone < 50 ? stone : wood` switched once and never returned to stone; stone climbed to 2450+ while AI could not afford Worker/Soldier (two independent F5 logs).
+- **Correct next step:** dual-floor / cyclic check (both thresholds every assign), F5 — **not** immediately “AI Economy 1.5” (goal → deficit → assignment).
+- **After F5:** if irreversible stick is gone and production works → full Economy 1.5 may be **deferred** until T2 / richer goal trees force it. If F5 still shows systematic failure under real goals → then design Economy 1.5 with facts, not assumptions.
+
+Cite as: `ACCEPTANCE_AND_PROCESS.md §3` / `§3 amendment`.
 
 ---
 
@@ -112,6 +134,7 @@ In chat or PR descriptions:
 ```text
 See Docs/ACCEPTANCE_AND_PROCESS.md §1 (Definition of Done)
 See Docs/ACCEPTANCE_AND_PROCESS.md §3 (narrow fix before big system)
+See Docs/ACCEPTANCE_AND_PROCESS.md §3 amendment (symptom ≠ full system)
 See Docs/ACCEPTANCE_AND_PROCESS.md §5 (repo fact vs chat lore)
 ```
 
@@ -136,13 +159,15 @@ Applied successfully on this branch:
 | Item | Process outcome |
 |------|-----------------|
 | Attack issue spam | Code fix → F5 showed one threshold/issued + reinforcements |
-| Dual stock floor harvest | Narrow fix only → F5 wood recovery; not full Economy 1.5 |
+| Dual stock floor harvest | Narrow fix only → F5 wood recovery, soldiers trained; **not** full Economy 1.5 |
 | TD-01 placement pipeline | Documented, not rewritten |
 | TD-03 post-TC residual AI | Accepted Stage 1 behavior, no code |
 | Zones economic effect | Explicitly deferred |
+
+**Economy 1.5 decision (per §3 amendment):** dual-floor F5 reduced irreversible stick. Full goal→deficit model remains **optional / later** unless a new F5 shows systematic failure under real production goals. Do not start T2 to “need” a bigger AI economy first.
 
 Use as a pattern, not as a freeze on future design.
 
 ---
 
-*Last updated: 2026-09-01 — extracted from recurring Claude/process audits so any chat can link one URL instead of re-deriving the rules.*
+*Last updated: 2026-09-01 — §3 amendment (Claude): symptom ≠ license for full system; dual-floor path recorded.*
