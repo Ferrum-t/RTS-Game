@@ -118,9 +118,80 @@ opponent conflict (same region → eco-war without replacing TC victory)
 
 ---
 
-#### Q2 — (open) When do resources become scarce or wrong-typed near the home base?
+#### Q2 — When do resources become scarce or wrong-typed near the home base?
 
-*(Analysis exists in design chat; not yet recorded in this file.)*
+**Status:** **DESIGN DECISION** (2026-09-01)
+
+**Consistency with Q1 / Q3:** OK — zone stays flow; depletion stays stock and is not a migration clock; distance tax preserved; migration optional; economic scarcity is not Economy 1.5.
+
+**Scarcity model:**
+
+| Type | Meaning |
+|------|--------|
+| **Physical depletion** | Node/cluster amount → 0 (local end of stock) |
+| **Spatial scarcity** | Useful stock still exists on the map, but the next cluster is far |
+| **Wrong-typed geography** | Nearby stock is abundant but poorly matched to the current plan (e.g. stone-rich home, wood-hungry army) |
+| **Economic scarcity** | Felt tempo gap: income vs current production demand — **observed result**, not a separate deficit/goals subsystem |
+
+**Home region:** initially strong working region / starting reserve — **not** an infinite safe income bubble and **not** a timed eviction.
+
+**Primary mid-game pressure:** the **cheap** working region next to the settlement becomes insufficient (empty, far next cluster, and/or wrong mix). Player must decide **where and what** to extract next — not press a forced Migration command.
+
+**Orthogonal factors (do not collapse into one meter):**
+
+```
+DEPLETION  = stock
+ZONE       = flow efficiency     (Q1)
+DISTANCE   = logistics cost      (Q1 constraint — remote harvest always pays tax)
+OPPONENT   = territorial pressure
+SETTLEMENT = production / deposit / defense anchor
+```
+
+No zone-driven amount wipe. Zones do not become depletion.
+
+**After local pressure / depletion — multiple valid answers:**
+
+```
+endure → switch local type → remote harvest → contest → optional migration
+```
+
+- Full local physical depletion is **allowed** and **survivable** (not economic game-over).
+- Remote harvesting remains a real trade-off because of **distance tax**.
+- **Migration** only when **persistent structural mismatch**: remote-as-normal and cumulative logistics / defense / production tax exceed relocation cost. Never automatic on empty home. Never hard depletion timer. Never forced migration.
+
+**Wrong-typed geography (Nomad-specific):** a still-healthy home of the *wrong* mix can push spatial decisions as strongly as an empty home of the *right* mix.
+
+**Resource types:** same depletion rules for Wood / Stone / Horses; different strategic weight (wood often drives T1 army tempo; stone buildings; horses spatial prize without gating all T1). **No new resources (including Gold) for Q2.**
+
+**Canonical causal chain (Q2):**
+
+```
+resource state
+(empty nearby / far next cluster / wrong mix / slow effective income)
+↓
+player economic situation
+(tempo vs current plan)
+↓
+strategic mismatch
+(region no longer supports the plan efficiently)
+↓
+available choices
+(endure / switch / remote / contest / optional migrate)
+↓
+risk
+(tempo / exposure / army split / migration downtime)
+↓
+payoff
+(restore tempo / secure resource type / deny enemy / better long-term anchor)
+↓
+territorial conflict and/or optional migration pressure
+```
+
+**Final design rule (Q2):**
+
+> Resources can become locally scarce or geographically wrong for the player's current plan. This changes the value of the working region, but never commands migration. Local depletion is survivable; spatial distance, resource mismatch, ecological efficiency, and opponent pressure determine whether another region becomes worth pursuing. Migration remains an optional response to persistent structural mismatch, not to depletion alone.
+
+**Not required by Q2:** Economy 1.5, AI migration, T2, hard depletion timer, forced migration, zone-driven amount depletion, Gold/new resources, new victory conditions, capture points.
 
 ---
 
@@ -248,7 +319,9 @@ Stage 1 foundation is solid enough to **design** mid-game without rewriting the 
 | Question | Status |
 |----------|--------|
 | Q1 Zones | **DESIGN ACCEPTED** |
-| Q2 Scarcity / wrong-typed | **Open in file** (chat analysis done; not yet recorded) |
+| Q2 Scarcity / wrong-typed | **DESIGN ACCEPTED** |
 | Q3 Depletion | **DESIGN ACCEPTED** |
 
-*Created 2026-09-01 after Stage 1 formal sign-off. Q3 recorded 2026-09-01.*
+Environment & resources block (Q1–Q3) forms one system: zone = flow, depletion = stock, scarcity includes spatial + wrong-typed, migration only via optional structural mismatch.
+
+*Created 2026-09-01 after Stage 1 formal sign-off. Q1–Q3 recorded 2026-09-01.*
