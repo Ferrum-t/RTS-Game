@@ -1,35 +1,33 @@
 # TODO
 
 **Source of truth:** `Docs/nomad_wars_v1_scope_and_architecture.md` §0  
-**Vision (not auto-MVP):** `Docs/12_PROGRESSION_AND_TIER_SYSTEM.md`  
-**Lore vs MVP:** `Docs/LORE_MVP_SCOPE_OVERRIDE.md`  
-**Tech debt detail:** `Docs/TECH_DEBT.md`  
-**Live status:** `Docs/CURRENT_STATE.md`  
-**How we accept work:** `Docs/ACCEPTANCE_AND_PROCESS.md` (§3 amendment: symptom ≠ full system)
+**Live status + balance snapshot:** `Docs/CURRENT_STATE.md`  
+**Process:** `Docs/ACCEPTANCE_AND_PROCESS.md`  
+**Stage 1.5 design:** `Docs/STAGE_1_5_GAMEPLAY.md`  
+**Tech debt:** `Docs/TECH_DEBT.md`
 
 ## Current Sprint
 
-**Stage 1** — practically confirmed (F5). Formal sign-off optional.
+**Stage 1 — ACCEPTED (2026-09-01).**  
+**Next:** Stage 1.5 **Gameplay Design** (why play after T1 stabilizes) — design only.
 
 ### Done
 
-- [x] Stage 1 economic loop + attack once + door/rally
-- [x] Dual stock-floor harvest (narrow fix; F5 wood recovery)
-- [x] `ACCEPTANCE_AND_PROCESS.md` + §3 amendment
+- [x] Stage 1 core loop + formal sign-off
+- [x] Attack once + dual-floor + F5
+- [x] Balance snapshot in `CURRENT_STATE.md`
+- [x] `STAGE_1_5_GAMEPLAY.md` framing opened
 
 ## Next
 
-- [ ] Canonical balance numbers in `CURRENT_STATE` (TC coords, amounts, speeds)
-- [ ] **AI Economy 1.5 design** — **only if** dual-floor F5 still insufficient (see §3 amendment); else defer until T2 needs richer goals
-- [ ] Optional: TD-01 shared `can_place`
-- [ ] Optional: Zone Stage B harvest — not AI-driven
-- [ ] Post–Stage 1: T1-only vs T1+T2 — **after** economy reassessment; **no T2 now**
+- [ ] Fill Stage 1.5 causal chain / open questions in `STAGE_1_5_GAMEPLAY.md` (chat design OK; commit conclusions to that file)
+- [ ] Only if design demands it: Economy 1.5 or zone Stage B or migration — with written need
+- [ ] T2 — blocked until 1.5 design says why
 
-## Technical Debt
+## Technical Debt (later)
 
-- [ ] **TD-01** AI build skips `can_build` — `TECH_DEBT.md`
-- [ ] **TD-02** Full Economy 1.5 — optional after dual-floor; not auto-next
-- [ ] **TD-03** Residual AI after TC death — Stage 1 OK
-- [ ] **TD-04** TeamRules `DEAD := 6`
-- [ ] EnemySpawner config single source
-- [ ] Staggered Nav Updates / aggro leashing / MOBILE collision / multi-select buildings
+- [ ] TD-01 shared `can_place`
+- [ ] TD-02 Economy 1.5 (optional)
+- [ ] TD-03 residual AI after TC
+- [ ] TD-04 TeamRules DEAD const
+- [ ] EnemySpawner config / nav stagger / aggro / MOBILE collision / multi-select buildings
