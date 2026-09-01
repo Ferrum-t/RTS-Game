@@ -114,18 +114,93 @@ payoff (better trips, deny enemy tempo, durable region, optional better anchor)
 opponent conflict (same region → eco-war without replacing TC victory)
 ```
 
-**Still open under Environment & resources (not decided here):**
-
-- When do resources become **scarce or wrong-typed** near the home base?
-- Is depletion a soft timer toward migration, or a hard local collapse?
-
 **Not required by Q1 alone:** Economy 1.5, T2, AI migration, new resources, new win conditions, hard collapse, capture-point scoring, zone→harvest **implementation** (design direction only; Stage B code later when tasked).
 
 ---
 
 #### Q2 — (open) When do resources become scarce or wrong-typed near the home base?
 
-#### Q3 — (open) Is depletion a soft timer toward migration, or a hard local collapse?
+*(Analysis exists in design chat; not yet recorded in this file.)*
+
+---
+
+#### Q3 — Is depletion a soft timer toward migration, or a hard local collapse?
+
+**Status:** **DESIGN DECISION** (2026-09-01)
+
+**Core constraint:** **Depletion ≠ migration clock.**
+
+| Model | Verdict |
+|--------|--------|
+| Hard local collapse (`home empty → must migrate`) | **Rejected** — survival timer, low agency, snowball, scripted nomad |
+| Soft-timer-toward-migration framing | **Rejected as framing** — still timer-shaped if migrate is the expected end of depletion |
+| **Depletion as pressure on working-region value** | **Accepted** |
+
+**What depletion is:** one input that lowers extract value of a region (stock left). It does **not** command “Migrate.”
+
+**What depletion is not:** a soft or hard survival timer; a direct parent of migration; global eco collapse when a local cluster hits 0.
+
+**Orthogonal axes (keep separate):**
+
+```
+DEPLETION  = stock left on nodes/cluster
+ZONE       = flow efficiency now          (Q1)
+DISTANCE   = logistics tax                (Q1 constraint)
+SETTLEMENT = production / deposit / defense anchor
+OPPONENT   = contest pressure
+```
+
+**Stock × flow (player-readable states):**
+
+| Stock | Flow | Meaning |
+|-------|------|--------|
+| High | Favorable | Strong working region; prime contest |
+| High | Poor | Reserve exists; currently inefficient |
+| Low | Favorable | Efficient but short-lived opportunity |
+| Low | Poor | Weak region; seek alternatives |
+
+**Full local depletion is allowed and survivable.** Intended ladder (not a single forced step):
+
+```
+local stock gone
+→ remote harvest (pay distance tax)
+→ and/or switch resource / plan
+→ and/or contest another region
+→ only if remote-as-normal + structural tax persists
+→ migration becomes attractive
+→ migration remains optional
+```
+
+**Canonical causal chain (Q3):**
+
+```
+depletion
+→ spatial / strategic mismatch
+→ logistics tax
+→ sustained inefficiency (with zone, wrong-type, opponent as co-inputs)
+→ migration becomes attractive
+→ migration remains optional
+```
+
+**Qualitative pressure ladder (no numbers):**
+
+```
+SAFE → LOCAL PRESSURE → REMOTE HARVEST → STRUCTURAL MISMATCH → MIGRATION ATTRACTIVE (still not mandatory)
+```
+
+**Recovery:** Match-scale permanent empty nodes are acceptable; no **required** regeneration system. Old home can remain a production anchor with remote extract; “return” only if residual/other value remains.
+
+**Anti-snowball (design constraints):** depletion is local not global; zone magnitude stays meaningful not dominant (Q1); multiple answers always exist; pressure must be readable (not a hidden timer).
+
+**Opponent:** Soft depletion feeds a contest graph (fight / longer remote / switch plan / migrate elsewhere), not `empty → self-migrate`.
+
+**Not required by Q3:** Economy 1.5, AI migration, T2, regeneration system, new resources, new victory conditions, mandatory migration, hard local collapse, hidden survival timer.
+
+**Final design rule:**
+
+> Resources can run out locally. Running out never commands “Migrate.” It changes the value of a working region; together with zone, distance, mismatch, and opponent it can make migration attractive. Migration remains a choice. A player can lose from bad economic geography decisions without any invisible survival timer firing.
+
+---
 
 ### Mobility & settlement
 
@@ -161,6 +236,8 @@ opponent conflict (same region → eco-war without replacing TC victory)
 | Zone harvest multipliers **code** | Allowed only after explicit implementation task; Q1 gives **direction** only |
 | AI migration | After migration is a proven player-facing necessity |
 | New unit roster | After conflict reasons are clear |
+| Resource regeneration system | Not required by Q3 |
+| Hard local collapse / migration timer | **Rejected** (Q3) |
 
 ---
 
@@ -168,6 +245,10 @@ opponent conflict (same region → eco-war without replacing TC victory)
 
 Stage 1 foundation is solid enough to **design** mid-game without rewriting the economic AI. Prefer one coherent loop story over parallel feature spikes.
 
-Q1 direction locked 2026-09-01 (two-pass design). Next: **Q2** (scarce / wrong-typed resources near home base).
+| Question | Status |
+|----------|--------|
+| Q1 Zones | **DESIGN ACCEPTED** |
+| Q2 Scarcity / wrong-typed | **Open in file** (chat analysis done; not yet recorded) |
+| Q3 Depletion | **DESIGN ACCEPTED** |
 
-*Created 2026-09-01 after Stage 1 formal sign-off.*
+*Created 2026-09-01 after Stage 1 formal sign-off. Q3 recorded 2026-09-01.*
