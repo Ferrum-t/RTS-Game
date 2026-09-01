@@ -1,10 +1,10 @@
 # Stage 1.5 — Gameplay Design
 
-**Status:** Design open — **no implementation task yet**  
+**Status:** Design in progress — **no implementation task yet**  
 **Depends on:** Stage 1 **ACCEPTED** (`CURRENT_STATE.md`)  
 **Process:** `ACCEPTANCE_AND_PROCESS.md` (design before code; §3 — do not invent AI systems without proven need)
 
-**Not this document:** Economy 1.5 implementation, T2 content, zone→harvest wiring, AI migration code.
+**Not this document:** Economy 1.5 implementation, T2 content, zone→harvest **code**, AI migration code.
 
 ---
 
@@ -60,9 +60,72 @@ Do **not** start from “add migration” or “add T2” in isolation. Start fr
 
 ### Environment & resources
 
-- What is the **player-facing** role of moving ecological zones (beyond visual)?
+#### Q1 — Player-facing role of moving ecological zones (beyond visual)?
+
+**Status:** **DESIGN DECISION** (direction closed; balance numbers not specified)
+
+**Short rule:** Player controls a **working region**, not a green blob.
+
+**Decision hierarchy:**
+
+```
+ZONE
+  → changes the value of a region (soft efficiency on existing nodes)
+
+WORKERS
+  → short-term: may follow temporary advantage
+
+SETTLEMENT
+  → long-term: moves only under structural, lasting disadvantage
+```
+
+**Player-facing rule:**
+
+> Land on the map is sometimes better or worse for the **same** Wood / Stone / Horses. A good strip lasts long enough to plan and contest, but is not so strong that the only strategy is chasing the favorable band every tick. The player may endure at home, retarget workers, contest the strip with the army, or (expensively, optionally) relocate the settlement. The opponent wants the same working region.
+
+**Zone role (refined):**
+
+- Soft **spatial economy modifiers** on existing resource nodes (efficiency / value), not pure VFX, not hard base-kill timer, not mandatory migration.
+- Magnitude must be **meaningful** (affects army/build **tempo**) but **not dominant** (off-band harvest remains viable; ignore is suboptimal, not suicide).
+- Value attaches to a **working region**: resource cluster + path to settlement + defendability + opponent interest + **time window** — not the center of a moving sprite.
+- Anti-chase principles: spatial **persistence** (minutes-scale windows), size ≈ cluster, movement slower than a free harvest cycle, large neutral baseline map, logistics tax on long trips, exposed workers so army presence matters.
+
+**Worker relocation** = short-term response (labor moves to land).  
+**Settlement migration** = optional long-term response (anchor moves when structural tax of deposit + train + defense exceeds migrate cost). Migration is **not** required by zone motion alone.
+
+**Architectural gameplay constraint (preserve later):**  
+If remote harvesting ever becomes so convenient that **distance stops mattering**, migration loses independent value and Nomad identity weakens. Do not silently remove structural tax on far eco (path time, deposit at settlement, production/rally at settlement, undefended workers).
+
+**Opponent interaction:** Recurring contest over the same valuable region (raid workers / defend eco / contest strip / still may push TC) — **not** a separate capture-point mode.
+
+**Causal chain (Q1):**
+
+```
+map change (slow bands over clusters)
+↓
+economic consequence (meaningful efficiency → tempo)
+↓
+player decision (endure / relocate workers / contest / optional migrate)
+↓
+risk (tempo loss / exposed workers / army away from TC / migrate downtime)
+↓
+payoff (better trips, deny enemy tempo, durable region, optional better anchor)
+↓
+opponent conflict (same region → eco-war without replacing TC victory)
+```
+
+**Still open under Environment & resources (not decided here):**
+
 - When do resources become **scarce or wrong-typed** near the home base?
 - Is depletion a soft timer toward migration, or a hard local collapse?
+
+**Not required by Q1 alone:** Economy 1.5, T2, AI migration, new resources, new win conditions, hard collapse, capture-point scoring, zone→harvest **implementation** (design direction only; Stage B code later when tasked).
+
+---
+
+#### Q2 — (open) When do resources become scarce or wrong-typed near the home base?
+
+#### Q3 — (open) Is depletion a soft timer toward migration, or a hard local collapse?
 
 ### Mobility & settlement
 
@@ -93,10 +156,10 @@ Do **not** start from “add migration” or “add T2” in isolation. Start fr
 
 | Topic | Rule |
 |--------|------|
-| Economy 1.5 code | Frozen unless a question above forces it |
+| Economy 1.5 code | Frozen unless a later question forces it |
 | T2 buildings/units | Frozen |
-| Zone harvest multipliers | Stage B; link to a filled “why react” answer |
-| AI migration | After migration is a player-facing necessity |
+| Zone harvest multipliers **code** | Allowed only after explicit implementation task; Q1 gives **direction** only |
+| AI migration | After migration is a proven player-facing necessity |
 | New unit roster | After conflict reasons are clear |
 
 ---
@@ -104,5 +167,7 @@ Do **not** start from “add migration” or “add T2” in isolation. Start fr
 ## Working note
 
 Stage 1 foundation is solid enough to **design** mid-game without rewriting the economic AI. Prefer one coherent loop story over parallel feature spikes.
+
+Q1 direction locked 2026-09-01 (two-pass design). Next: **Q2** (scarce / wrong-typed resources near home base).
 
 *Created 2026-09-01 after Stage 1 formal sign-off.*
