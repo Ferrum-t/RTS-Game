@@ -10,11 +10,15 @@ class_name EconomicAIController
 @export var attack_threshold: int = 3
 @export var decision_interval: float = 1.5
 @export var barracks_offset: Vector3 = Vector3(4.0, 0.0, 3.0)
+## Soft floor for both wood and stone; below → prefer that resource (narrow fix, not Economy 1.5).
+@export var stock_floor: int = 100
 
 var _timer: float = 0.0
 var _barracks_data: BuildingData = null
 ## True after we first crossed attack_threshold; reset when army falls below.
 var _attack_issued: bool = false
+## Alternates preferred type when both stocks are above floor (avoids permanent stick).
+var _harvest_flip: int = 0
 
 
 func _ready() -> void:
@@ -22,7 +26,8 @@ func _ready() -> void:
 	_timer = 0.5
 	print("[AI_ECO] controller ready team=", team_id,
 		" workers_goal=", desired_worker_count,
-		" attack_at=", attack_threshold)
+		" attack_at=", attack_threshold,
+		" stock_floor=", stock_floor)
 
 
 func _physics_process(delta: float) -> void:
@@ -129,11 +134,27 @@ func _assign_idle_workers(workers: Array) -> void:
 		u.replace_order_harvest(res)
 
 
+## Cyclic dual-floor pick: never permanently abandon stone or wood.
+## Not Economy 1.5 (no BUILDING/PRODUCTION goals) — only removes irreversible stick.
 func _pick_resource_for_worker(u: BaseUnit) -> BaseResource:
-	var need_stone := false
 	var rm := get_node_or_null("/root/ResourceManager")
-	if rm and rm.get_stock(team_id, BaseResource.Type.STONE) < 50:
-		need_stone = true
+	var wood := 0
+	var stone := 0
+	if rm:
+		wood = rm.get_stock(team_id, BaseResource.Type.WOOD)
+		stone = rm.get_stock(team_id, BaseResource.Type.STONE)
+
+	var floor: int = maxi(stock_floor, 1)
+	var prefer_type: int
+	if stone < floor:
+		prefer_type = BaseResource.Type.STONE
+	elif wood < floor:
+		prefer_type = BaseResource.Type.WOOD
+	else:
+		# Both above floor — alternate so one resource cannot monopolize forever.
+		prefer_type = BaseResource.Type.WOOD if (_harvest_flip % 2 == 0) else BaseResource.Type.STONE
+		_harvest_flip += 1
+
 	var best: BaseResource = null
 	var best_d := INF
 	for n in u.get_tree().get_nodes_in_group("Resource"):
@@ -142,10 +163,7 @@ func _pick_resource_for_worker(u: BaseUnit) -> BaseResource:
 		var r := n as BaseResource
 		if r.resource_amount <= 0:
 			continue
-		var is_stone := int(r.resource_type) == BaseResource.Type.STONE
-		if need_stone and not is_stone:
-			continue
-		if not need_stone and is_stone:
+		if int(r.resource_type) != prefer_type:
 			continue
 		var d := u.global_position.distance_squared_to(r.global_position)
 		if d < best_d:
@@ -153,6 +171,8 @@ func _pick_resource_for_worker(u: BaseUnit) -> BaseResource:
 			best = r
 	if best != null:
 		return best
+
+	# Fallback: nearest any non-empty node (node depleted / wrong side of map).
 	for n in u.get_tree().get_nodes_in_group("Resource"):
 		if n is BaseResource and (n as BaseResource).resource_amount > 0:
 			return n as BaseResource
