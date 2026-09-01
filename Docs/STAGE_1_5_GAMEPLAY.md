@@ -275,9 +275,99 @@ SAFE → LOCAL PRESSURE → REMOTE HARVEST → STRUCTURAL MISMATCH → MIGRATION
 
 ### Mobility & settlement
 
-- Why can’t the player just sit on one TC forever?
-- What does “migrate” mean in one sentence for the player?
-- How do pack/unpack buildings participate in that pressure (already exist in Stage 1)?
+#### Q4 — Why not sit forever / what is migrate / role of pack-unpack?
+
+**Status:** **DESIGN DECISION** (2026-09-01)
+
+**Consistency Q1 ↔ Q2 ↔ Q3 ↔ Q4:** OK — zone never alone forces migrate; scarcity enables remote without forcing pack; depletion ≠ pack now; distance tax preserved on the full anchor loop; multiple agency paths; migration can be wrong; attractiveness is structural cost vs new-anchor value, **not** “after N minutes of remote harvest.”
+
+**Mobility hierarchy:**
+
+```
+Worker relocation
+    ↓
+Remote harvesting
+    ↓
+Temporary forward presence
+    ↓
+Settlement migration
+```
+
+| Level | Role |
+|-------|------|
+| **Worker relocation** | Short-term / local mismatch (zone window, wrong type, thin nearby) |
+| **Remote harvesting** | Sustained spatial scarcity while **keeping** the old settlement anchor |
+| **Temporary forward presence** | Contest / protect a strip — **not** a new settlement |
+| **Settlement migration** | Long-term reposition of deposit + production + defense + rally **anchor** |
+
+**Core distinction:**
+
+> Worker relocation solves a **temporary/local** mismatch. Settlement migration solves a **persistent structural** mismatch of the **whole** settlement anchor.
+
+**Settlement anchor (Stage 1 structure — preserve):**
+
+```
+resources → workers → deposit at TC → production / rally → army + defense
+```
+
+Remote extract must **not** become free because workers can walk far. Distance tax is the repeated cost on travel, deposit, production/rally lag, and undefended remote workers.
+
+**Player-facing definition of migration:**
+
+> Move the settlement anchor closer to a region you believe will sustain your economy and army for the long term, paying downtime and risk.
+
+Pack/unpack (existing Stage 1 mobile buildings) is the **means** to change anchor, not the meaning of the decision.
+
+**Why not migrate immediately:** current settlement still supports the plan; remote region may be temporary; migration downtime can lose military timing; destination may be contested; existing defensive/rally footprint has value; worker relocation may already suffice; player may intentionally pursue a military/TC strategy instead.
+
+**Why migrate eventually (no time-threshold substitute):** migration becomes attractive only when **persistent** remote harvesting plus repeated distance tax plus deposit/production/defense/rally friction, against a **durable** alternative region, outweigh the continued cost of the old anchor. Compare structural tax to migrate cost and expected value of the new anchor — **not** “remote for N minutes ⇒ must pack.”
+
+**Migration can be wrong:** too early (window ends, stranded); too late (tempo already bled); wrong destination; move into contested ground; wrong prediction of the future working region. If migration cannot fail as a bet, it is not strategic.
+
+**Opponent interaction (no capture points):**
+
+```
+A starts migration
+↓
+B can raid / contest / intercept / attack old or soft targets
+↓
+A can continue / abort / redirect / defend / choose another region
+```
+
+**Can the player win without migration?** **Yes.** Migration is **one strategic branch among several**, not a hidden requirement for victory.
+
+**Canonical causal chain (Q4):**
+
+```
+resource geography changes
+(stock / type / zone flow / access)
+↓
+working region moves or becomes structurally distant
+↓
+worker relocation / remote harvest initially solves it
+↓
+persistent distance + deposit + production + defense tax accumulate
+↓
+player evaluates alternative long-term anchor
+↓
+migration becomes attractive
+↓
+migration creates downtime + vulnerability + positional risk
+↓
+destination must remain valuable long enough
+↓
+opponent can contest / punish
+↓
+successful migration creates a better long-term settlement anchor
+```
+
+**Final design rule (Q4):**
+
+> Settlement migration is an optional long-term repositioning of the economic and military anchor. It is not triggered by depletion or zones alone. It becomes attractive when persistent geographic mismatch makes remote extraction and the resulting deposit, production, rally, and defense costs worse than establishing a new anchor. Migration is a prediction and a strategic bet: it costs time and safety, can be wrong, and is never mandatory for victory.
+
+**Not required by Q4:** Economy 1.5, deficit AI, AI migration, T2, new migration currency, forced migration, hard collapse, capture points, new victory conditions, new resource types, Stage 1 changes beyond preserving existing distance / deposit / production / rally / pack-unpack behavior.
+
+---
 
 ### Conflict beyond “kill TC”
 
@@ -309,6 +399,7 @@ SAFE → LOCAL PRESSURE → REMOTE HARVEST → STRUCTURAL MISMATCH → MIGRATION
 | New unit roster | After conflict reasons are clear |
 | Resource regeneration system | Not required by Q3 |
 | Hard local collapse / migration timer | **Rejected** (Q3) |
+| Forced migration / migration time-threshold | **Rejected** (Q4) |
 
 ---
 
@@ -321,7 +412,8 @@ Stage 1 foundation is solid enough to **design** mid-game without rewriting the 
 | Q1 Zones | **DESIGN ACCEPTED** |
 | Q2 Scarcity / wrong-typed | **DESIGN ACCEPTED** |
 | Q3 Depletion | **DESIGN ACCEPTED** |
+| Q4 Mobility & settlement | **DESIGN ACCEPTED** |
 
-Environment & resources block (Q1–Q3) forms one system: zone = flow, depletion = stock, scarcity includes spatial + wrong-typed, migration only via optional structural mismatch.
+Q1–Q4 form one system: flow × stock × logistics × optional anchor move. Next open block: **Conflict beyond kill TC**.
 
-*Created 2026-09-01 after Stage 1 formal sign-off. Q1–Q3 recorded 2026-09-01.*
+*Created 2026-09-01 after Stage 1 formal sign-off. Q1–Q4 recorded 2026-09-01.*
