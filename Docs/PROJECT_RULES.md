@@ -1,8 +1,12 @@
 # PROJECT RULES
 
-Project: RTS Engine
-Engine: Godot 4.7+
+Project: RTS Engine / Nomad Wars  
+Engine: Godot 4.7+  
 Language: GDScript 2.0
+
+**Process / acceptance (F5, debt vs fix, multi-chat hygiene):**  
+→ **[`Docs/ACCEPTANCE_AND_PROCESS.md`](ACCEPTANCE_AND_PROCESS.md)**  
+Cite that file when verifying mechanics or closing tasks. Architecture rules below stay here.
 
 ## Core Principles
 
@@ -34,7 +38,7 @@ Language: GDScript 2.0
 - One feature per commit.
 - Every refactor must preserve architecture.
 
-## AI Rules
+## AI Rules (code output)
 
 Always return complete files.
 
@@ -45,3 +49,9 @@ Never use placeholders.
 Never omit code.
 
 Files must be immediately replaceable.
+
+## AI Rules (process)
+
+- “Done” requires post-commit F5 evidence — see `ACCEPTANCE_AND_PROCESS.md` §1.
+- Prefer narrow isolated fixes before large redesigns — §3.
+- Durable facts (balance numbers, debt) go in `Docs/`, not only chat handoffs — §5.
