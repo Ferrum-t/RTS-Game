@@ -27,7 +27,7 @@ What code **may** treat as in-scope for v1.0 (see also scope §1):
 * mobile Town Center
 * mobile settlement (DEPLOYED / PACKING / MOBILE / UNPACKING)
 * migration / caravan move (Raise Entire Settlement + selection-aware control)
-* changing environmental zones (**v1.0:** blobs + harvest multiplier — **DONE**)
+* changing environmental conditions on **fixed regions** (Stage 1.5 target: Cold / Favorable / Dry; code may still host Zones v1.0 blob prototype until implementation)
 * resource redistribution via zones (harvest mult only in v1.0)
 * horse capture / horses as resource
 * basic nomadic economy (Wood, Stone, Horses; gold as present in code)
