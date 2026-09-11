@@ -1,120 +1,142 @@
 # Nomad Wars — MVP v1.0 Scope и архитектурная дорожная карта
 
 > **Единственный живой документ** по scope / статусу / порядку фаз.
-> World lore и design-vision (`12_PROGRESSION…`) не расширяют gameplay scope молча — при конфликте побеждает этот файл.
-> §0 менять перед каждой сессией.
+> World lore и design-vision не расширяют gameplay scope молча — при конфликте побеждает этот файл.
+> Stage 1.5 design contract: `Docs/DESIGN_CLIMATE_AND_MIGRATION_PRESSURE.md`.
 
 ---
 
-## 0. CURRENT STATUS (2026-08-31, ветка `nomads-wars-grok`)
+## 0. CURRENT STATUS (2026-09-11, ветка `nomads-wars-grok`)
 
 **Репо:** `Ferrum-t/RTS-Game` → `nomads-wars-grok`  
 **Движок:** Godot 4.7 stable  
 **Правило приёмки:** код из чата ≠ факт, пока нет F5-лога + чтения файла.
 
-### Product Scope — Under Active Review (2026-08-31)
+### Product Scope — Stage 1 accepted, Stage 1.5 design active
 
-Решается: **v1.0 = T1-only** (commercial-ready vertical slice) **vs T1+T2**.
+**Stage 1 — Simple Economic AI Opponent (T1, no AI migration) — ACCEPTED.**
 
-**Решение ОТКЛАДЫВАЕТСЯ** до результата **Stage 1** (Simple Economic AI Opponent, T1 only, **без migration у AI**) — см. `Docs/12_PROGRESSION_AND_TIER_SYSTEM.md` §7.
+Текущий следующий этап — **Stage 1.5 Gameplay Design / implementation planning**.
 
-- **Wave spawner** (`EnemySpawner` / `EnemyAIComponent`) = **Pressure Test Mode**, не финальный marketed gameplay loop.
-- **Не крутить дальше цифры волн** как главный баланс-пасс, пока Stage 1 не даст F5-результат.
-- **Не расширять v1.0 до T2/Places/air/magic** по бумажному спору — только после плейтеста Stage 1.
+Stage 1.5 сейчас является design phase. Никакая новая механика не считается реализованной только потому, что она описана в design contract.
 
-### Милестоуны (код)
+- Wave spawner (`EnemySpawner` / `EnemyAIComponent`) остаётся **Pressure Test Mode**, не финальным marketed gameplay loop.
+- Не расширять T1/T2 scope по бумажному спору. T2 остаётся замороженным до доказанной необходимости после Stage 1.5.
+- AI migration остаётся вне текущего implementation slice.
+
+### Milestones
 
 | ID | Содержание | Статус |
 |----|------------|--------|
 | M1–M9, Phase 2–8.2 | Core RTS + mobile TC/WT + raid | **ACCEPTED** |
 | Stuck / Billboard / Formation / selection-aware | **ACCEPTED** |
-| **10** Environment Zones v1.0 | **ACCEPTED** |
-| **11** Enemy AI waves (Pressure Test Mode) | **ACCEPTED** (role demoted to test tool) |
-| **12** Polish (debug keys, names) | **ACCEPTED** |
-| Balance Pass (wave interval 15/30/45) | **PAUSED** — data kept; not primary goal |
-| **Stage 1** Simple Economic AI Opponent (T1, no AI migrate) | **NEXT** |
+| 10 | Environment Zones v1.0 | **ACCEPTED** |
+| 11 | Enemy AI waves (Pressure Test Mode) | **ACCEPTED** |
+| 12 | Polish (debug keys, names) | **ACCEPTED** |
+| Stage 1 | Simple Economic AI Opponent, T1, no AI migration | **ACCEPTED** |
+| Stage 1.5 | Climate / region / migration-pressure design | **ACTIVE DESIGN** |
 
-### Сейчас
+### Canonical Stage 1.5 design contract
 
-**Design vision synced:** `12_PROGRESSION_AND_TIER_SYSTEM.md` (tiers, Places of Power, air/magic roles, Stage 1 AI experiment, risks).
+`Docs/DESIGN_CLIMATE_AND_MIGRATION_PRESSURE.md`
 
-**Caravan dual-mode / Zones v1.0 / MOBILE combat off + vuln** — без изменений.
+Core decisions:
 
-**Spawner numbers (both files):** interval/delay **30**, max_alive **6** (Pressure Test Mode defaults).
+- map regions are geographically fixed;
+- region boundaries do not overlap;
+- each region has exactly three gameplay climate states: `COLD`, `FAVORABLE`, `DRY`;
+- seasonal change modifies region state, not region geometry;
+- `TRANSITION` is not a fourth gameplay state in the current model;
+- `FAVORABLE` is the most advantageous ecological state for settlement/economic development;
+- each major region is conceived as an ecological/economic package for an aul;
+- horses are a first visible climate-response system;
+- neutral camps are a separate PvE value stream;
+- a minimal **player hero** is planned because artifact carry/drop/steal cannot be tested without one;
+- one artifact type is sufficient for the first hero slice;
+- Power Sites are reserved future infrastructure, not current implementation;
+- AI hero, AI migration, full hero progression, magic/mana, Artifact tiers and T2 remain deferred.
 
-### Открытые / tech debt (не кодить без промта)
+### Current implementation order
 
-| ID | Тема | Статус |
-|----|------|--------|
-| Stage 1 AI | Economic opponent T1, shared systems, no migrate | **Next experiment** |
-| Wave tempo | 20s candidate | Frozen until Stage 1 |
-| Zone readability / v1.1 | Seasonal front | Parallel identity priority after Stage 1 starts |
-| Building HP bar | Billboard on damage | Optional parallel polish |
-| T2/T3 / Places / air / magic | Vision only | **Not v1.0 until post–Stage 1 decision** |
-| AI migration | PACK cycle for enemy | **After Stage 1** |
-| Heroes | Full system | After v1.0 |
-| Spawner config dual source | MatchManager overrides | Tech debt |
-| Staggered Nav | 50+ units | Risk rises with dual economy |
+1. **A — Climate backend:** fixed regions + seasonal state lookup.
+2. **B — Environment visuals:** state presentation.
+3. **C — Resource climate pressure:** soft effect on existing resource extraction.
+4. **D — Horses:** climate-dependent availability using existing horse/cavalry pipeline.
+5. **E — Neutral camps:** combat + basic loot.
+6. **F — Minimal player hero + one artifact:** pickup → bonus → death drop → steal.
+7. **G — Conflict matrix:** develop / migrate / defend / raid / contest / commit.
 
-### Следующий шаг
-
-1. **Stage 1 — Simple Economic AI Opponent** (отдельный промт: scope, запреты, F5).  
-2. Optional: Building Health Bar.  
-3. Zone readability / Zones v1.1.  
-4. Затем — решение T1-only vs T1+T2.
-
----
-
-## 1. V1.0 SCOPE (baseline until Stage 1 decides otherwise)
-
-Цель: одна раса (Turan), играбельное ядро. **По умолчанию T1 content already in code.** T1+T2 only if Stage 1 playtest demands it and scope §0 is updated.
-
-### 1.1–1.6
-Turan only · Wood/Stone/Gold/Horses · Raid foundation DONE · Mobile settlements + dual-mode DONE · Mobile towers DONE · Zones v1.0 DONE · Zones v1.1 candidate.
-
-### 1.7 Units
-Worker, Soldier, Cavalry, SiegeUnit. **No heroes. No air/magic roster in baseline v1.0.**
-
-### 1.8 Heroes
-**Not v1.0.**
-
-### 1.9 Progression
-**Baseline = T1 only.** T2/T3 vision in `12_PROGRESSION…`. Implementation only after Stage 1 decision + explicit scope update.
-
-### 1.10 Opponent pressure
-**Target loop:** economic opponent (Stage 1+).  
-**Current tool:** wave Pressure Test Mode.
+Every implementation slice requires its own narrow request and F5 acceptance according to `Docs/ACCEPTANCE_AND_PROCESS.md`.
 
 ---
 
-## 2. BACKLOG после baseline v1.0
+## 1. V1.0 BASELINE
 
-- T2/T3, Places of Power, air, magic (if not pulled into v1.0 post–Stage 1)
+The accepted baseline remains the T1 RTS foundation. Stage 1.5 is a design/vertical-slice expansion under active review and does not silently rewrite the accepted Stage 1 contracts.
+
+### Existing baseline
+
+- Turan only
+- Wood / Stone / Gold / Horses
+- Worker / Soldier / Cavalry / SiegeUnit
+- Raid foundation
+- Mobile settlements and mobile towers
+- Zones v1.0
+- Economic AI opponent
+- Match victory/defeat through existing Stage 1 rules
+
+### Scope boundary
+
+Stage 1.5 may introduce a minimal player hero if the implementation slice is explicitly tasked and accepted. It does **not** authorize a full hero progression system, AI hero, magic roster, or T2.
+
+---
+
+## 2. BACKLOG / DEFERRED
+
 - AI migration
-- Full economic AI sophistication
-- Heroes, other factions, multiplayer, campaign
-- See `12_PROGRESSION…` and `NOMAD_WORLD_BACKLOG.md`
+- AI hero
+- Full economic AI sophistication / Economy 1.5 unless a concrete F5 proves need
+- Full hero progression
+- Artifact tiers
+- Places of Power gameplay
+- Mana / magic systems
+- Other factions
+- Multiplayer
+- Campaign
+- T2/T3 unless Stage 1.5 evidence changes scope
 
 ---
 
-## 3. Архитектурные контракты (заморожены)
+## 3. ARCHITECTURAL CONTRACTS
 
-Order · DeploymentState · `base × tier × deployment` · Building mover · NavBake · Horses · Damage→Loot · Building visual · Tower auto-attack · Match win/lose · dual-mode selection · Zones v1.0 harvest-only — as previously frozen.
+Existing accepted contracts remain frozen unless an implementation request explicitly targets them.
 
-**3.15 Economic AI (Stage 1+)**  
-Prefer shared Resource/Building/Order pipelines. Stage 1 = threshold rules, no AI pack/migrate.
+Order · DeploymentState · `base × tier × deployment` · Building mover · NavBake · Horses · Damage→Loot · Building visual · Tower auto-attack · Match win/lose · dual-mode selection · Stage 1 economic AI.
 
----
-
-## 4. Порядок фаз
-
-…10–12 ACCEPTED · Balance wave pass PAUSED · **Stage 1 Economic AI = NEXT** · then zone readability / v1.1 · then T1 vs T1+T2 decision.
+**Important:** the old Zones v1.0 moving-zone implementation is now a **migration target for Stage 1.5 A**, not a design direction. The new contract is fixed geographic regions with changing state.
 
 ---
 
-## 5. Работа с документами и Grok
+## 4. PROCESS
 
-1. Конкретный промт: scope, файлы, запреты.  
-2. «Готово» = F5-лог или чтение файла после commit.  
-3. Контракты §3 не рефакторить «заодно».  
-4. Vision/lore не расширяет MVP без правки **этого** файла §0/§1.
+1. Design decision is recorded before feature code.
+2. One implementation slice at a time.
+3. F5 after commit is required for “done”.
+4. Do not combine climate, resource, horse, neutral, hero and AI systems into one implementation patch.
+5. Repository facts must be verified directly; chat claims are not evidence.
+
+See `Docs/ACCEPTANCE_AND_PROCESS.md` §1–§5.
+
+---
+
+## 5. DOCUMENTATION OWNERSHIP
+
+- `CURRENT_STATE.md` — implemented/accepted state and balance facts.
+- `STAGE_1_5_GAMEPLAY.md` — Stage 1.5 gameplay questions and causal design.
+- `DESIGN_CLIMATE_AND_MIGRATION_PRESSURE.md` — canonical fixed-region climate/migration/neutral/hero design contract.
+- `02_GEOGRAPHY_AND_CLIMATE.md` — worldbuilding; must not override the Stage 1.5 gameplay contract.
+- `08_MIGRATION_AND_NOMADISM.md` — worldbuilding/design foundation; must not override the Stage 1.5 gameplay contract.
+- `TODO.md` — short next-step checklist.
+- `ACCEPTANCE_AND_PROCESS.md` — process rules.
+
+When documents conflict on current gameplay implementation, this file and the Stage 1.5 design contract are authoritative for their respective scope.
