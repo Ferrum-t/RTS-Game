@@ -1,289 +1,228 @@
 # Stage 1.5 — Gameplay Design
 
-**Status:** Design in progress — **no implementation task yet**  
+**Status:** Design active — implementation not yet accepted  
 **Depends on:** Stage 1 **ACCEPTED** (`CURRENT_STATE.md`)  
-**Process:** `ACCEPTANCE_AND_PROCESS.md` (design before code; §3 — do not invent AI systems without proven need)
+**Canonical climate/migration contract:** `DESIGN_CLIMATE_AND_MIGRATION_PRESSURE.md`  
+**Process:** `ACCEPTANCE_AND_PROCESS.md` §2–§5
 
-**Not this document:** Economy 1.5 implementation, T2 content, zone→harvest **code**, AI migration code.
+> This document answers **why Stage 1.5 exists and what gameplay loop it must create**. The detailed fixed-region climate, horse, neutral, hero and artifact contract lives in `DESIGN_CLIMATE_AND_MIGRATION_PRESSURE.md`.
 
 ---
 
-## Why Stage 1.5 exists
+## 1. Why Stage 1.5 exists
 
 Stage 1 delivers a complete T1 fight:
 
-```
+```text
 ENVIRONMENT → RESOURCES → WORKERS → ECONOMY → MILITARY → ATTACK → RAID → VICTORY/DEFEAT
 ```
 
-After ~5–10 minutes the risk is a **flat loop**:
+The risk after stabilization is a flat loop:
 
+```text
+gather → Barracks → army → attack TC → win/lose → repeat
 ```
-gather → Barracks → army → attack TC → win/lose → (same again next match)
-```
 
-Stage 1.5 answers:
+Stage 1.5 asks:
 
-> **Why should the player keep playing after the basic T1 economy has stabilized?**
+> **Why should the player keep making meaningful decisions after the basic T1 economy has stabilized?**
 
-For **Nomad Wars** the intended identity is not “RTS with nomad skins”, but:
+Nomad Wars should not become “RTS with nomad skins”. The map itself must create changing economic and territorial decisions.
 
-```
-map changes → resources change → society must move → army is part of a mobile system
+The intended identity is:
+
+```text
+FIXED GEOGRAPHY
+      ↓
+SEASONAL STATE CHANGES
+      ↓
+REGIONAL VALUE CHANGES
+      ↓
+RESOURCE / HORSE PRESSURE
+      ↓
+PLAYER DECISION
+      ↓
+STAY / DEVELOP / CONTEST / RAID / MIGRATE
+      ↓
+CONFLICT
 ```
 
 ---
 
-## Causal chain to design (fill in before any feature code)
+## 2. Canonical map concept
 
-For every proposed mid-game beat, answer:
+The current map concept is **not** a set of moving ecological blobs.
 
-```
-What changed on the map / economy?
+Each large circle is a permanent geographic region. Its boundary and location stay fixed for the match. The season changes the region's state.
+
+The regions intentionally **do not overlap or intersect**. Neutral land remains between them.
+
+Each region is conceived as a potential ecological/economic package for an aul. The map concept places combinations of:
+
+- Wood / trees;
+- Stone;
+- Gold;
+- Horses when conditions are favorable;
+- a Power Site;
+- neutral threats;
+- physical settlement space.
+
+A large region can potentially hold more than one aul. The current concept uses roughly two as a future multiplayer/map-design possibility; exact capacity is not a Stage 1.5 constant.
+
+### Three climate states
+
+Each region has exactly three gameplay-relevant states:
+
+| Technical name | Map color | Meaning |
+|---|---|---|
+| `COLD` | blue | winter / frost / low biological productivity |
+| `FAVORABLE` | green | zone of life; best general ecological state for settlement and development |
+| `DRY` | orange | summer heat / dryness / reduced ecological productivity |
+
+`TRANSITION` is **not** a fourth gameplay state in the current model. Spring/autumn can be represented by the seasonal clock changing a region from one state to another.
+
+The technical names are temporary. Final world terminology should be fictional and Turkic-inspired without directly copying a historical language or Tolkien-style fantasy languages.
+
+---
+
+## 3. Core causal chain
+
+Every Stage 1.5 mechanic must answer:
+
+```text
+What changed?
       ↓
-Why is the player forced to react?
+Why does it matter?
       ↓
-What choices exist? (develop / migrate / defend / raid / all-in)
+What can the player do?
       ↓
-What is the risk of each choice?
+What does each choice cost/risk?
       ↓
 What is the payoff?
       ↓
-How does that create conflict with the opponent?
+How can the opponent exploit the same situation?
 ```
 
-Do **not** start from “add migration” or “add T2” in isolation. Start from the chain above.
+The primary intended chain is:
+
+```text
+SEASON CHANGES
+      ↓
+REGION STATES CHANGE
+      ↓
+ECOLOGICAL / ECONOMIC VALUE CHANGES
+      ↓
+RESOURCE / HORSE CONDITIONS CHANGE
+      ↓
+CURRENT AUL BECOMES MORE OR LESS ATTRACTIVE
+      ↓
+PLAYER EVALUATES OTHER REGIONS
+      ↓
+STAY / RETARGET / DEFEND / RAID / CONTEST / MIGRATE
+```
+
+The player must not be forced into migration merely because a clock reached a threshold.
 
 ---
 
-## Open design questions
+## 4. Q1 — Role of climate regions
 
-### Environment & resources
+**Status:** DESIGN ACCEPTED.
 
-#### Q1 — Player-facing role of moving ecological zones (beyond visual)?
+Climate is a gameplay system, not only VFX.
 
-**Status:** **DESIGN DECISION** (direction closed; balance numbers not specified)
+The current intended first effect is a soft change in regional resource value/efficiency. The effect should be meaningful enough to influence army/build tempo, but not so dominant that harvesting outside a favorable state becomes impossible.
 
-**Short rule:** Player controls a **working region**, not a green blob.
+Important separation:
 
-**Decision hierarchy:**
-
-```
-ZONE
-  → changes the value of a region (soft efficiency on existing nodes)
-
-WORKERS
-  → short-term: may follow temporary advantage
-
-SETTLEMENT
-  → long-term: moves only under structural, lasting disadvantage
+```text
+REGION       = fixed geography
+CLIMATE      = current state of that region
+STOCK        = resource amount remaining
+DISTANCE     = logistics cost
+WORKING AREA = practical combination of value + logistics + defense + opponent pressure
 ```
 
-**Player-facing rule:**
+A green/FAVORABLE region is generally the most attractive ecological state, but **green does not automatically mean “build here”**.
 
-> Land on the map is sometimes better or worse for the **same** Wood / Stone / Horses. A good strip lasts long enough to plan and contest, but is not so strong that the only strategy is chasing the favorable band every tick. The player may endure at home, retarget workers, contest the strip with the army, or (expensively, optionally) relocate the settlement. The opponent wants the same working region.
+Terrain/buildability is a separate future layer.
 
-**Zone role (refined):**
+### Working region
 
-- Soft **spatial economy modifiers** on existing resource nodes (efficiency / value), not pure VFX, not hard base-kill timer, not mandatory migration.
-- Magnitude must be **meaningful** (affects army/build **tempo**) but **not dominant** (off-band harvest remains viable; ignore is suboptimal, not suicide).
-- Value attaches to a **working region**: resource cluster + path to settlement + defendability + opponent interest + **time window** — not the center of a moving sprite.
-- Anti-chase principles: spatial **persistence** (minutes-scale windows), size ≈ cluster, movement slower than a free harvest cycle, large neutral baseline map, logistics tax on long trips, exposed workers so army presence matters.
+The player's effective working region depends on more than color:
 
-**Worker relocation** = short-term response (labor moves to land).  
-**Settlement migration** = optional long-term response (anchor moves when structural tax of deposit + train + defense exceeds migrate cost). Migration is **not** required by zone motion alone.
-
-**Architectural gameplay constraint (preserve later):**  
-If remote harvesting ever becomes so convenient that **distance stops mattering**, migration loses independent value and Nomad identity weakens. Do not silently remove structural tax on far eco (path time, deposit at settlement, production/rally at settlement, undefended workers).
-
-**Opponent interaction:** Recurring contest over the same valuable region (raid workers / defend eco / contest strip / still may push TC) — **not** a separate capture-point mode.
-
-**Causal chain (Q1):**
-
-```
-map change (slow bands over clusters)
-↓
-economic consequence (meaningful efficiency → tempo)
-↓
-player decision (endure / relocate workers / contest / optional migrate)
-↓
-risk (tempo loss / exposed workers / army away from TC / migrate downtime)
-↓
-payoff (better trips, deny enemy tempo, durable region, optional better anchor)
-↓
-opponent conflict (same region → eco-war without replacing TC victory)
+```text
+CLIMATE
+ + RESOURCE MIX / STOCK
+ + HORSE AVAILABILITY
+ + DISTANCE
+ + DEFENSE
+ + OPPONENT PRESSURE
+ + SETTLEMENT POSITION / CAPACITY
+ = CURRENT WORKING REGION
 ```
 
-**Not required by Q1 alone:** Economy 1.5, T2, AI migration, new resources, new win conditions, hard collapse, capture-point scoring, zone→harvest **implementation** (design direction only; Stage B code later when tasked).
+This prevents the system from becoming a simple “chase the green circle” mechanic.
 
 ---
 
-#### Q2 — When do resources become scarce or wrong-typed near the home base?
+## 5. Q2 — Scarcity and wrong geography
 
-**Status:** **DESIGN DECISION** (2026-09-01)
+**Status:** DESIGN ACCEPTED.
 
-**Consistency with Q1 / Q3:** OK — zone stays flow; depletion stays stock and is not a migration clock; distance tax preserved; migration optional; economic scarcity is not Economy 1.5.
+Resource pressure remains separate from climate.
 
-**Scarcity model:**
+| Axis | Meaning |
+|---|---|
+| Physical depletion | local stock reaches zero |
+| Spatial scarcity | useful stock exists but the next cluster is far |
+| Wrong-typed geography | nearby stock does not match the current production plan |
+| Climate flow | current regional efficiency/value |
+| Economic scarcity | felt tempo gap, not a new deficit subsystem |
 
-| Type | Meaning |
-|------|--------|
-| **Physical depletion** | Node/cluster amount → 0 (local end of stock) |
-| **Spatial scarcity** | Useful stock still exists on the map, but the next cluster is far |
-| **Wrong-typed geography** | Nearby stock is abundant but poorly matched to the current plan (e.g. stone-rich home, wood-hungry army) |
-| **Economic scarcity** | Felt tempo gap: income vs current production demand — **observed result**, not a separate deficit/goals subsystem |
+Local depletion is survivable.
 
-**Home region:** initially strong working region / starting reserve — **not** an infinite safe income bubble and **not** a timed eviction.
+Valid responses remain:
 
-**Primary mid-game pressure:** the **cheap** working region next to the settlement becomes insufficient (empty, far next cluster, and/or wrong mix). Player must decide **where and what** to extract next — not press a forced Migration command.
-
-**Orthogonal factors (do not collapse into one meter):**
-
-```
-DEPLETION  = stock
-ZONE       = flow efficiency     (Q1)
-DISTANCE   = logistics cost      (Q1 constraint — remote harvest always pays tax)
-OPPONENT   = territorial pressure
-SETTLEMENT = production / deposit / defense anchor
+```text
+endure
+→ switch resource / plan
+→ remote harvest
+→ contest another region
+→ migrate if persistent structural mismatch makes it worthwhile
 ```
 
-No zone-driven amount wipe. Zones do not become depletion.
-
-**After local pressure / depletion — multiple valid answers:**
-
-```
-endure → switch local type → remote harvest → contest → optional migration
-```
-
-- Full local physical depletion is **allowed** and **survivable** (not economic game-over).
-- Remote harvesting remains a real trade-off because of **distance tax**.
-- **Migration** only when **persistent structural mismatch**: remote-as-normal and cumulative logistics / defense / production tax exceed relocation cost. Never automatic on empty home. Never hard depletion timer. Never forced migration.
-
-**Wrong-typed geography (Nomad-specific):** a still-healthy home of the *wrong* mix can push spatial decisions as strongly as an empty home of the *right* mix.
-
-**Resource types:** same depletion rules for Wood / Stone / Horses; different strategic weight (wood often drives T1 army tempo; stone buildings; horses spatial prize without gating all T1). **No new resources (including Gold) for Q2.**
-
-**Canonical causal chain (Q2):**
-
-```
-resource state
-(empty nearby / far next cluster / wrong mix / slow effective income)
-↓
-player economic situation
-(tempo vs current plan)
-↓
-strategic mismatch
-(region no longer supports the plan efficiently)
-↓
-available choices
-(endure / switch / remote / contest / optional migrate)
-↓
-risk
-(tempo / exposure / army split / migration downtime)
-↓
-payoff
-(restore tempo / secure resource type / deny enemy / better long-term anchor)
-↓
-territorial conflict and/or optional migration pressure
-```
-
-**Final design rule (Q2):**
-
-> Resources can become locally scarce or geographically wrong for the player's current plan. This changes the value of the working region, but never commands migration. Local depletion is survivable; spatial distance, resource mismatch, ecological efficiency, and opponent pressure determine whether another region becomes worth pursuing. Migration remains an optional response to persistent structural mismatch, not to depletion alone.
-
-**Not required by Q2:** Economy 1.5, AI migration, T2, hard depletion timer, forced migration, zone-driven amount depletion, Gold/new resources, new victory conditions, capture points.
+Do not turn climate into a depletion wipe and do not create an automatic migration timer.
 
 ---
 
-#### Q3 — Is depletion a soft timer toward migration, or a hard local collapse?
+## 6. Q3 — Depletion is not a migration clock
 
-**Status:** **DESIGN DECISION** (2026-09-01)
+**Status:** DESIGN ACCEPTED.
 
-**Core constraint:** **Depletion ≠ migration clock.**
+Rejected:
 
-| Model | Verdict |
-|--------|--------|
-| Hard local collapse (`home empty → must migrate`) | **Rejected** — survival timer, low agency, snowball, scripted nomad |
-| Soft-timer-toward-migration framing | **Rejected as framing** — still timer-shaped if migrate is the expected end of depletion |
-| **Depletion as pressure on working-region value** | **Accepted** |
+- hard local collapse;
+- “home empty → must migrate”;
+- a disguised depletion timer whose intended endpoint is migration.
 
-**What depletion is:** one input that lowers extract value of a region (stock left). It does **not** command “Migrate.”
+Accepted:
 
-**What depletion is not:** a soft or hard survival timer; a direct parent of migration; global eco collapse when a local cluster hits 0.
+> Depletion lowers the value of a local working region. Combined with distance, climate, resource mismatch, defense and opponent pressure, it can make another region more attractive.
 
-**Orthogonal axes (keep separate):**
-
-```
-DEPLETION  = stock left on nodes/cluster
-ZONE       = flow efficiency now          (Q1)
-DISTANCE   = logistics tax                (Q1 constraint)
-SETTLEMENT = production / deposit / defense anchor
-OPPONENT   = contest pressure
-```
-
-**Stock × flow (player-readable states):**
-
-| Stock | Flow | Meaning |
-|-------|------|--------|
-| High | Favorable | Strong working region; prime contest |
-| High | Poor | Reserve exists; currently inefficient |
-| Low | Favorable | Efficient but short-lived opportunity |
-| Low | Poor | Weak region; seek alternatives |
-
-**Full local depletion is allowed and survivable.** Intended ladder (not a single forced step):
-
-```
-local stock gone
-→ remote harvest (pay distance tax)
-→ and/or switch resource / plan
-→ and/or contest another region
-→ only if remote-as-normal + structural tax persists
-→ migration becomes attractive
-→ migration remains optional
-```
-
-**Canonical causal chain (Q3):**
-
-```
-depletion
-→ spatial / strategic mismatch
-→ logistics tax
-→ sustained inefficiency (with zone, wrong-type, opponent as co-inputs)
-→ migration becomes attractive
-→ migration remains optional
-```
-
-**Qualitative pressure ladder (no numbers):**
-
-```
-SAFE → LOCAL PRESSURE → REMOTE HARVEST → STRUCTURAL MISMATCH → MIGRATION ATTRACTIVE (still not mandatory)
-```
-
-**Recovery:** Match-scale permanent empty nodes are acceptable; no **required** regeneration system. Old home can remain a production anchor with remote extract; “return” only if residual/other value remains.
-
-**Anti-snowball (design constraints):** depletion is local not global; zone magnitude stays meaningful not dominant (Q1); multiple answers always exist; pressure must be readable (not a hidden timer).
-
-**Opponent:** Soft depletion feeds a contest graph (fight / longer remote / switch plan / migrate elsewhere), not `empty → self-migrate`.
-
-**Not required by Q3:** Economy 1.5, AI migration, T2, regeneration system, new resources, new victory conditions, mandatory migration, hard local collapse, hidden survival timer.
-
-**Final design rule:**
-
-> Resources can run out locally. Running out never commands “Migrate.” It changes the value of a working region; together with zone, distance, mismatch, and opponent it can make migration attractive. Migration remains a choice. A player can lose from bad economic geography decisions without any invisible survival timer firing.
+Migration remains optional.
 
 ---
 
-### Mobility & settlement
+## 7. Q4 — Mobility and settlement migration
 
-#### Q4 — Why not sit forever / what is migrate / role of pack-unpack?
+**Status:** DESIGN ACCEPTED.
 
-**Status:** **DESIGN DECISION** (2026-09-01)
+Migration is a strategic repositioning of the settlement anchor, not a command issued by the climate system.
 
-**Consistency Q1 ↔ Q2 ↔ Q3 ↔ Q4:** OK — zone never alone forces migrate; scarcity enables remote without forcing pack; depletion ≠ pack now; distance tax preserved on the full anchor loop; multiple agency paths; migration can be wrong; attractiveness is structural cost vs new-anchor value, **not** “after N minutes of remote harvest.”
+Hierarchy:
 
-**Mobility hierarchy:**
-
-```
+```text
 Worker relocation
     ↓
 Remote harvesting
@@ -293,127 +232,241 @@ Temporary forward presence
 Settlement migration
 ```
 
-| Level | Role |
-|-------|------|
-| **Worker relocation** | Short-term / local mismatch (zone window, wrong type, thin nearby) |
-| **Remote harvesting** | Sustained spatial scarcity while **keeping** the old settlement anchor |
-| **Temporary forward presence** | Contest / protect a strip — **not** a new settlement |
-| **Settlement migration** | Long-term reposition of deposit + production + defense + rally **anchor** |
+The existing mobile Town Center / pack-unpack system is the **means** of changing the settlement anchor.
 
-**Core distinction:**
+Migration should involve:
 
-> Worker relocation solves a **temporary/local** mismatch. Settlement migration solves a **persistent structural** mismatch of the **whole** settlement anchor.
+- downtime;
+- vulnerability;
+- lost or delayed production;
+- positional risk;
+- prediction of whether the destination remains valuable.
 
-**Settlement anchor (Stage 1 structure — preserve):**
-
-```
-resources → workers → deposit at TC → production / rally → army + defense
-```
-
-Remote extract must **not** become free because workers can walk far. Distance tax is the repeated cost on travel, deposit, production/rally lag, and undefended remote workers.
-
-**Player-facing definition of migration:**
-
-> Move the settlement anchor closer to a region you believe will sustain your economy and army for the long term, paying downtime and risk.
-
-Pack/unpack (existing Stage 1 mobile buildings) is the **means** to change anchor, not the meaning of the decision.
-
-**Why not migrate immediately:** current settlement still supports the plan; remote region may be temporary; migration downtime can lose military timing; destination may be contested; existing defensive/rally footprint has value; worker relocation may already suffice; player may intentionally pursue a military/TC strategy instead.
-
-**Why migrate eventually (no time-threshold substitute):** migration becomes attractive only when **persistent** remote harvesting plus repeated distance tax plus deposit/production/defense/rally friction, against a **durable** alternative region, outweigh the continued cost of the old anchor. Compare structural tax to migrate cost and expected value of the new anchor — **not** “remote for N minutes ⇒ must pack.”
-
-**Migration can be wrong:** too early (window ends, stranded); too late (tempo already bled); wrong destination; move into contested ground; wrong prediction of the future working region. If migration cannot fail as a bet, it is not strategic.
-
-**Opponent interaction (no capture points):**
-
-```
-A starts migration
-↓
-B can raid / contest / intercept / attack old or soft targets
-↓
-A can continue / abort / redirect / defend / choose another region
-```
-
-**Can the player win without migration?** **Yes.** Migration is **one strategic branch among several**, not a hidden requirement for victory.
-
-**Canonical causal chain (Q4):**
-
-```
-resource geography changes
-(stock / type / zone flow / access)
-↓
-working region moves or becomes structurally distant
-↓
-worker relocation / remote harvest initially solves it
-↓
-persistent distance + deposit + production + defense tax accumulate
-↓
-player evaluates alternative long-term anchor
-↓
-migration becomes attractive
-↓
-migration creates downtime + vulnerability + positional risk
-↓
-destination must remain valuable long enough
-↓
-opponent can contest / punish
-↓
-successful migration creates a better long-term settlement anchor
-```
-
-**Final design rule (Q4):**
-
-> Settlement migration is an optional long-term repositioning of the economic and military anchor. It is not triggered by depletion or zones alone. It becomes attractive when persistent geographic mismatch makes remote extraction and the resulting deposit, production, rally, and defense costs worse than establishing a new anchor. Migration is a prediction and a strategic bet: it costs time and safety, can be wrong, and is never mandatory for victory.
-
-**Not required by Q4:** Economy 1.5, deficit AI, AI migration, T2, new migration currency, forced migration, hard collapse, capture points, new victory conditions, new resource types, Stage 1 changes beyond preserving existing distance / deposit / production / rally / pack-unpack behavior.
+Migration can be wrong. The player must be able to win without migrating.
 
 ---
 
-### Conflict beyond “kill TC”
+## 8. Horses as the first ecological response
 
-- Reasons to attack that are **not** only enemy Town Center?
-- Contested space, herds, favorable zones, raid loot, denying a migration path?
-- Mid-game decision matrix: develop vs migrate vs defend vs raid vs commit army?
+Horses are a particularly readable test of the climate loop.
 
-### Progression
+Conceptually:
 
-- Where does **T2** appear as a *response* to Stage 1.5 pressure (not as a content dump)?
-- New win/lose conditions later — only after the loop needs them (see TD-03 coupling).
+```text
+BAD HORSE CONDITIONS
+      ↓
+HORSE AVAILABILITY FALLS / BECOMES ZERO
 
-### AI (only if design requires it)
+FAVORABLE CONDITIONS
+      ↓
+HORSE HERD BECOMES AVAILABLE AGAIN
+```
 
-- Does Stage 1.5 need the AI to understand goal → cost → deficit → workers?
-- If **yes** → then open **Economy 1.5 design** with a written requirement from this doc.
-- If **no** → keep dual-floor Stage 1 AI; do not complicate the decision layer.
+The implementation must reuse the existing Horse/Cavalry resource pipeline where practical.
 
----
+The first slice does **not** require animal pathfinding. Deactivation/removal/respawn is an implementation choice to be made after repository inspection.
 
-## Out of scope until design answers exist
+The key gameplay result is:
 
-| Topic | Rule |
-|--------|------|
-| Economy 1.5 code | Frozen unless a later question forces it |
-| T2 buildings/units | Frozen |
-| Zone harvest multipliers **code** | Allowed only after explicit implementation task; Q1 gives **direction** only |
-| AI migration | After migration is a proven player-facing necessity |
-| New unit roster | After conflict reasons are clear |
-| Resource regeneration system | Not required by Q3 |
-| Hard local collapse / migration timer | **Rejected** (Q3) |
-| Forced migration / migration time-threshold | **Rejected** (Q4) |
+```text
+climate
+→ horse availability
+→ cavalry economy
+→ regional value
+→ player decision
+```
 
 ---
 
-## Working note
+## 9. Neutral camps and hero progression
 
-Stage 1 foundation is solid enough to **design** mid-game without rewriting the economic AI. Prefer one coherent loop story over parallel feature spikes.
+The temporary term “creeper” is not canonical. Use **Neutral Camp / Neutral** in technical design until a final lore name is chosen.
+
+Neutral camps create a second route to value besides ordinary resource extraction:
+
+```text
+NEUTRAL CAMP
+      ↓
+COMBAT
+      ↓
+LOOT
+ ┌────┴────┐
+resources  future artifact
+```
+
+Neutral difficulty can eventually have multiple levels. The first slice may use one level only.
+
+The long-term intended relationship is:
+
+```text
+weak hero / army
+→ some neutral camps are too dangerous
+
+stronger hero / army
+→ higher-level camps become accessible
+```
+
+### Minimal hero
+
+A minimal **player hero** is included in Stage 1.5 planning because the artifact mechanic cannot be meaningfully tested without a carrier.
+
+First hero scope:
+
+- reuse `BaseUnit` / Movement / Combat / Order where possible;
+- normal movement and combat;
+- HP/death;
+- existing selection/UI;
+- minimal progression hook if required by neutral rewards;
+- one artifact slot;
+- no full inventory;
+- no ability tree;
+- no full mana system;
+- no hero classes.
+
+AI hero is deferred. This is a scope decision, not a permanent asymmetric rule.
+
+---
+
+## 10. Artifact loop
+
+The first artifact implementation is deliberately minimal:
+
+```text
+Neutral encounter / camp
+      ↓
+Artifact appears as world loot
+      ↓
+Hero reaches artifact
+      ↓
+Pickup
+      ↓
+One simple passive bonus
+      ↓
+Hero dies
+      ↓
+Artifact drops
+      ↓
+Another hero can steal it
+```
+
+Use **one artifact type** initially. Do not create Artifact Tier 1/2/3 until the basic loop is proven.
+
+The artifact is a world object, not a normal Wood/Stone/Gold/Horse resource.
+
+---
+
+## 11. Power Sites
+
+The star-marked Power Sites are deliberate future infrastructure anchors.
+
+They are reserved for later:
+
+- magical creatures;
+- hero mana replenishment;
+- magic infrastructure;
+- faction-specific interactions.
+
+No Power Site gameplay is part of the first implementation slice.
+
+The current map concept expects a Power Site to be associated with each major region as a future strategic layer.
+
+---
+
+## 12. Conflict beyond “kill TC”
+
+Stage 1.5 should create reasons to fight that are not limited to immediately attacking the enemy Town Center.
+
+Candidate conflict reasons include:
+
+- contesting a favorable region;
+- contesting horse availability;
+- raiding exposed workers;
+- attacking neutral camps for rewards;
+- denying an opponent's migration destination;
+- protecting an artifact carrier;
+- stealing a dropped artifact;
+- defending the economic anchor during migration.
+
+These are **conflict consequences**, not new capture-point modes or new victory conditions.
+
+---
+
+## 13. Strategic decision matrix
+
+The intended player decision set is:
+
+```text
+DEVELOP
+MIGRATE
+DEFEND
+RAID
+CONTEST
+COMMIT
+```
+
+These choices must emerge from the systems above. Do not create separate “migrate mode”, “territory mode”, or “raid mode” simply to manufacture variety.
+
+---
+
+## 14. Deferred systems
+
+Until the narrower slices prove a concrete need, keep the following out of implementation:
+
+- AI migration;
+- AI hero;
+- full Economy 1.5 goal/deficit architecture;
+- full hero level/skill progression;
+- Artifact tiers;
+- terrain/settlement suitability scoring;
+- animal pathfinding;
+- magic/mana systems;
+- Power Site gameplay;
+- T2/T3;
+- new victory conditions.
+
+Do not start these because they are theoretically useful. Start them only when the accepted gameplay loop demonstrates the need.
+
+---
+
+## 15. Implementation order
+
+The canonical order is defined in `DESIGN_CLIMATE_AND_MIGRATION_PRESSURE.md`:
+
+```text
+A  Climate backend
+↓
+B  Environment visuals
+↓
+C  Resource climate pressure
+↓
+D  Horse response
+↓
+E  Neutral camps
+↓
+F  Minimal player hero + artifact
+↓
+G  Conflict matrix / playtest
+```
+
+Each stage is a separate implementation request and requires F5 acceptance.
+
+---
+
+## 16. Design completion state
+
+Q1–Q4 are accepted as the current foundation:
 
 | Question | Status |
-|----------|--------|
-| Q1 Zones | **DESIGN ACCEPTED** |
-| Q2 Scarcity / wrong-typed | **DESIGN ACCEPTED** |
-| Q3 Depletion | **DESIGN ACCEPTED** |
-| Q4 Mobility & settlement | **DESIGN ACCEPTED** |
+|---|---|
+| Q1 — Climate regions | **ACCEPTED** |
+| Q2 — Scarcity / wrong geography | **ACCEPTED** |
+| Q3 — Depletion | **ACCEPTED** |
+| Q4 — Mobility / migration | **ACCEPTED** |
+| Fixed non-overlapping region model | **ACCEPTED** |
+| Three-state climate model | **ACCEPTED** |
+| Neutral / hero / artifact vertical slice | **DESIGNED — NOT IMPLEMENTED** |
+| Power Sites | **DEFERRED** |
 
-Q1–Q4 form one system: flow × stock × logistics × optional anchor move. Next open block: **Conflict beyond kill TC**.
+**Next implementation question:** Can the fixed-region climate backend replace the old moving-zone model cleanly without touching unrelated Stage 1 systems?
 
-*Created 2026-09-01 after Stage 1 formal sign-off. Q1–Q4 recorded 2026-09-01.*
+*Updated 2026-09-11 after map review and multi-model design reconciliation.*
