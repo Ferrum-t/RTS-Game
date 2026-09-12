@@ -1,166 +1,201 @@
 extends Node
 
-## Environment Zones v1.0 — Stage A: drifting zone blobs + ground visual.
-## Stage B (harvest multiplier) is NOT wired here — wait for F5 acceptance of A.
-## Lore limit: zones affect resource gather rate only (02_GEOGRAPHY §12/§38).
-## Visual: draw order + Y offset + render_priority so overlap shows the same
-## winner as get_multiplier_at() (COLD > DRY > FAVORABLE), not alpha mud.
+## Environment Zones — Stage 1.5 Slice A: fixed climate regions + seasonal state.
+## Geometry does not move. Season changes state only.
+## Public API for harvest: get_multiplier_at(world_pos) — signature preserved.
+## HarvestComponent is not modified in Slice A.
+## No velocity / drift / bounce / TRANSITION / overlap priority.
 
-enum ZoneType {
-	FAVORABLE,
-	TRANSITION,
-	DRY,
+enum ClimateState {
 	COLD,
+	FAVORABLE,
+	DRY,
 }
 
-## Priority when blobs overlap (higher wins). TRANSITION is background only.
-const _PRIORITY := {
-	ZoneType.COLD: 3,
-	ZoneType.DRY: 2,
-	ZoneType.FAVORABLE: 1,
-	ZoneType.TRANSITION: 0,
+## Schedule templates: equal thirds of season_progress.
+## A: FAV → DRY → COLD
+## B: DRY → COLD → FAV
+## C: COLD → FAV → DRY
+enum ScheduleId {
+	A,
+	B,
+	C,
 }
 
 const _MULT := {
-	ZoneType.FAVORABLE: 1.5,
-	ZoneType.TRANSITION: 1.0,
-	ZoneType.DRY: 0.5,
-	ZoneType.COLD: 0.5,
+	ClimateState.FAVORABLE: 1.5,
+	ClimateState.DRY: 0.5,
+	ClimateState.COLD: 0.5,
 }
 
-## Solid-enough alpha so a higher-priority disc fully covers a lower one in
-## the intersection, while still seeing units/buildings through the top disc.
 const _COLOR := {
-	ZoneType.FAVORABLE: Color(0.15, 0.8, 0.25, 0.55),
-	ZoneType.DRY: Color(0.95, 0.38, 0.12, 0.62),
-	ZoneType.COLD: Color(0.25, 0.55, 1.0, 0.68),
+	ClimateState.FAVORABLE: Color(0.15, 0.8, 0.25, 0.55),
+	ClimateState.DRY: Color(0.95, 0.38, 0.12, 0.62),
+	ClimateState.COLD: Color(0.25, 0.55, 1.0, 0.68),
 }
 
-## Slight Y stack so depth sort matches priority (FAVORABLE lowest).
-const _Y_OFFSET := {
-	ZoneType.FAVORABLE: 0.04,
-	ZoneType.DRY: 0.055,
-	ZoneType.COLD: 0.07,
-}
+## Minimum gap so circles neither overlap nor touch.
+const REGION_GAP := 2.0
 
-## Playable AABB on XZ (from MatchManager spawn layout ≈ ±20; pad for drift).
-@export var map_min_x: float = -28.0
-@export var map_max_x: float = 28.0
-@export var map_min_z: float = -28.0
-@export var map_max_z: float = 28.0
+## Full season cycle length (seconds). Export for F5 tuning only.
+@export var season_duration_sec: float = 180.0
 
-## Tick interval for movement (not every physics frame).
-@export var tick_interval: float = 0.2
+## Debug ground discs (static). Color follows current state.
+@export var debug_draw: bool = true
 
-## Default blob radii / speeds (units/sec). Crossing ~40–50 units ≈ 40–50s at 1.0.
-@export var default_radius: float = 10.0
-@export var default_speed: float = 1.0
+## season_progress ∈ [0, 1). Advances from season_duration_sec.
+var season_progress: float = 0.0
 
-var blobs: Array = []
-var _tick_accum: float = 0.0
+var regions: Array = []
 var _visual_root: Node3D = null
+var _last_logged_slot: int = -1
 
 
-class ZoneBlob:
+class ClimateRegion:
 	extends RefCounted
-	var type: int = ZoneType.FAVORABLE
-	var position: Vector3 = Vector3.ZERO
-	var radius: float = 10.0
-	var velocity: Vector3 = Vector3.ZERO
+	var id: String = ""
+	var center: Vector3 = Vector3.ZERO
+	var radius: float = 14.0
+	var schedule_id: int = ScheduleId.A
 	var mesh_instance: MeshInstance3D = null
+	var label: Label3D = null
 
 
 func _ready() -> void:
-	_spawn_default_blobs()
-	_ensure_visual_root()
-	_build_visuals()
+	_spawn_regions()
+	_assert_non_overlap()
+	if debug_draw:
+		_ensure_visual_root()
+		_build_visuals()
 	_print_startup()
 
 
 func _process(delta: float) -> void:
-	_tick_accum += delta
-	if _tick_accum < tick_interval:
+	if season_duration_sec <= 0.001:
 		return
-	var step: float = _tick_accum
-	_tick_accum = 0.0
-	_move_blobs(step)
+	var prev_slot: int = _season_slot(season_progress)
+	season_progress = fposmod(season_progress + delta / season_duration_sec, 1.0)
+	var slot: int = _season_slot(season_progress)
+	if slot != prev_slot:
+		_on_season_slot_changed(slot)
+	_update_visual_colors()
 
 
-## Public API for Stage B (harvest). Safe to call now; always returns 1.0 outside blobs.
+## Public API — used by HarvestComponent. Do not change signature.
+## Neutral land (outside all regions) → 1.0
 func get_multiplier_at(world_pos: Vector3) -> float:
-	var p := Vector3(world_pos.x, 0.0, world_pos.z)
-	var best_type: int = ZoneType.TRANSITION
-	var best_pri: int = -1
-	for b in blobs:
-		var blob: ZoneBlob = b
-		if blob.type == ZoneType.TRANSITION:
-			continue
-		var d: float = Vector2(p.x - blob.position.x, p.z - blob.position.z).length()
-		if d > blob.radius:
-			continue
-		var pri: int = int(_PRIORITY.get(blob.type, 0))
-		if pri > best_pri:
-			best_pri = pri
-			best_type = blob.type
-	if best_pri < 0:
+	var region: ClimateRegion = get_region_at(world_pos)
+	if region == null:
 		return 1.0
-	return float(_MULT.get(best_type, 1.0))
+	var state: int = get_region_state(region)
+	return float(_MULT.get(state, 1.0))
 
 
-func _spawn_default_blobs() -> void:
-	blobs.clear()
-	# 2× FAVORABLE, 1× DRY, 1× COLD — positions near play area so motion is visible in F5.
+func get_region_at(world_pos: Vector3) -> ClimateRegion:
+	var p := Vector2(world_pos.x, world_pos.z)
+	for r in regions:
+		var region: ClimateRegion = r
+		var c := Vector2(region.center.x, region.center.z)
+		if p.distance_to(c) <= region.radius:
+			return region
+	return null
+
+
+func get_region_state(region: ClimateRegion) -> int:
+	if region == null:
+		return ClimateState.FAVORABLE
+	return _state_for_schedule(region.schedule_id, _season_slot(season_progress))
+
+
+func _season_slot(progress: float) -> int:
+	var p: float = fposmod(progress, 1.0)
+	var slot: int = int(floor(p * 3.0))
+	if slot > 2:
+		slot = 2
+	return slot
+
+
+func _state_for_schedule(schedule_id: int, slot: int) -> int:
+	# Tables match pre-code validation.
+	match schedule_id:
+		ScheduleId.A:
+			# FAV → DRY → COLD
+			match slot:
+				0:
+					return ClimateState.FAVORABLE
+				1:
+					return ClimateState.DRY
+				_:
+					return ClimateState.COLD
+		ScheduleId.B:
+			# DRY → COLD → FAV
+			match slot:
+				0:
+					return ClimateState.DRY
+				1:
+					return ClimateState.COLD
+				_:
+					return ClimateState.FAVORABLE
+		ScheduleId.C:
+			# COLD → FAV → DRY
+			match slot:
+				0:
+					return ClimateState.COLD
+				1:
+					return ClimateState.FAVORABLE
+				_:
+					return ClimateState.DRY
+		_:
+			return ClimateState.FAVORABLE
+
+
+func _spawn_regions() -> void:
+	regions.clear()
+	# Pre-code validated layout (GAP>=2, home coverage of TC + starter resources).
 	var specs: Array = [
-		{ "type": ZoneType.FAVORABLE, "pos": Vector3(8.0, 0.0, 4.0), "vel": Vector3(-0.7, 0.0, 0.6) },
-		{ "type": ZoneType.FAVORABLE, "pos": Vector3(-10.0, 0.0, -6.0), "vel": Vector3(0.8, 0.0, 0.5) },
-		{ "type": ZoneType.DRY, "pos": Vector3(0.0, 0.0, 14.0), "vel": Vector3(0.5, 0.0, -0.9) },
-		{ "type": ZoneType.COLD, "pos": Vector3(-14.0, 0.0, 8.0), "vel": Vector3(0.9, 0.0, -0.4) },
+		{"id": "R0", "center": Vector3(32.0, 0.0, -30.0), "radius": 14.0, "schedule": ScheduleId.A},
+		{"id": "R1", "center": Vector3(-30.0, 0.0, 30.0), "radius": 14.0, "schedule": ScheduleId.A},
+		{"id": "R2", "center": Vector3(55.0, 0.0, 5.0), "radius": 14.0, "schedule": ScheduleId.B},
+		{"id": "R3", "center": Vector3(-55.0, 0.0, -5.0), "radius": 14.0, "schedule": ScheduleId.C},
 	]
 	for s in specs:
-		var blob := ZoneBlob.new()
-		blob.type = int(s["type"])
-		blob.position = s["pos"]
-		blob.radius = default_radius
-		var v: Vector3 = s["vel"]
-		v.y = 0.0
-		if v.length() > 0.001:
-			v = v.normalized() * default_speed
-		blob.velocity = v
-		blobs.append(blob)
+		var region := ClimateRegion.new()
+		region.id = str(s["id"])
+		region.center = s["center"]
+		region.radius = float(s["radius"])
+		region.schedule_id = int(s["schedule"])
+		regions.append(region)
 
 
-func _move_blobs(delta: float) -> void:
-	for b in blobs:
-		var blob: ZoneBlob = b
-		blob.position += blob.velocity * delta
-		blob.position.y = 0.0
-		_bounce_blob(blob)
-		if blob.mesh_instance != null and is_instance_valid(blob.mesh_instance):
-			var y: float = float(_Y_OFFSET.get(blob.type, 0.05))
-			blob.mesh_instance.global_position = Vector3(blob.position.x, y, blob.position.z)
+func _assert_non_overlap() -> void:
+	for i in range(regions.size()):
+		for j in range(i + 1, regions.size()):
+			var a: ClimateRegion = regions[i]
+			var b: ClimateRegion = regions[j]
+			var d: float = Vector2(a.center.x - b.center.x, a.center.z - b.center.z).length()
+			var need: float = a.radius + b.radius + REGION_GAP
+			if d < need:
+				push_error(
+					"[ZONE] OVERLAP/TOUCH %s-%s dist=%.2f need=%.2f (gap=%.1f)"
+					% [a.id, b.id, d, need, REGION_GAP]
+				)
+			else:
+				print("[ZONE] non-overlap OK %s-%s dist=%.2f need=%.2f" % [a.id, b.id, d, need])
 
 
-func _bounce_blob(blob: ZoneBlob) -> void:
-	var bounced := false
-	var r: float = blob.radius * 0.25  # soft pad so disc edge stays roughly on map
-	if blob.position.x - r < map_min_x:
-		blob.position.x = map_min_x + r
-		blob.velocity.x = absf(blob.velocity.x)
-		bounced = true
-	elif blob.position.x + r > map_max_x:
-		blob.position.x = map_max_x - r
-		blob.velocity.x = -absf(blob.velocity.x)
-		bounced = true
-	if blob.position.z - r < map_min_z:
-		blob.position.z = map_min_z + r
-		blob.velocity.z = absf(blob.velocity.z)
-		bounced = true
-	elif blob.position.z + r > map_max_z:
-		blob.position.z = map_max_z - r
-		blob.velocity.z = -absf(blob.velocity.z)
-		bounced = true
-	if bounced:
-		print("[ZONE] blob type=", _type_name(blob.type), " bounced at edge pos=", blob.position)
+func _on_season_slot_changed(slot: int) -> void:
+	_last_logged_slot = slot
+	print("[ZONE] season slot → ", slot, " progress=", snappedf(season_progress, 0.001))
+	for r in regions:
+		var region: ClimateRegion = r
+		var st: int = get_region_state(region)
+		print(
+			"[ZONE] ", region.id,
+			" state=", _state_name(st),
+			" mult=", float(_MULT.get(st, 1.0)),
+			" center=", region.center,
+			" radius=", region.radius
+		)
 
 
 func _ensure_visual_root() -> void:
@@ -168,7 +203,6 @@ func _ensure_visual_root() -> void:
 		return
 	var scene := get_tree().current_scene
 	if scene == null:
-		# Autoload may run before main scene; defer.
 		call_deferred("_ensure_visual_root")
 		call_deferred("_build_visuals")
 		return
@@ -178,41 +212,60 @@ func _ensure_visual_root() -> void:
 
 
 func _build_visuals() -> void:
+	if not debug_draw:
+		return
 	if _visual_root == null or not is_instance_valid(_visual_root):
 		return
 	for child in _visual_root.get_children():
 		child.queue_free()
 
-	# Draw low priority first, high last → COLD covers DRY covers FAVORABLE
-	# in intersections (same rule as get_multiplier_at).
-	var ordered: Array = blobs.duplicate()
-	ordered.sort_custom(func(a: ZoneBlob, b: ZoneBlob) -> bool:
-		return int(_PRIORITY.get(a.type, 0)) < int(_PRIORITY.get(b.type, 0))
-	)
+	for r in regions:
+		var region: ClimateRegion = r
+		var st: int = get_region_state(region)
 
-	for b in ordered:
-		var blob: ZoneBlob = b
-		if blob.type == ZoneType.TRANSITION:
-			continue
 		var mi := MeshInstance3D.new()
-		mi.name = "ZoneDisc_%s" % _type_name(blob.type)
-		mi.mesh = _make_ground_disc_mesh(blob.radius, 48)
+		mi.name = "RegionDisc_%s" % region.id
+		mi.mesh = _make_ground_disc_mesh(region.radius, 48)
 		var mat := StandardMaterial3D.new()
-		mat.albedo_color = _COLOR.get(blob.type, Color(1, 1, 1, 0.5))
+		mat.albedo_color = _COLOR.get(st, Color(1, 1, 1, 0.5))
 		mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
 		mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
 		mat.cull_mode = BaseMaterial3D.CULL_DISABLED
-		# Higher priority draws later + higher render_priority → no muddy mix.
-		mat.render_priority = int(_PRIORITY.get(blob.type, 0))
 		mat.depth_draw_mode = BaseMaterial3D.DEPTH_DRAW_ALWAYS
 		mi.material_override = mat
-		var y: float = float(_Y_OFFSET.get(blob.type, 0.05))
-		mi.position = Vector3(blob.position.x, y, blob.position.z)
+		# Static position — never updated for motion.
+		mi.position = Vector3(region.center.x, 0.05, region.center.z)
 		_visual_root.add_child(mi)
-		blob.mesh_instance = mi
+		region.mesh_instance = mi
+
+		var lbl := Label3D.new()
+		lbl.name = "RegionLabel_%s" % region.id
+		lbl.text = "%s\n%s" % [region.id, _state_name(st)]
+		lbl.font_size = 48
+		lbl.modulate = Color(1, 1, 1, 0.9)
+		lbl.billboard = BaseMaterial3D.BILLBOARD_ENABLED
+		lbl.position = Vector3(region.center.x, 2.5, region.center.z)
+		_visual_root.add_child(lbl)
+		region.label = lbl
 
 
-## Flat filled disc on XZ (Y up) — same spirit as MobileBuilding._make_ground_ring_mesh.
+func _update_visual_colors() -> void:
+	if not debug_draw:
+		return
+	for r in regions:
+		var region: ClimateRegion = r
+		var st: int = get_region_state(region)
+		if region.mesh_instance != null and is_instance_valid(region.mesh_instance):
+			var mat: StandardMaterial3D = region.mesh_instance.material_override as StandardMaterial3D
+			if mat != null:
+				mat.albedo_color = _COLOR.get(st, Color(1, 1, 1, 0.5))
+			# Position stays fixed — no motion.
+			region.mesh_instance.position = Vector3(region.center.x, 0.05, region.center.z)
+		if region.label != null and is_instance_valid(region.label):
+			region.label.text = "%s\n%s" % [region.id, _state_name(st)]
+			region.label.position = Vector3(region.center.x, 2.5, region.center.z)
+
+
 func _make_ground_disc_mesh(radius: float, segments: int) -> ArrayMesh:
 	var verts := PackedVector3Array()
 	var norms := PackedVector3Array()
@@ -221,7 +274,7 @@ func _make_ground_disc_mesh(radius: float, segments: int) -> ArrayMesh:
 	norms.append(Vector3.UP)
 	for i in range(segments):
 		var a: float = TAU * float(i) / float(segments)
-		verts.append(Vector3(cos(a) * radius, 0.0, sin(a) * radius))
+		verts.append(Vector3(cos(a) * radius, 0.0, sin(a) * radius)
 		norms.append(Vector3.UP)
 	for i in range(segments):
 		var i0 := 0
@@ -239,26 +292,42 @@ func _make_ground_disc_mesh(radius: float, segments: int) -> ArrayMesh:
 
 
 func _print_startup() -> void:
-	print("[ZONE] EnvironmentZoneService ready — blobs=", blobs.size())
-	for b in blobs:
-		var blob: ZoneBlob = b
+	print("[ZONE] EnvironmentZoneService Slice A ready — fixed regions=", regions.size())
+	print("[ZONE] season_progress=", season_progress, " duration_sec=", season_duration_sec)
+	for r in regions:
+		var region: ClimateRegion = r
+		var st: int = get_region_state(region)
 		print(
-			"[ZONE] blob type=", _type_name(blob.type),
-			" pos=", blob.position,
-			" radius=", blob.radius,
-			" vel=", blob.velocity
+			"[ZONE] ", region.id,
+			" center=", region.center,
+			" radius=", region.radius,
+			" schedule=", _schedule_name(region.schedule_id),
+			" state=", _state_name(st),
+			" mult=", float(_MULT.get(st, 1.0))
 		)
+	# Explicit: no motion fields
+	print("[ZONE] motion=none velocity=none bounce=none TRANSITION=none priority=none")
 
 
-func _type_name(t: int) -> String:
+func _state_name(t: int) -> String:
 	match t:
-		ZoneType.FAVORABLE:
+		ClimateState.FAVORABLE:
 			return "FAVORABLE"
-		ZoneType.TRANSITION:
-			return "TRANSITION"
-		ZoneType.DRY:
+		ClimateState.DRY:
 			return "DRY"
-		ZoneType.COLD:
+		ClimateState.COLD:
 			return "COLD"
 		_:
 			return str(t)
+
+
+func _schedule_name(s: int) -> String:
+	match s:
+		ScheduleId.A:
+			return "A"
+		ScheduleId.B:
+			return "B"
+		ScheduleId.C:
+			return "C"
+		_:
+			return str(s)
