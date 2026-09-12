@@ -274,7 +274,7 @@ func _make_ground_disc_mesh(radius: float, segments: int) -> ArrayMesh:
 	norms.append(Vector3.UP)
 	for i in range(segments):
 		var a: float = TAU * float(i) / float(segments)
-		verts.append(Vector3(cos(a) * radius, 0.0, sin(a) * radius)
+		verts.append(Vector3(cos(a) * radius, 0.0, sin(a) * radius))
 		norms.append(Vector3.UP)
 	for i in range(segments):
 		var i0 := 0
