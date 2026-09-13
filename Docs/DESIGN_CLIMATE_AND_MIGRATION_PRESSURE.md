@@ -4,7 +4,7 @@
 **Scope:** Stage 1.5 gameplay design  
 **Branch:** `nomads-wars-grok`  
 **Process:** `Docs/ACCEPTANCE_AND_PROCESS.md` §2, §3, §5  
-**Related:** `STAGE_1_5_GAMEPLAY.md`, `CURRENT_STATE.md`, `nomad_wars_v1_scope_and_architecture.md`, `02_GEOGRAPHY_AND_CLIMATE.md`, `08_MIGRATION_AND_NOMADISM.md`
+**Related:** `STAGE_1_5_GAMEPLAY.md`, `CURRENT_STATE.md`, `EXPANDED_CLIMATE_GEOMETRY_V0_1.md`, `nomad_wars_v1_scope_and_architecture.md`, `02_GEOGRAPHY_AND_CLIMATE.md`, `08_MIGRATION_AND_NOMADISM.md`
 
 > This document turns the current map concept and Stage 1.5 discussion into a single design contract. It describes intended gameplay and implementation direction; it does **not** mean any of these systems are implemented.
 
@@ -549,6 +549,16 @@ This document is considered **design-complete for the next implementation step**
 5. the next implementation slice is a single narrow A-stage request.
 
 Design completion does **not** mean any of the mechanics are accepted in code.
+
+---
+
+## Appendix — Expanded Climate Geometry v0.1
+
+Design sign-off for the first **8-region / radius 21** layout (Variant B) lives in:
+
+`Docs/EXPANDED_CLIMATE_GEOMETRY_V0_1.md`
+
+That document is geography-only. It does not by itself accept implementation, change Slice A runtime prototype (4×r14), or authorize Slice B visuals.
 
 ---
 
