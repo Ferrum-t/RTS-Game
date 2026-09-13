@@ -53,9 +53,10 @@
 
 ## Stage 1.5 — CURRENT DESIGN PHASE
 
-**Status:** **DESIGN ACTIVE / IMPLEMENTATION NOT YET ACCEPTED**
+**Status:** **DESIGN ACTIVE / SLICE A PROTOTYPE IN CODE / EXPANDED GEOMETRY SIGNED OFF**
 
-Canonical contract: `DESIGN_CLIMATE_AND_MIGRATION_PRESSURE.md`.
+Canonical contract: `DESIGN_CLIMATE_AND_MIGRATION_PRESSURE.md`.  
+Expanded map geometry (design only): `EXPANDED_CLIMATE_GEOMETRY_V0_1.md`.
 
 ### Accepted design direction
 
@@ -84,6 +85,20 @@ Canonical contract: `DESIGN_CLIMATE_AND_MIGRATION_PRESSURE.md`.
 7. **G — Conflict matrix:** develop / migrate / defend / raid / contest / commit.
 
 Each step requires its own explicit implementation request and F5 acceptance. No Stage 1.5 mechanic is accepted merely because it is documented.
+
+### Slice A — Climate backend (code status)
+
+- **Implemented** in `EnvironmentZoneService` as a **technical prototype**.
+- Layout in code: **4 regions × radius 14** (R0–R3), season duration **180 s** (debug).
+- F5 accepted: non-overlap OK, no motion/TRANSITION/priority, seasonal state change, `get_multiplier_at` drives harvest (`zone_mult` logs), Stage 1 match still completes.
+- This prototype proves the backend contract; it is **not** the expanded production geography.
+
+### Expanded Climate Geometry v0.1 (design only)
+
+- **Signed off 2026-09-13** — see `Docs/EXPANDED_CLIMATE_GEOMETRY_V0_1.md`.
+- **8 regions × radius 21**, Variant B centers; MIN_GAP ≈ 10 for future climate visuals.
+- **Not in code yet.** Porting layout is a separate explicit task; do not treat sign-off as an implementation order.
+- 1 region ≈ 1 future aul package; dual-aul-per-region deferred (multiplayer reserve).
 
 ### Deferred
 
@@ -167,5 +182,8 @@ Values from F5 / code exports on `nomads-wars-grok` as of 2026-09-01. Update thi
 1. ~~Formal Stage 1 sign-off~~ **done**
 2. ~~Balance snapshot in repo~~ **done**
 3. ~~Open Stage 1.5 design~~ **done / expanded**
-4. **Next:** review/accept Stage 1.5 design contract, then implement **A — Climate backend** as a separate narrow task
-5. Economy 1.5 / T2 / AI migration / hero AI only if later evidence explicitly demands them
+4. ~~A — Climate backend prototype (4×r14)~~ **done + F5**
+5. ~~Expanded Climate Geometry v0.1 sign-off~~ **done** (`EXPANDED_CLIMATE_GEOMETRY_V0_1.md`)
+6. **Later (explicit request only):** port Variant B (8×r21) into `EnvironmentZoneService`
+7. **Then:** Slice B — environment state visuals (world-readable climate)
+8. Economy 1.5 / T2 / AI migration / hero AI only if later evidence explicitly demands them
