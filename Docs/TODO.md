@@ -1,31 +1,26 @@
 # TODO
 
-**Source of truth:** `Docs/nomad_wars_v1_scope_and_architecture.md` §0  
-**Live status + balance snapshot:** `Docs/CURRENT_STATE.md`  
-**Process:** `Docs/ACCEPTANCE_AND_PROCESS.md`  
-**Stage 1.5 gameplay:** `Docs/STAGE_1_5_GAMEPLAY.md`  
+**Source of truth for Stage 1 status:** `Docs/CURRENT_STATE.md`  
 **Stage 1.5 climate/migration contract:** `Docs/DESIGN_CLIMATE_AND_MIGRATION_PRESSURE.md`  
-**Tech debt:** `Docs/TECH_DEBT.md`
+**Expanded geography (design):** `Docs/EXPANDED_CLIMATE_GEOMETRY_V0_1.md`  
+**Acceptance process:** `Docs/ACCEPTANCE_AND_PROCESS.md`
 
-## Current Sprint
+---
 
-**Stage 1 — ACCEPTED (2026-09-01).**  
-**Current phase:** Stage 1.5 design is defined; next is a narrow Climate backend implementation task.
+## Stage 1 — ACCEPTED (2026-09-01)
 
-### Done
+Core T1 loop, dual-floor economy, attack-once, door/rally, buildings, loot, nav rebake — closed. Do not reopen without new F5 evidence.
 
-- [x] Stage 1 core loop + formal sign-off
-- [x] Attack once + dual-floor + F5
-- [x] Balance snapshot in `CURRENT_STATE.md`
-- [x] Stage 1.5 causal-chain framing
+---
+
+## Stage 1.5
+
 - [x] Fixed-region / three-state climate design contract
-- [x] Region content / horses / neutral camps / minimal hero / artifact scope defined
-
-## Next
-
-- [ ] Review Stage 1.5 design contract against current repository implementation
-- [ ] **A — Climate backend:** replace moving-zone model with fixed non-overlapping regions + seasonal state lookup
-- [ ] F5 Climate A against written acceptance criteria
+- [x] Review Stage 1.5 design contract against current repository implementation
+- [x] **A — Climate backend (prototype):** fixed non-overlapping regions + seasonal state lookup (4×r14 in code, F5 OK)
+- [x] F5 Climate A against written acceptance criteria
+- [x] **Expanded Climate Geometry v0.1** design sign-off (8×r21 Variant B) — `EXPANDED_CLIMATE_GEOMETRY_V0_1.md`
+- [ ] **Layout port (explicit task):** put Variant B table into `EnvironmentZoneService` (only when requested)
 - [ ] B — Environment state visuals
 - [ ] F5 B
 - [ ] C — Soft climate pressure on existing resource extraction

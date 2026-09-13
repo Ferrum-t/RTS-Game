@@ -32,3 +32,15 @@ in `00_WORLD_FOUNDATION.md`, `01_WORLD_AND_PLANET.md`, `02_GEOGRAPHY_AND_CLIMATE
 - Stage 1: ACCEPTED
 - Stage 1.5 design (Q1–Q4): DESIGN ACCEPTED
 - Code may still host Zones v1.0 blob prototype until Stage 1.5 implementation
+
+---
+
+## Runtime vs expanded geography
+
+| Layer | Status | Notes |
+|-------|--------|--------|
+| **Slice A code** | In repo / F5 OK | 4 regions × r=14 — technical prototype only |
+| **Expanded Climate Geometry v0.1** | Design signed-off | 8 regions × r=21 — see `EXPANDED_CLIMATE_GEOMETRY_V0_1.md` |
+| Port of v0.1 into code | **Not started** | Requires a separate implementation request |
+
+Do not assume the running match uses 8 regions until the port task is completed and F5-accepted.
