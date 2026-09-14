@@ -1,6 +1,6 @@
 extends Node
 
-## Environment Zones — Stage 1.5 Slice A: fixed climate regions + seasonal state.
+## Environment Zones — Stage 1.5: fixed climate regions + seasonal state (layout: Variant B 8×r21).
 ## Geometry does not move. Season changes state only.
 ## Public API for harvest: get_multiplier_at(world_pos) — signature preserved.
 ## HarvestComponent is not modified in Slice A.
@@ -55,7 +55,7 @@ class ClimateRegion:
 	extends RefCounted
 	var id: String = ""
 	var center: Vector3 = Vector3.ZERO
-	var radius: float = 14.0
+	var radius: float = 21.0
 	var schedule_id: int = ScheduleId.A
 	var mesh_instance: MeshInstance3D = null
 	var label: Label3D = null
@@ -151,12 +151,16 @@ func _state_for_schedule(schedule_id: int, slot: int) -> int:
 
 func _spawn_regions() -> void:
 	regions.clear()
-	# Pre-code validated layout (GAP>=2, home coverage of TC + starter resources).
+	# Expanded Climate Geometry v0.1 — Variant B (8 × r21). Homes R0/R1 schedule A → FAVORABLE at progress 0.
 	var specs: Array = [
-		{"id": "R0", "center": Vector3(32.0, 0.0, -30.0), "radius": 14.0, "schedule": ScheduleId.A},
-		{"id": "R1", "center": Vector3(-30.0, 0.0, 30.0), "radius": 14.0, "schedule": ScheduleId.A},
-		{"id": "R2", "center": Vector3(55.0, 0.0, 5.0), "radius": 14.0, "schedule": ScheduleId.B},
-		{"id": "R3", "center": Vector3(-55.0, 0.0, -5.0), "radius": 14.0, "schedule": ScheduleId.C},
+		{"id": "R0", "center": Vector3(32.0, 0.0, -30.0), "radius": 21.0, "schedule": ScheduleId.A},
+		{"id": "R1", "center": Vector3(-30.0, 0.0, 30.0), "radius": 21.0, "schedule": ScheduleId.A},
+		{"id": "R2", "center": Vector3(77.0, 0.0, 0.0), "radius": 21.0, "schedule": ScheduleId.B},
+		{"id": "R3", "center": Vector3(60.0, 0.0, 72.0), "radius": 21.0, "schedule": ScheduleId.C},
+		{"id": "R4", "center": Vector3(-7.0, 0.0, 77.0), "radius": 21.0, "schedule": ScheduleId.B},
+		{"id": "R5", "center": Vector3(-72.0, 0.0, 60.0), "radius": 21.0, "schedule": ScheduleId.C},
+		{"id": "R6", "center": Vector3(-77.0, 0.0, -7.0), "radius": 21.0, "schedule": ScheduleId.B},
+		{"id": "R7", "center": Vector3(0.0, 0.0, -77.0), "radius": 21.0, "schedule": ScheduleId.C},
 	]
 	for s in specs:
 		var region := ClimateRegion.new()
@@ -292,7 +296,7 @@ func _make_ground_disc_mesh(radius: float, segments: int) -> ArrayMesh:
 
 
 func _print_startup() -> void:
-	print("[ZONE] EnvironmentZoneService Slice A ready — fixed regions=", regions.size())
+	print("[ZONE] EnvironmentZoneService Variant B ready — fixed regions=", regions.size())
 	print("[ZONE] season_progress=", season_progress, " duration_sec=", season_duration_sec)
 	for r in regions:
 		var region: ClimateRegion = r
