@@ -1,10 +1,10 @@
 extends Node
 
-## Environment Zones — Stage 1.5: fixed climate regions + seasonal state (layout: Variant B 8×r21).
-## Geometry does not move. Season changes state only.
+## Environment Zones — Stage 1.5 Seasonal Front v0 (layout: Variant B 8×r21).
+## Geometry does not move. Season changes state via global temperature field.
+## T(z,s) = T0 + A * sin(2π s) - G * z   (+Z = north, colder)
 ## Public API for harvest: get_multiplier_at(world_pos) — signature preserved.
-## HarvestComponent is not modified in Slice A.
-## No velocity / drift / bounce / TRANSITION / overlap priority.
+## No velocity / drift / bounce / TRANSITION / overlap priority / per-region schedules.
 
 enum ClimateState {
 	COLD,
@@ -12,15 +12,12 @@ enum ClimateState {
 	DRY,
 }
 
-## Schedule templates: equal thirds of season_progress.
-## A: FAV → DRY → COLD
-## B: DRY → COLD → FAV
-## C: COLD → FAV → DRY
-enum ScheduleId {
-	A,
-	B,
-	C,
-}
+## Seasonal Front v0 — approved numerical set (pre-code review).
+const T0: float = 0.0
+const A: float = 1.0
+const G: float = 0.014
+const T_COLD: float = -0.55
+const T_HOT: float = 0.55
 
 const _MULT := {
 	ClimateState.FAVORABLE: 1.5,
@@ -43,12 +40,13 @@ const REGION_GAP := 2.0
 ## Debug ground discs (static). Color follows current state.
 @export var debug_draw: bool = true
 
-## season_progress ∈ [0, 1). Advances from season_duration_sec.
+## season_progress ∈ [0, 1). s0 = 0.0 at match start (approved).
 var season_progress: float = 0.0
 
 var regions: Array = []
 var _visual_root: Node3D = null
-var _last_logged_slot: int = -1
+## Fingerprint of region states for change logging (F5).
+var _last_state_fingerprint: String = ""
 
 
 class ClimateRegion:
@@ -56,7 +54,6 @@ class ClimateRegion:
 	var id: String = ""
 	var center: Vector3 = Vector3.ZERO
 	var radius: float = 21.0
-	var schedule_id: int = ScheduleId.A
 	var mesh_instance: MeshInstance3D = null
 	var label: Label3D = null
 
@@ -68,16 +65,17 @@ func _ready() -> void:
 		_ensure_visual_root()
 		_build_visuals()
 	_print_startup()
+	_last_state_fingerprint = _state_fingerprint()
 
 
 func _process(delta: float) -> void:
 	if season_duration_sec <= 0.001:
 		return
-	var prev_slot: int = _season_slot(season_progress)
 	season_progress = fposmod(season_progress + delta / season_duration_sec, 1.0)
-	var slot: int = _season_slot(season_progress)
-	if slot != prev_slot:
-		_on_season_slot_changed(slot)
+	var fp: String = _state_fingerprint()
+	if fp != _last_state_fingerprint:
+		_last_state_fingerprint = fp
+		_on_climate_states_changed()
 	_update_visual_colors()
 
 
@@ -104,70 +102,40 @@ func get_region_at(world_pos: Vector3) -> ClimateRegion:
 func get_region_state(region: ClimateRegion) -> int:
 	if region == null:
 		return ClimateState.FAVORABLE
-	return _state_for_schedule(region.schedule_id, _season_slot(season_progress))
+	return _state_from_temperature(_temperature_at_z(region.center.z, season_progress))
 
 
-func _season_slot(progress: float) -> int:
-	var p: float = fposmod(progress, 1.0)
-	var slot: int = int(floor(p * 3.0))
-	if slot > 2:
-		slot = 2
-	return slot
+## T(z, s) = T0 + A * sin(2π s) - G * z
+func _temperature_at_z(z: float, s: float) -> float:
+	return T0 + A * sin(TAU * s) - G * z
 
 
-func _state_for_schedule(schedule_id: int, slot: int) -> int:
-	# Tables match pre-code validation.
-	match schedule_id:
-		ScheduleId.A:
-			# FAV → DRY → COLD
-			match slot:
-				0:
-					return ClimateState.FAVORABLE
-				1:
-					return ClimateState.DRY
-				_:
-					return ClimateState.COLD
-		ScheduleId.B:
-			# DRY → COLD → FAV
-			match slot:
-				0:
-					return ClimateState.DRY
-				1:
-					return ClimateState.COLD
-				_:
-					return ClimateState.FAVORABLE
-		ScheduleId.C:
-			# COLD → FAV → DRY
-			match slot:
-				0:
-					return ClimateState.COLD
-				1:
-					return ClimateState.FAVORABLE
-				_:
-					return ClimateState.DRY
-		_:
-			return ClimateState.FAVORABLE
+func _state_from_temperature(t: float) -> int:
+	if t < T_COLD:
+		return ClimateState.COLD
+	if t > T_HOT:
+		return ClimateState.DRY
+	return ClimateState.FAVORABLE
 
 
 func _spawn_regions() -> void:
 	regions.clear()
-	# Expanded Climate Geometry v0.1 — Variant B (8 × r21). Homes R0/R1 schedule A → FAVORABLE at progress 0.
+	# Expanded Climate Geometry v0.1 — Variant B (8 × r21). Geometry fixed; state from seasonal front.
 	var specs: Array = [
-		{"id": "R0", "center": Vector3(32.0, 0.0, -30.0), "radius": 21.0, "schedule": ScheduleId.A},
-		{"id": "R1", "center": Vector3(-30.0, 0.0, 30.0), "radius": 21.0, "schedule": ScheduleId.A},
-		{"id": "R2", "center": Vector3(77.0, 0.0, 0.0), "radius": 21.0, "schedule": ScheduleId.B},
-		{"id": "R3", "center": Vector3(60.0, 0.0, 72.0), "radius": 21.0, "schedule": ScheduleId.C},
-		{"id": "R4", "center": Vector3(-7.0, 0.0, 77.0), "radius": 21.0, "schedule": ScheduleId.B},
-		{"id": "R5", "center": Vector3(-72.0, 0.0, 60.0), "radius": 21.0, "schedule": ScheduleId.C},
-		{"id": "R6", "center": Vector3(-77.0, 0.0, -7.0), "radius": 21.0, "schedule": ScheduleId.B},
-		{"id": "R7", "center": Vector3(0.0, 0.0, -77.0), "radius": 21.0, "schedule": ScheduleId.C},
+		{"id": "R0", "center": Vector3(32.0, 0.0, -30.0), "radius": 21.0},
+		{"id": "R1", "center": Vector3(-30.0, 0.0, 30.0), "radius": 21.0},
+		{"id": "R2", "center": Vector3(77.0, 0.0, 0.0), "radius": 21.0},
+		{"id": "R3", "center": Vector3(60.0, 0.0, 72.0), "radius": 21.0},
+		{"id": "R4", "center": Vector3(-7.0, 0.0, 77.0), "radius": 21.0},
+		{"id": "R5", "center": Vector3(-72.0, 0.0, 60.0), "radius": 21.0},
+		{"id": "R6", "center": Vector3(-77.0, 0.0, -7.0), "radius": 21.0},
+		{"id": "R7", "center": Vector3(0.0, 0.0, -77.0), "radius": 21.0},
 	]
 	for s in specs:
 		var region := ClimateRegion.new()
 		region.id = str(s["id"])
 		region.center = s["center"]
 		region.radius = float(s["radius"])
-		region.schedule_id = int(s["schedule"])
 		regions.append(region)
 
 
@@ -187,15 +155,24 @@ func _assert_non_overlap() -> void:
 				print("[ZONE] non-overlap OK %s-%s dist=%.2f need=%.2f" % [a.id, b.id, d, need])
 
 
-func _on_season_slot_changed(slot: int) -> void:
-	_last_logged_slot = slot
-	print("[ZONE] season slot → ", slot, " progress=", snappedf(season_progress, 0.001))
+func _state_fingerprint() -> String:
+	var parts: PackedStringArray = PackedStringArray()
+	for r in regions:
+		var region: ClimateRegion = r
+		parts.append("%s:%s" % [region.id, _state_name(get_region_state(region))])
+	return "|".join(parts)
+
+
+func _on_climate_states_changed() -> void:
+	print("[ZONE] climate state change progress=", snappedf(season_progress, 0.001))
 	for r in regions:
 		var region: ClimateRegion = r
 		var st: int = get_region_state(region)
+		var t: float = _temperature_at_z(region.center.z, season_progress)
 		print(
 			"[ZONE] ", region.id,
 			" state=", _state_name(st),
+			" T=", snappedf(t, 0.01),
 			" mult=", float(_MULT.get(st, 1.0)),
 			" center=", region.center,
 			" radius=", region.radius
@@ -296,21 +273,22 @@ func _make_ground_disc_mesh(radius: float, segments: int) -> ArrayMesh:
 
 
 func _print_startup() -> void:
-	print("[ZONE] EnvironmentZoneService Variant B ready — fixed regions=", regions.size())
+	print("[ZONE] EnvironmentZoneService Seasonal Front v0 — fixed regions=", regions.size())
+	print("[ZONE] field T=T0+A*sin(2pi*s)-G*z  T0=", T0, " A=", A, " G=", G, " T_cold=", T_COLD, " T_hot=", T_HOT)
 	print("[ZONE] season_progress=", season_progress, " duration_sec=", season_duration_sec)
 	for r in regions:
 		var region: ClimateRegion = r
 		var st: int = get_region_state(region)
+		var t: float = _temperature_at_z(region.center.z, season_progress)
 		print(
 			"[ZONE] ", region.id,
 			" center=", region.center,
 			" radius=", region.radius,
-			" schedule=", _schedule_name(region.schedule_id),
+			" T=", snappedf(t, 0.01),
 			" state=", _state_name(st),
 			" mult=", float(_MULT.get(st, 1.0))
 		)
-	# Explicit: no motion fields
-	print("[ZONE] motion=none velocity=none bounce=none TRANSITION=none priority=none")
+	print("[ZONE] motion=none velocity=none bounce=none TRANSITION=none priority=none schedule=none")
 
 
 func _state_name(t: int) -> String:
@@ -323,15 +301,3 @@ func _state_name(t: int) -> String:
 			return "COLD"
 		_:
 			return str(t)
-
-
-func _schedule_name(s: int) -> String:
-	match s:
-		ScheduleId.A:
-			return "A"
-		ScheduleId.B:
-			return "B"
-		ScheduleId.C:
-			return "C"
-		_:
-			return str(s)
