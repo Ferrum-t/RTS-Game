@@ -63,6 +63,10 @@ func _unhandled_input(event: InputEvent) -> void:
 
 
 func try_train_worker() -> bool:
+	if not is_constructed:
+		print("TownCenter: still under construction")
+		return false
+
 	if not is_deployed():
 		print("TownCenter: train only while DEPLOYED (state=", deployment_state, ")")
 		return false
