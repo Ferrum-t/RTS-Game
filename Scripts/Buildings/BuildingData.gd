@@ -18,6 +18,11 @@ class_name BuildingData
 @export var food : int = 0
 @export var horses : int = 0
 
+@export_group("Construction")
+
+## Seconds for one Worker to finish this building type (M10).
+@export var build_time_sec: float = 25.0
+
 
 ## Dictionary cost for ResourceManager.can_afford / spend.
 func get_cost_dict() -> Dictionary:

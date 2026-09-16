@@ -13,3 +13,4 @@ wood = 40
 stone = 20
 gold = 0
 food = 0
+build_time_sec = 25.0
