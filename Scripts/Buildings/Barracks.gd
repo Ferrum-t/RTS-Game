@@ -66,6 +66,10 @@ func _unhandled_input(event: InputEvent) -> void:
 
 
 func try_train_soldier() -> bool:
+	if not is_constructed:
+		print("Barracks: still under construction")
+		return false
+
 	if is_training:
 		print("Barracks: already training")
 		return false
@@ -91,6 +95,10 @@ func try_train_soldier() -> bool:
 
 
 func try_train_cavalry() -> bool:
+	if not is_constructed:
+		print("Barracks: still under construction")
+		return false
+
 	if is_training:
 		print("Barracks: already training")
 		return false
@@ -135,6 +143,10 @@ func try_train_cavalry() -> bool:
 
 
 func try_train_siege() -> bool:
+	if not is_constructed:
+		print("Barracks: still under construction")
+		return false
+
 	if is_training:
 		print("Barracks: already training")
 		return false
