@@ -30,4 +30,6 @@ func setup(data: BuildingData) -> void:
 func _pressed() -> void:
 	if building_data == null:
 		return
+	if disabled:
+		return
 	ConstructionManager.start_building(building_data)
