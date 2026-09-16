@@ -3,12 +3,20 @@ extends Node
 var current_ghost: GhostBuilding = null
 var current_building_data: BuildingData = null
 var _place_serial: int = 0
+## M10.1 — Worker locked at start_building; must still be valid at confirm.
+var _pending_builder: BaseUnit = null
 
 const BUILD_APPROACH_DIST := 3.0
 
 
 func start_building(data: BuildingData) -> void:
 	if data == null:
+		return
+
+	# M10.1: player construction only from a selected Worker.
+	var builder := _first_selected_worker()
+	if builder == null:
+		print("Construction: select a Worker before placing ", data.building_name)
 		return
 
 	var cost: Dictionary = data.get_cost_dict()
@@ -22,14 +30,24 @@ func start_building(data: BuildingData) -> void:
 		current_ghost.queue_free()
 
 	current_building_data = data
+	_pending_builder = builder
 
 	if data.ghost_scene == null:
 		push_error("Construction: ghost_scene is null")
+		_pending_builder = null
 		return
 
 	current_ghost = data.ghost_scene.instantiate()
 	get_tree().current_scene.add_child(current_ghost)
-	print("Started building mode: ", data.building_name)
+	print("Started building mode: ", data.building_name, " builder=", builder.name)
+
+
+func cancel_build_mode() -> void:
+	if current_ghost != null and is_instance_valid(current_ghost):
+		current_ghost.queue_free()
+	current_ghost = null
+	current_building_data = null
+	_pending_builder = null
 
 
 func confirm_build() -> void:
@@ -40,19 +58,30 @@ func confirm_build() -> void:
 		print("Can't build here.")
 		return
 
+	# M10.1: no site / no spend without a valid builder.
+	var builder := _resolve_pending_builder()
+	if builder == null:
+		print("[BUILD] NO VALID BUILDER — placement cancelled (no spend)")
+		cancel_build_mode()
+		return
+
 	var data := current_building_data
 	var position := current_ghost.global_position
 
 	# Player path: site under construction (AI keeps start_constructed=true default).
 	var building := place_building_for_team(data, position, 0, false)
 	if building == null:
+		# spend failed or scene null — clear ghost
+		cancel_build_mode()
 		return
 
 	current_ghost.queue_free()
 	current_ghost = null
 	current_building_data = null
+	_pending_builder = null
 
-	_assign_builder(building as BaseBuilding)
+	builder.replace_order_build(building as BaseBuilding)
+	print("[BUILD] assigned ", builder.name, " → ", building.name)
 
 
 ## Stage 1 — programmatic placement used by player UI and Economic AI.
@@ -123,61 +152,40 @@ func place_building_for_team(
 	return building
 
 
-func _assign_builder(site: BaseBuilding) -> void:
-	if site == null or not is_instance_valid(site):
-		return
-	var worker := _pick_builder_worker(site.global_position)
-	if worker == null:
-		print("[BUILD] no free Worker for ", site.name, " — site waits at progress=", site.construction_progress)
-		return
-	worker.replace_order_build(site)
-	print("[BUILD] assigned ", worker.name, " → ", site.name)
+func _resolve_pending_builder() -> BaseUnit:
+	if _is_valid_builder(_pending_builder):
+		return _pending_builder
+	# Re-check selection once (worker may have been re-selected).
+	var w := _first_selected_worker()
+	if _is_valid_builder(w):
+		return w
+	return null
 
 
-func _pick_builder_worker(site_pos: Vector3) -> BaseUnit:
-	# 1) Selected Worker team 0 (any non-DEAD)
-	var sm := get_node_or_null("/root/SelectionManager")
-	if sm != null and sm.has_method("get_valid_selection"):
-		var selected: Array = sm.get_valid_selection()
-		for u in selected:
-			if u is Worker and is_instance_valid(u):
-				var w: BaseUnit = u as BaseUnit
-				if w.team_id == 0 and w.unit_state != BaseUnit.UnitState.DEAD:
-					return w
-	# 2) Nearest free Worker team 0
-	var um := get_node_or_null("/root/UnitManager")
-	if um == null:
-		return null
-	var best: BaseUnit = null
-	var best_d := INF
-	for u in um.units:
-		if not (u is Worker) or not is_instance_valid(u):
-			continue
-		var w: BaseUnit = u as BaseUnit
-		if w.team_id != 0:
-			continue
-		if not _is_worker_free(w):
-			continue
-		var d: float = w.global_position.distance_squared_to(site_pos)
-		if d < best_d:
-			best_d = d
-			best = w
-	return best
-
-
-func _is_worker_free(w: BaseUnit) -> bool:
+func _is_valid_builder(w: BaseUnit) -> bool:
 	if w == null or not is_instance_valid(w):
 		return false
-	match w.unit_state:
-		BaseUnit.UnitState.DEAD:
-			return false
-		BaseUnit.UnitState.BUILDING:
-			return false
-		BaseUnit.UnitState.HARVESTING:
-			return false
-		BaseUnit.UnitState.RETURNING:
-			return false
-		BaseUnit.UnitState.ATTACKING:
-			return false
-		_:
-			return true
+	if not (w is Worker):
+		return false
+	if w.team_id != 0:
+		return false
+	if w.unit_state == BaseUnit.UnitState.DEAD:
+		return false
+	return true
+
+
+func _first_selected_worker() -> BaseUnit:
+	var sm := get_node_or_null("/root/SelectionManager")
+	if sm == null:
+		var nodes := get_tree().get_nodes_in_group("selection_manager")
+		if nodes.size() > 0:
+			sm = nodes[0]
+	if sm == null or not sm.has_method("get_valid_selection"):
+		return null
+	var selected: Array = sm.get_valid_selection()
+	for u in selected:
+		if u is Worker and is_instance_valid(u):
+			var w: BaseUnit = u as BaseUnit
+			if w.team_id == 0 and w.unit_state != BaseUnit.UnitState.DEAD:
+				return w
+	return null
