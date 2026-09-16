@@ -4,6 +4,8 @@ var current_ghost: GhostBuilding = null
 var current_building_data: BuildingData = null
 var _place_serial: int = 0
 
+const BUILD_APPROACH_DIST := 3.0
+
 
 func start_building(data: BuildingData) -> void:
 	if data == null:
@@ -41,7 +43,8 @@ func confirm_build() -> void:
 	var data := current_building_data
 	var position := current_ghost.global_position
 
-	var building := place_building_for_team(data, position, 0)
+	# Player path: site under construction (AI keeps start_constructed=true default).
+	var building := place_building_for_team(data, position, 0, false)
 	if building == null:
 		return
 
@@ -49,10 +52,18 @@ func confirm_build() -> void:
 	current_ghost = null
 	current_building_data = null
 
+	_assign_builder(building as BaseBuilding)
+
 
 ## Stage 1 — programmatic placement used by player UI and Economic AI.
-## Same cost / instantiate / nav path; team_id owns the building and stock spend.
-func place_building_for_team(data: BuildingData, world_pos: Vector3, team_id: int) -> Node:
+## start_constructed=true → immediately READY (AI / legacy).
+## start_constructed=false → M10 construction site for player.
+func place_building_for_team(
+	data: BuildingData,
+	world_pos: Vector3,
+	team_id: int,
+	start_constructed: bool = true
+) -> Node:
 	if data == null:
 		return null
 	if data.building_scene == null:
@@ -87,6 +98,12 @@ func place_building_for_team(data: BuildingData, world_pos: Vector3, team_id: in
 		return null
 	scene.add_child(building)
 
+	if not start_constructed and building is BaseBuilding:
+		var bt: float = 25.0
+		if data.build_time_sec > 0.0:
+			bt = data.build_time_sec
+		(building as BaseBuilding).begin_construction(bt)
+
 	var nav := get_node_or_null("/root/NavigationBakeService")
 	if nav != null and nav.has_method("update_building_position"):
 		nav.update_building_position(building)
@@ -99,7 +116,68 @@ func place_building_for_team(data: BuildingData, world_pos: Vector3, team_id: in
 	print(
 		"Building placed: ", building.name,
 		" team=", team_id,
+		" constructed=", start_constructed,
 		" (cost W:", data.wood, " S:", data.stone, ")",
 		" at ", building.global_position
 	)
 	return building
+
+
+func _assign_builder(site: BaseBuilding) -> void:
+	if site == null or not is_instance_valid(site):
+		return
+	var worker := _pick_builder_worker(site.global_position)
+	if worker == null:
+		print("[BUILD] no free Worker for ", site.name, " — site waits at progress=", site.construction_progress)
+		return
+	worker.replace_order_build(site)
+	print("[BUILD] assigned ", worker.name, " → ", site.name)
+
+
+func _pick_builder_worker(site_pos: Vector3) -> BaseUnit:
+	# 1) Selected Worker team 0 (any non-DEAD)
+	var sm := get_node_or_null("/root/SelectionManager")
+	if sm != null and sm.has_method("get_valid_selection"):
+		var selected: Array = sm.get_valid_selection()
+		for u in selected:
+			if u is Worker and is_instance_valid(u):
+				var w: BaseUnit = u as BaseUnit
+				if w.team_id == 0 and w.unit_state != BaseUnit.UnitState.DEAD:
+					return w
+	# 2) Nearest free Worker team 0
+	var um := get_node_or_null("/root/UnitManager")
+	if um == null:
+		return null
+	var best: BaseUnit = null
+	var best_d := INF
+	for u in um.units:
+		if not (u is Worker) or not is_instance_valid(u):
+			continue
+		var w: BaseUnit = u as BaseUnit
+		if w.team_id != 0:
+			continue
+		if not _is_worker_free(w):
+			continue
+		var d: float = w.global_position.distance_squared_to(site_pos)
+		if d < best_d:
+			best_d = d
+			best = w
+	return best
+
+
+func _is_worker_free(w: BaseUnit) -> bool:
+	if w == null or not is_instance_valid(w):
+		return false
+	match w.unit_state:
+		BaseUnit.UnitState.DEAD:
+			return false
+		BaseUnit.UnitState.BUILDING:
+			return false
+		BaseUnit.UnitState.HARVESTING:
+			return false
+		BaseUnit.UnitState.RETURNING:
+			return false
+		BaseUnit.UnitState.ATTACKING:
+			return false
+		_:
+			return true
