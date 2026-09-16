@@ -56,6 +56,19 @@ func issue_attack_building(units: Array[BaseUnit], building: BaseBuilding) -> vo
 		unit.replace_order_attack_building(building)
 
 
+func issue_build(units: Array[BaseUnit], building: BaseBuilding) -> void:
+	if not _match_allows_commands():
+		return
+	if building == null or not is_instance_valid(building):
+		return
+	if building.is_destroyed or building.is_constructed:
+		return
+	for unit: BaseUnit in _filter_valid(units):
+		if not (unit is Worker):
+			continue
+		unit.replace_order_build(building)
+
+
 func _match_allows_commands() -> bool:
 	var mm := get_node_or_null("/root/MatchManager")
 	if mm == null:
