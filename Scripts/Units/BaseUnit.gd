@@ -150,6 +150,8 @@ func _physics_process(delta: float) -> void:
 			update_harvesting(delta)
 		UnitState.RETURNING:
 			update_return(delta)
+		UnitState.BUILDING:
+			update_building(delta)
 		UnitState.ATTACKING:
 			update_attacking(delta)
 		_:
@@ -408,6 +410,7 @@ func replace_order_move(pos: Vector3) -> void:
 	current_order = Order.new(Order.Type.MOVE, null, {"pos": pos})
 	move_target = pos
 	harvest_target = null
+	build_target = null
 	attack_target = null
 	attack_building_target = null
 	return_target = null
@@ -425,6 +428,7 @@ func replace_order_harvest(resource: BaseResource) -> void:
 		return
 	current_order = Order.new(Order.Type.HARVEST, resource)
 	harvest_target = resource
+	build_target = null
 	attack_target = null
 	attack_building_target = null
 	return_target = null
@@ -440,6 +444,7 @@ func replace_order_attack(enemy: BaseUnit) -> void:
 	attack_target = enemy
 	attack_building_target = null
 	harvest_target = null
+	build_target = null
 	return_target = null
 	if harvest:
 		harvest.reset()
@@ -453,6 +458,7 @@ func replace_order_attack_building(building: BaseBuilding) -> void:
 	attack_building_target = building
 	attack_target = null
 	harvest_target = null
+	build_target = null
 	return_target = null
 	_siege_in_range = false
 	_siege_stuck_time = 0.0
@@ -461,3 +467,67 @@ func replace_order_attack_building(building: BaseBuilding) -> void:
 	if harvest:
 		harvest.reset()
 	unit_state = UnitState.ATTACKING
+
+
+func replace_order_build(building: BaseBuilding) -> void:
+	if building == null or not is_instance_valid(building):
+		return
+	if not (self is Worker):
+		print(name, " cannot BUILD (not a Worker)")
+		return
+	current_order = Order.new(Order.Type.BUILD, building)
+	build_target = building
+	harvest_target = null
+	attack_target = null
+	attack_building_target = null
+	return_target = null
+	if harvest:
+		harvest.reset()
+	unit_state = UnitState.BUILDING
+	print(name, " -> BUILD ", building.name)
+
+
+const BUILD_STAND_DIST := 3.0
+
+
+func update_building(delta: float) -> void:
+	var site := build_target
+	if site == null or not is_instance_valid(site) or site.is_destroyed or site.health <= 0:
+		_clear_build("site lost")
+		return
+	if site.is_constructed:
+		_clear_build("already ready")
+		return
+
+	var to_s := site.global_position - global_position
+	to_s.y = 0.0
+	var dist := to_s.length()
+	if dist > BUILD_STAND_DIST:
+		var stand := site.global_position
+		if dist > 0.01:
+			stand = site.global_position - to_s.normalized() * (BUILD_STAND_DIST * 0.85)
+		stand.y = 0.0
+		if movement:
+			movement.ensure_moving_to(stand, APPROACH_RETARGET_DIST)
+			movement.update(delta)
+		return
+
+	# In range — construct
+	if movement and movement.status == MovementComponent.Status.MOVING:
+		movement.cancel()
+	velocity = Vector3.ZERO
+	var bt: float = maxf(site.build_time_sec, 0.1)
+	var done: bool = site.add_construction_progress(delta / bt)
+	if done:
+		print(name, " finished BUILD ", site.name)
+		_clear_build("complete")
+
+
+func _clear_build(reason: String) -> void:
+	if OS.is_debug_build() and reason != "":
+		print(name, " BUILD end (", reason, ")")
+	build_target = null
+	current_order = Order.none()
+	velocity = Vector3.ZERO
+	if unit_state == UnitState.BUILDING:
+		unit_state = UnitState.IDLE
