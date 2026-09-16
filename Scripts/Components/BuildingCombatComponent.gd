@@ -38,6 +38,9 @@ func _process(delta: float) -> void:
 	if b == null or b.is_destroyed or b.health <= 0:
 		_clear_target("host dead")
 		return
+	if not b.is_constructed:
+		_clear_target("under construction")
+		return
 	if b.deployment_state != DeploymentState.State.DEPLOYED:
 		_clear_target("not deployed")
 		return
