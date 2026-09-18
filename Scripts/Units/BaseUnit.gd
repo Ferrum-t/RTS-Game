@@ -61,7 +61,6 @@ const APPROACH_RETARGET_DIST := 0.9
 const BUILD_STAND_DIST := 3.0
 const BUILD_FOOTPRINT_MARGIN := 1.25
 
-
 func _ready() -> void:
 	health = max_health
 	add_to_group("Unit")
@@ -85,18 +84,14 @@ func _ready() -> void:
 	_setup_selection_ring()
 	print(name, " ready at ", global_position)
 
-
 func _setup_health_bar() -> void:
-	if HEALTH_BAR_SCENE == null:
-		return
+	if HEALTH_BAR_SCENE == null: return
 	health_bar = HEALTH_BAR_SCENE.instantiate() as HealthBar3D
-	if health_bar == null:
-		return
+	if health_bar == null: return
 	add_child(health_bar)
 	health_bar.position = Vector3(0.0, health_bar_height, 0.0)
 	health_bar.setup(max_health)
 	health_bar.set_health(health)
-
 
 func _setup_selection_ring() -> void:
 	_selection_ring = MeshInstance3D.new()
@@ -119,35 +114,24 @@ func _setup_selection_ring() -> void:
 	_selection_ring.visible = false
 	add_child(_selection_ring)
 
-
 func _physics_process(delta: float) -> void:
-	if unit_state == UnitState.DEAD:
-		return
+	if unit_state == UnitState.DEAD: return
 	if not is_on_floor():
 		velocity.y -= GRAVITY * delta
 	else:
 		velocity.y = 0.0
 	match unit_state:
-		UnitState.MOVING:
-			update_moving(delta)
-		UnitState.HARVESTING:
-			update_harvesting(delta)
-		UnitState.RETURNING:
-			update_return(delta)
-		UnitState.BUILDING:
-			update_building(delta)
-		UnitState.REPAIRING:
-			update_repairing(delta)
-		UnitState.ATTACKING:
-			update_attacking(delta)
-		_:
-			pass
+		UnitState.MOVING: update_moving(delta)
+		UnitState.HARVESTING: update_harvesting(delta)
+		UnitState.RETURNING: update_return(delta)
+		UnitState.BUILDING: update_building(delta)
+		UnitState.REPAIRING: update_repairing(delta)
+		UnitState.ATTACKING: update_attacking(delta)
+		_: pass
 	move_and_slide()
 
-
 func update_moving(delta: float) -> void:
-	if movement == null:
-		return
+	if movement == null: return
 	movement.update(delta)
 	match movement.status:
 		MovementComponent.Status.ARRIVED:
@@ -158,21 +142,17 @@ func update_moving(delta: float) -> void:
 			last_move_end_reason = "failed"
 			current_order = Order.none()
 			unit_state = UnitState.IDLE
-		_:
-			pass
-
+		_: pass
 
 func update_harvesting(delta: float) -> void:
 	harvest.update(delta)
 	match harvest.status:
 		HarvestComponent.Status.BAG_FULL:
-			if movement:
-				movement.cancel()
+			if movement: movement.cancel()
 			return_target = null
 			unit_state = UnitState.RETURNING
 		HarvestComponent.Status.RESOURCE_GONE:
-			if movement:
-				movement.cancel()
+			if movement: movement.cancel()
 			harvest_target = null
 			current_order = Order.none()
 			velocity = Vector3.ZERO
@@ -187,9 +167,7 @@ func update_harvesting(delta: float) -> void:
 			if movement and movement.status == MovementComponent.Status.MOVING:
 				movement.cancel()
 			velocity = Vector3.ZERO
-		_:
-			pass
-
+		_: pass
 
 func update_attacking(delta: float) -> void:
 	if current_order.type == Order.Type.ATTACK_BUILDING or attack_building_target != null:
@@ -197,19 +175,12 @@ func update_attacking(delta: float) -> void:
 		return
 	combat.update(delta)
 	match combat.status:
-		CombatComponent.Status.TARGET_LOST:
+		CombatComponent.Status.TARGET_LOST, CombatComponent.Status.TARGET_DEAD:
 			attack_target = null
 			current_order = Order.none()
 			velocity = Vector3.ZERO
 			unit_state = UnitState.IDLE
-		CombatComponent.Status.TARGET_DEAD:
-			attack_target = null
-			current_order = Order.none()
-			velocity = Vector3.ZERO
-			unit_state = UnitState.IDLE
-		_:
-			pass
-
+		_: pass
 
 func update_attacking_building(delta: float) -> void:
 	var building := attack_building_target
@@ -222,13 +193,10 @@ func update_attacking_building(delta: float) -> void:
 	var exit_range: float = building_attack_range * building_exit_range_mult
 	var moved := global_position.distance_to(_siege_last_pos)
 	_siege_last_pos = global_position
-	if moved < 0.03:
-		_siege_stuck_time += delta
-	else:
-		_siege_stuck_time = 0.0
+	if moved < 0.03: _siege_stuck_time += delta
+	else: _siege_stuck_time = 0.0
 	if _siege_in_range:
-		if dist > exit_range:
-			_siege_in_range = false
+		if dist > exit_range: _siege_in_range = false
 		else:
 			_siege_hold_and_strike(delta, building)
 			return
@@ -246,14 +214,11 @@ func update_attacking_building(delta: float) -> void:
 	movement.ensure_moving_to(approach, APPROACH_RETARGET_DIST)
 	movement.update(delta)
 
-
 func _siege_hold_and_strike(delta: float, building: BaseBuilding) -> void:
-	if movement and movement.status == MovementComponent.Status.MOVING:
-		movement.cancel()
+	if movement and movement.status == MovementComponent.Status.MOVING: movement.cancel()
 	velocity = Vector3.ZERO
 	_building_attack_timer -= delta
-	if _building_attack_timer > 0.0:
-		return
+	if _building_attack_timer > 0.0: return
 	_building_attack_timer = attack_cooldown
 	if building.has_method("damage"):
 		building.damage(attack_damage, team_id)
@@ -263,9 +228,7 @@ func _siege_hold_and_strike(delta: float, building: BaseBuilding) -> void:
 		building.take_damage(attack_damage, self)
 	else:
 		building.health = maxi(0, building.health - attack_damage)
-		if building.health <= 0 and building.has_method("die"):
-			building.die()
-
+		if building.health <= 0 and building.has_method("die"): building.die()
 
 func _clear_building_attack() -> void:
 	attack_building_target = null
@@ -276,21 +239,16 @@ func _clear_building_attack() -> void:
 	current_order = Order.none()
 	unit_state = UnitState.IDLE
 
-
 func update_return(delta: float) -> void:
 	if return_target != null and is_instance_valid(return_target):
-		if return_target.get("is_destroyed") == true:
-			return_target = null
-		elif return_target.get("health") != null and int(return_target.health) <= 0:
-			return_target = null
-		elif return_target.get("team_id") != null and int(return_target.team_id) != team_id:
-			return_target = null
+		if return_target.get("is_destroyed") == true: return_target = null
+		elif return_target.get("health") != null and int(return_target.health) <= 0: return_target = null
+		elif return_target.get("team_id") != null and int(return_target.team_id) != team_id: return_target = null
 	else:
 		return_target = null
 	if return_target == null:
 		var bm := get_node_or_null("/root/BuildingManager")
-		if bm:
-			return_target = bm.get_nearest_town_center(global_position, team_id)
+		if bm: return_target = bm.get_nearest_town_center(global_position, team_id)
 		if return_target == null:
 			print(name, " — no own-team Town Center found, keeping inventory")
 			unit_state = UnitState.IDLE
@@ -324,42 +282,32 @@ func update_return(delta: float) -> void:
 	print(name, " deposited W:", deposited_wood, " S:", deposited_stone, " H:", deposited_horses, " at ", return_target.name)
 	return_target = null
 	if harvest_target != null and is_instance_valid(harvest_target):
-		if harvest:
-			harvest.reset()
-		if movement:
-			movement.cancel()
+		if harvest: harvest.reset()
+		if movement: movement.cancel()
 		unit_state = UnitState.HARVESTING
 	else:
 		current_order = Order.none()
 		unit_state = UnitState.IDLE
 
-
 func take_damage(amount: int, _source: Node = null) -> void:
-	if unit_state == UnitState.DEAD:
-		return
+	if unit_state == UnitState.DEAD: return
 	health = maxi(0, health - amount)
-	if health_bar:
-		health_bar.set_health(health)
-	if health <= 0:
-		die()
-
+	if health_bar: health_bar.set_health(health)
+	if health <= 0: die()
 
 func die() -> void:
 	unit_state = UnitState.DEAD
 	current_order = Order.none()
 	velocity = Vector3.ZERO
-	if movement:
-		movement.cancel()
+	if movement: movement.cancel()
 	print(name, " died")
 	UnitManager.unregister_unit(self)
 	queue_free()
-
 
 func set_selected(value: bool) -> void:
 	selected = value
 	if _selection_ring != null and is_instance_valid(_selection_ring):
 		_selection_ring.visible = value
-
 
 func replace_order_move(pos: Vector3) -> void:
 	current_order = Order.new(Order.Type.MOVE, null, {"pos": pos})
@@ -371,18 +319,13 @@ func replace_order_move(pos: Vector3) -> void:
 	attack_building_target = null
 	return_target = null
 	_build_stuck_time = 0.0
-	if harvest:
-		harvest.reset()
-	if movement:
-		movement.set_target(pos)
+	if harvest: harvest.reset()
+	if movement: movement.set_target(pos)
 	unit_state = UnitState.MOVING
 
-
 func replace_order_harvest(resource: BaseResource) -> void:
-	if not can_gather:
-		return
-	if resource == null or not is_instance_valid(resource):
-		return
+	if not can_gather: return
+	if resource == null or not is_instance_valid(resource): return
 	current_order = Order.new(Order.Type.HARVEST, resource)
 	harvest_target = resource
 	build_target = null
@@ -391,14 +334,11 @@ func replace_order_harvest(resource: BaseResource) -> void:
 	attack_building_target = null
 	return_target = null
 	_build_stuck_time = 0.0
-	if harvest:
-		harvest.reset()
+	if harvest: harvest.reset()
 	unit_state = UnitState.HARVESTING
 
-
 func replace_order_attack(enemy: BaseUnit) -> void:
-	if enemy == null or not is_instance_valid(enemy):
-		return
+	if enemy == null or not is_instance_valid(enemy): return
 	current_order = Order.new(Order.Type.ATTACK, enemy)
 	attack_target = enemy
 	attack_building_target = null
@@ -407,14 +347,11 @@ func replace_order_attack(enemy: BaseUnit) -> void:
 	repair_target = null
 	return_target = null
 	_build_stuck_time = 0.0
-	if harvest:
-		harvest.reset()
+	if harvest: harvest.reset()
 	unit_state = UnitState.ATTACKING
 
-
 func replace_order_attack_building(building: BaseBuilding) -> void:
-	if building == null or not is_instance_valid(building):
-		return
+	if building == null or not is_instance_valid(building): return
 	current_order = Order.new(Order.Type.ATTACK_BUILDING, building)
 	attack_building_target = building
 	attack_target = null
@@ -427,19 +364,15 @@ func replace_order_attack_building(building: BaseBuilding) -> void:
 	_siege_stuck_time = 0.0
 	_siege_last_pos = global_position
 	_building_attack_timer = 0.0
-	if harvest:
-		harvest.reset()
+	if harvest: harvest.reset()
 	unit_state = UnitState.ATTACKING
 
-
 func replace_order_build(building: BaseBuilding) -> void:
-	if building == null or not is_instance_valid(building):
-		return
+	if building == null or not is_instance_valid(building): return
 	if not (self is Worker):
 		print(name, " cannot BUILD (not a Worker)")
 		return
-	if unit_state == UnitState.BUILDING and build_target == building:
-		return
+	if unit_state == UnitState.BUILDING and build_target == building: return
 	current_order = Order.new(Order.Type.BUILD, building)
 	build_target = building
 	repair_target = null
@@ -449,22 +382,17 @@ func replace_order_build(building: BaseBuilding) -> void:
 	return_target = null
 	_build_stuck_time = 0.0
 	_build_last_pos = global_position
-	if harvest:
-		harvest.reset()
+	if harvest: harvest.reset()
 	unit_state = UnitState.BUILDING
 	print(name, " -> BUILD ", building.name)
 
-
 func replace_order_repair(building: BaseBuilding) -> void:
-	if building == null or not is_instance_valid(building):
-		return
+	if building == null or not is_instance_valid(building): return
 	if not (self is Worker):
 		print(name, " cannot REPAIR (not a Worker)")
 		return
-	if not building.is_constructed or building.health >= building.max_health:
-		return
-	if unit_state == UnitState.REPAIRING and repair_target == building:
-		return
+	if not building.is_constructed or building.health >= building.max_health: return
+	if unit_state == UnitState.REPAIRING and repair_target == building: return
 	current_order = Order.new(Order.Type.REPAIR, building)
 	repair_target = building
 	build_target = null
@@ -474,11 +402,9 @@ func replace_order_repair(building: BaseBuilding) -> void:
 	return_target = null
 	_build_stuck_time = 0.0
 	_build_last_pos = global_position
-	if harvest:
-		harvest.reset()
+	if harvest: harvest.reset()
 	unit_state = UnitState.REPAIRING
 	print(name, " -> REPAIR ", building.name)
-
 
 func _build_stand_dist(site: BaseBuilding) -> float:
 	var he: float = 2.2
@@ -486,7 +412,6 @@ func _build_stand_dist(site: BaseBuilding) -> float:
 		var v: Vector3 = site.nav_half_extents
 		he = maxf(v.x, v.z)
 	return maxf(BUILD_STAND_DIST, he + BUILD_FOOTPRINT_MARGIN)
-
 
 func update_building(delta: float) -> void:
 	var site := build_target
@@ -502,10 +427,8 @@ func update_building(delta: float) -> void:
 	var dist := to_s.length()
 	var moved := global_position.distance_to(_build_last_pos)
 	_build_last_pos = global_position
-	if moved < 0.04:
-		_build_stuck_time += delta
-	else:
-		_build_stuck_time = 0.0
+	if moved < 0.04: _build_stuck_time += delta
+	else: _build_stuck_time = 0.0
 	var in_range: bool = dist <= stand_dist
 	if not in_range and _build_stuck_time > 0.7 and dist <= stand_dist + 2.0:
 		in_range = true
@@ -518,15 +441,13 @@ func update_building(delta: float) -> void:
 			movement.ensure_moving_to(stand, APPROACH_RETARGET_DIST)
 			movement.update(delta)
 		return
-	if movement and movement.status == MovementComponent.Status.MOVING:
-		movement.cancel()
+	if movement and movement.status == MovementComponent.Status.MOVING: movement.cancel()
 	velocity = Vector3.ZERO
 	var bt: float = maxf(site.build_time_sec, 0.1)
 	var done: bool = site.add_construction_progress(delta / bt)
 	if done:
 		print(name, " finished BUILD ", site.name)
 		_clear_build("complete")
-
 
 func update_repairing(delta: float) -> void:
 	var site := repair_target
@@ -546,10 +467,8 @@ func update_repairing(delta: float) -> void:
 	var dist := to_s.length()
 	var moved := global_position.distance_to(_build_last_pos)
 	_build_last_pos = global_position
-	if moved < 0.04:
-		_build_stuck_time += delta
-	else:
-		_build_stuck_time = 0.0
+	if moved < 0.04: _build_stuck_time += delta
+	else: _build_stuck_time = 0.0
 	var in_range: bool = dist <= stand_dist
 	if not in_range and _build_stuck_time > 0.7 and dist <= stand_dist + 2.0:
 		in_range = true
@@ -562,8 +481,7 @@ func update_repairing(delta: float) -> void:
 			movement.ensure_moving_to(stand, APPROACH_RETARGET_DIST)
 			movement.update(delta)
 		return
-	if movement and movement.status == MovementComponent.Status.MOVING:
-		movement.cancel()
+	if movement and movement.status == MovementComponent.Status.MOVING: movement.cancel()
 	velocity = Vector3.ZERO
 	var done: bool = false
 	if site.has_method("request_repair_tick"):
@@ -571,7 +489,6 @@ func update_repairing(delta: float) -> void:
 	if done or site.health >= site.max_health:
 		print(name, " finished REPAIR ", site.name)
 		_clear_repair("complete")
-
 
 func _clear_repair(reason: String) -> void:
 	if OS.is_debug_build() and reason != "":
@@ -582,7 +499,6 @@ func _clear_repair(reason: String) -> void:
 	_build_stuck_time = 0.0
 	if unit_state == UnitState.REPAIRING:
 		unit_state = UnitState.IDLE
-
 
 func _clear_build(reason: String) -> void:
 	if OS.is_debug_build() and reason != "":
