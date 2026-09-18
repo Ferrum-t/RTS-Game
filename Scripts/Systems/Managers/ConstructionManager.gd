@@ -9,6 +9,10 @@ var _pending_builder: BaseUnit = null
 const BUILD_APPROACH_DIST := 3.0
 
 
+func is_placing() -> bool:
+	return current_ghost != null and is_instance_valid(current_ghost)
+
+
 func start_building(data: BuildingData) -> void:
 	if data == null:
 		return
@@ -42,12 +46,16 @@ func start_building(data: BuildingData) -> void:
 	print("Started building mode: ", data.building_name, " builder=", builder.name)
 
 
+## M10.1c — cancel placement only (no site, no spend).
 func cancel_build_mode() -> void:
-	if current_ghost != null and is_instance_valid(current_ghost):
+	var had_ghost: bool = current_ghost != null and is_instance_valid(current_ghost)
+	if had_ghost:
 		current_ghost.queue_free()
 	current_ghost = null
 	current_building_data = null
 	_pending_builder = null
+	if had_ghost:
+		print("[BUILD] ghost cancelled (no site, no spend)")
 
 
 func confirm_build() -> void:
