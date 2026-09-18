@@ -30,6 +30,9 @@ const HEALTH_BAR_SCENE := preload("res://Scenes/UI/HealthBar3D.tscn")
 const RALLY_GRID_COLS := 4
 const RALLY_SLOT_SPACING := 2.5
 
+## M10.2 — under-construction tint (scaffold look).
+const _CONSTRUCTION_TINT := Color(0.55, 0.58, 0.62, 0.72)
+
 @export var team_id: int = 0
 @export var max_health: int = 500
 ## Half-extents of footprint used for NavMesh obstruction (XZ)
@@ -78,6 +81,8 @@ var visual_state: int = VisualState.INTACT
 ## Cached albedo from scene mesh material (captured once).
 var _visual_base_albedo: Color = Color(1, 1, 1, 1)
 var _visual_base_captured: bool = false
+## M10.2 — mesh scales at ready (for construction grow).
+var _mesh_base_scales: Dictionary = {} # MeshInstance3D -> Vector3
 
 ## Accumulated loot this raid (for one summary line on destroy).
 var _raid_loot_total: Dictionary = {}
@@ -293,6 +298,7 @@ func _ready() -> void:
 	_setup_select_ring()
 	_setup_rally_flag()
 	_capture_visual_base_albedo()
+	_cache_mesh_base_scales()
 	_refresh_visual_state()
 	call_deferred("_init_default_rally")
 
@@ -334,6 +340,8 @@ func begin_construction(p_build_time_sec: float) -> void:
 	is_constructed = false
 	construction_progress = 0.0
 	build_time_sec = maxf(p_build_time_sec, 0.1)
+	_cache_mesh_base_scales()
+	_apply_construction_visual()
 	print("[BUILD] ", name, " UNDER_CONSTRUCTION time=", build_time_sec, "s")
 
 
@@ -344,6 +352,7 @@ func add_construction_progress(delta_frac: float) -> bool:
 	if is_constructed:
 		return true
 	construction_progress = minf(1.0, construction_progress + maxf(delta_frac, 0.0))
+	_apply_construction_visual()
 	if construction_progress >= 1.0:
 		complete_construction()
 		return true
@@ -355,11 +364,66 @@ func complete_construction() -> void:
 		return
 	is_constructed = true
 	construction_progress = 1.0
+	_restore_constructed_visual()
 	print("[BUILD] ", name, " COMPLETE (READY)")
 
 
 func is_operational() -> bool:
 	return is_constructed and not is_destroyed and health > 0
+
+
+## M10.2 — scaffold look + grow Y + progress bar while building.
+func _apply_construction_visual() -> void:
+	if is_constructed:
+		return
+	_cache_mesh_base_scales()
+	var p: float = clampf(construction_progress, 0.0, 1.0)
+	var sy: float = 0.22 + 0.78 * p
+
+	for mi_key in _mesh_base_scales.keys():
+		var mi: MeshInstance3D = mi_key as MeshInstance3D
+		if mi == null or not is_instance_valid(mi):
+			continue
+		var base_s: Vector3 = _mesh_base_scales[mi]
+		mi.scale = Vector3(base_s.x, base_s.y * sy, base_s.z)
+		var std := StandardMaterial3D.new()
+		std.albedo_color = _visual_base_albedo * _CONSTRUCTION_TINT
+		std.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+		std.albedo_color.a = _CONSTRUCTION_TINT.a
+		mi.material_override = std
+
+	if health_bar != null and is_instance_valid(health_bar):
+		if health_bar.has_method("set_build_progress"):
+			health_bar.set_build_progress(p)
+
+
+func _restore_constructed_visual() -> void:
+	for mi_key in _mesh_base_scales.keys():
+		var mi: MeshInstance3D = mi_key as MeshInstance3D
+		if mi == null or not is_instance_valid(mi):
+			continue
+		var base_s: Vector3 = _mesh_base_scales[mi]
+		mi.scale = base_s
+
+	if health_bar != null and is_instance_valid(health_bar):
+		if health_bar.has_method("clear_construction_mode"):
+			health_bar.clear_construction_mode()
+		health_bar.setup(max_health)
+		health_bar.set_health(health)
+
+	_refresh_visual_state()
+
+
+func _cache_mesh_base_scales() -> void:
+	if not _mesh_base_scales.is_empty():
+		return
+	for child in get_children():
+		if not (child is MeshInstance3D):
+			continue
+		var mi := child as MeshInstance3D
+		if _is_ui_mesh(mi):
+			continue
+		_mesh_base_scales[mi] = mi.scale
 
 
 ## amount is already modified (building multipliers applied by attacker).
@@ -377,7 +441,7 @@ func damage(amount: int, attacker_team_id: int = -1) -> void:
 				" → ", final_amount, " (state=", deployment_state, ")"
 			)
 	health -= final_amount
-	if health_bar:
+	if health_bar and is_constructed:
 		health_bar.set_health(health)
 	if lootable != null and attacker_team_id >= 0 and final_amount > 0:
 		var looted: Dictionary = lootable.extract_loot(float(final_amount), attacker_team_id)
@@ -398,7 +462,10 @@ func damage(amount: int, attacker_team_id: int = -1) -> void:
 		health = 0
 		die()
 	else:
-		_refresh_visual_state()
+		if is_constructed:
+			_refresh_visual_state()
+		else:
+			_apply_construction_visual()
 
 
 func die() -> void:
@@ -407,6 +474,8 @@ func die() -> void:
 	is_destroyed = true
 	health = 0
 	if health_bar:
+		if health_bar.has_method("clear_construction_mode"):
+			health_bar.clear_construction_mode()
 		health_bar.set_health(0)
 	_refresh_visual_state()
 	if is_lootable and _raid_damage_total > 0:
@@ -422,6 +491,10 @@ func die() -> void:
 
 ## Phase 6.2 — HP event only. DESTROYED follows is_destroyed (die()), not a second destroy path.
 func _refresh_visual_state() -> void:
+	if not is_constructed and not is_destroyed:
+		_apply_construction_visual()
+		return
+
 	var next: int = VisualState.INTACT
 	if is_destroyed or health <= 0:
 		next = VisualState.DESTROYED
@@ -492,6 +565,8 @@ func _capture_visual_base_albedo() -> void:
 ## Godot 4 MeshInstance3D has no modulate (CanvasItem only). Tint via material_override.
 ## Skips deployment progress bar / range ring so they keep their own colours.
 func _apply_visual_presentation(state: int) -> void:
+	if not is_constructed and not is_destroyed:
+		return
 	_capture_visual_base_albedo()
 	var tint := Color(1.0, 1.0, 1.0, 1.0)
 	match state:
