@@ -34,6 +34,8 @@ const RALLY_SLOT_SPACING := 2.5
 
 ## M10.2 — under-construction tint (scaffold look).
 const _CONSTRUCTION_TINT := Color(0.55, 0.58, 0.62, 0.72)
+## Starting HP fraction when site is placed (WC-style grows with progress).
+const _CONSTRUCTION_START_HP_FRAC := 0.05
 
 @export var team_id: int = 0
 @export var max_health: int = 500
@@ -75,6 +77,8 @@ var is_destroyed: bool = false
 var is_constructed: bool = true
 var construction_progress: float = 1.0
 var build_time_sec: float = 25.0
+## HP granted by construction progress so far (damage cannot be healed by progress).
+var _construction_hp_granted: int = 0
 var lootable: LootableComponent = null
 var health_bar: HealthBar3D = null
 
@@ -339,7 +343,10 @@ func begin_construction(p_build_time_sec: float) -> void:
 	is_constructed = false
 	construction_progress = 0.0
 	build_time_sec = maxf(p_build_time_sec, 0.1)
-	# Force re-scan meshes (nested under body nodes).
+	# WC-style: low starting HP; grows with construction progress.
+	var start_hp: int = maxi(1, int(ceil(float(max_health) * _CONSTRUCTION_START_HP_FRAC)))
+	health = start_hp
+	_construction_hp_granted = start_hp
 	_mesh_base_scales.clear()
 	_cache_mesh_base_scales()
 	_apply_construction_visual()
@@ -353,6 +360,12 @@ func add_construction_progress(delta_frac: float) -> bool:
 	if is_constructed:
 		return true
 	construction_progress = minf(1.0, construction_progress + maxf(delta_frac, 0.0))
+	# Grow HP with progress (only upward). Damage taken stays — progress does not heal.
+	var target_granted: int = maxi(1, int(ceil(float(max_health) * construction_progress)))
+	var gain: int = target_granted - _construction_hp_granted
+	if gain > 0:
+		health = mini(max_health, health + gain)
+		_construction_hp_granted = target_granted
 	_apply_construction_visual()
 	if construction_progress >= 1.0:
 		complete_construction()
@@ -365,6 +378,9 @@ func complete_construction() -> void:
 		return
 	is_constructed = true
 	construction_progress = 1.0
+	_construction_hp_granted = max_health
+	# Keep current health (may be damaged); never exceed max.
+	health = clampi(health, 1, max_health)
 	_restore_constructed_visual()
 	print("[BUILD] ", name, " COMPLETE (READY)")
 
@@ -373,7 +389,7 @@ func is_operational() -> bool:
 	return is_constructed and not is_destroyed and health > 0
 
 
-## M10.2 — scaffold look + grow Y + progress bar while building.
+## M10.2 — scaffold look + grow Y + bar = remaining HP (WC).
 func _apply_construction_visual() -> void:
 	if is_constructed:
 		return
@@ -394,9 +410,16 @@ func _apply_construction_visual() -> void:
 		std.albedo_color.a = _CONSTRUCTION_TINT.a
 		mi.material_override = std
 
-	if health_bar != null and is_instance_valid(health_bar):
-		if health_bar.has_method("set_build_progress"):
-			health_bar.set_build_progress(p)
+	_refresh_construction_bar()
+
+
+## Bar shows remaining HP / max while under construction (shrinks when attacked).
+func _refresh_construction_bar() -> void:
+	if health_bar == null or not is_instance_valid(health_bar):
+		return
+	var hp_ratio: float = clampf(float(health) / float(maxi(max_health, 1)), 0.0, 1.0)
+	if health_bar.has_method("set_build_progress"):
+		health_bar.set_build_progress(hp_ratio)
 
 
 func _restore_constructed_visual() -> void:
@@ -458,8 +481,12 @@ func damage(amount: int, attacker_team_id: int = -1) -> void:
 				" → ", final_amount, " (state=", deployment_state, ")"
 			)
 	health -= final_amount
-	if health_bar and is_constructed:
-		health_bar.set_health(health)
+	if health_bar:
+		if is_constructed:
+			health_bar.set_health(health)
+		else:
+			# Incomplete site: bar shrinks with remaining HP (Warcraft-style).
+			_refresh_construction_bar()
 	if lootable != null and attacker_team_id >= 0 and final_amount > 0:
 		var looted: Dictionary = lootable.extract_loot(float(final_amount), attacker_team_id)
 		_raid_damage_total += final_amount
