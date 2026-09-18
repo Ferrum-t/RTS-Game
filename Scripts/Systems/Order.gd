@@ -12,6 +12,7 @@ enum Type {
 	ATTACK,
 	ATTACK_BUILDING,
 	BUILD,
+	REPAIR,
 }
 
 var type: Type = Type.NONE
@@ -47,5 +48,7 @@ func type_name() -> String:
 			return "ATTACK_BUILDING"
 		Type.BUILD:
 			return "BUILD"
+		Type.REPAIR:
+			return "REPAIR"
 		_:
 			return str(type)
