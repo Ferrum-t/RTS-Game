@@ -58,6 +58,17 @@ func handle_right_click(
 					command_manager.issue_build(selected_units, building)
 					return
 
+			# M12 — repair own damaged READY building.
+			if int(building.team_id) == 0 and building.is_constructed and building.health < building.max_health:
+				var has_repairer := false
+				for u in selected_units:
+					if u is Worker and is_instance_valid(u):
+						has_repairer = true
+						break
+				if has_repairer:
+					command_manager.issue_repair(selected_units, building)
+					return
+
 			var can_siege := false
 			for u in selected_units:
 				if TeamRules.can_attack_building(u, building):
