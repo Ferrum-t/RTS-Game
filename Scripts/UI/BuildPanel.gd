@@ -1,8 +1,8 @@
 extends PanelContainer
 
-## M10.1 — Worker Construction UI.
-## Visible only while at least one team-0 Worker is selected.
-## Buttons disable when team 0 cannot afford the cost.
+## M10.1b — Worker build buttons (Watchtower, Barracks only).
+## Visibility is owned by parent CommandBar WorkerGroup.
+## Affordability still refreshed while visible.
 
 @onready var container = $VBoxContainer
 
@@ -13,8 +13,6 @@ var _buttons: Array[BuildButton] = []
 
 
 func _ready() -> void:
-	visible = false
-
 	if build_catalog == null:
 		push_error("BuildCatalog is not assigned!")
 		return
@@ -24,6 +22,10 @@ func _ready() -> void:
 		return
 
 	for building in build_catalog.buildings:
+		if building == null:
+			continue
+		if not _is_worker_buildable(building):
+			continue
 		var button = build_button_scene.instantiate()
 		button.setup(building)
 		container.add_child(button)
@@ -32,41 +34,13 @@ func _ready() -> void:
 
 
 func _process(_delta: float) -> void:
-	var has_worker := _has_selected_worker()
-	if visible != has_worker:
-		visible = has_worker
-		if not has_worker:
-			# Leaving worker selection cancels in-progress ghost placement.
-			var cm := get_node_or_null("/root/ConstructionManager")
-			if cm != null and cm.has_method("cancel_build_mode"):
-				cm.cancel_build_mode()
 	if visible:
 		_refresh_affordability()
 
 
-func _has_selected_worker() -> bool:
-	var sm := _selection_manager()
-	if sm == null:
-		return false
-	if not sm.has_method("get_valid_selection"):
-		return false
-	var selected: Array = sm.get_valid_selection()
-	for u in selected:
-		if u is Worker and is_instance_valid(u):
-			var w: BaseUnit = u as BaseUnit
-			if w.team_id == 0 and w.unit_state != BaseUnit.UnitState.DEAD:
-				return true
-	return false
-
-
-func _selection_manager() -> Node:
-	var sm := get_node_or_null("/root/SelectionManager")
-	if sm != null:
-		return sm
-	var nodes := get_tree().get_nodes_in_group("selection_manager")
-	if nodes.size() > 0:
-		return nodes[0]
-	return null
+func _is_worker_buildable(data: BuildingData) -> bool:
+	var n: String = str(data.building_name).strip_edges().to_lower()
+	return n == "watchtower" or n == "barracks"
 
 
 func _refresh_affordability() -> void:
