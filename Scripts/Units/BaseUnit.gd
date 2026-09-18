@@ -62,11 +62,17 @@ var _siege_stuck_time: float = 0.0
 var _siege_last_pos: Vector3 = Vector3.ZERO
 ## Polish: locked in building strike range (hysteresis).
 var _siege_in_range: bool = false
+## M10.2 — stuck near construction site (nav blocked by footprint).
+var _build_stuck_time: float = 0.0
+var _build_last_pos: Vector3 = Vector3.ZERO
 
 const GRAVITY := 30.0
 const HEALTH_BAR_SCENE := preload("res://Scenes/UI/HealthBar3D.tscn")
 ## M6.3: only rebuild path when approach point drifts this far
 const APPROACH_RETARGET_DIST := 0.9
+## Base stand distance; actual uses max with site nav footprint + margin.
+const BUILD_STAND_DIST := 3.0
+const BUILD_FOOTPRINT_MARGIN := 1.25
 
 
 func _ready() -> void:
@@ -282,7 +288,6 @@ func _siege_hold_and_strike(delta: float, building: BaseBuilding) -> void:
 	if _building_attack_timer > 0.0:
 		return
 	_building_attack_timer = attack_cooldown
-	# Prefer official BaseBuilding.damage path so die()/queue_free runs
 	if building.has_method("damage"):
 		building.damage(attack_damage, team_id)
 	elif building.has_method("apply_damage"):
@@ -306,7 +311,6 @@ func _clear_building_attack() -> void:
 
 
 func update_return(delta: float) -> void:
-	# Drop invalid / enemy / destroyed deposit target
 	if return_target != null and is_instance_valid(return_target):
 		if return_target.get("is_destroyed") == true:
 			return_target = null
@@ -414,6 +418,7 @@ func replace_order_move(pos: Vector3) -> void:
 	attack_target = null
 	attack_building_target = null
 	return_target = null
+	_build_stuck_time = 0.0
 	if harvest:
 		harvest.reset()
 	if movement:
@@ -432,6 +437,7 @@ func replace_order_harvest(resource: BaseResource) -> void:
 	attack_target = null
 	attack_building_target = null
 	return_target = null
+	_build_stuck_time = 0.0
 	if harvest:
 		harvest.reset()
 	unit_state = UnitState.HARVESTING
@@ -446,6 +452,7 @@ func replace_order_attack(enemy: BaseUnit) -> void:
 	harvest_target = null
 	build_target = null
 	return_target = null
+	_build_stuck_time = 0.0
 	if harvest:
 		harvest.reset()
 	unit_state = UnitState.ATTACKING
@@ -460,6 +467,7 @@ func replace_order_attack_building(building: BaseBuilding) -> void:
 	harvest_target = null
 	build_target = null
 	return_target = null
+	_build_stuck_time = 0.0
 	_siege_in_range = false
 	_siege_stuck_time = 0.0
 	_siege_last_pos = global_position
@@ -475,19 +483,29 @@ func replace_order_build(building: BaseBuilding) -> void:
 	if not (self is Worker):
 		print(name, " cannot BUILD (not a Worker)")
 		return
+	# Same site already — do not spam log / reset stuck timer needlessly.
+	if unit_state == UnitState.BUILDING and build_target == building:
+		return
 	current_order = Order.new(Order.Type.BUILD, building)
 	build_target = building
 	harvest_target = null
 	attack_target = null
 	attack_building_target = null
 	return_target = null
+	_build_stuck_time = 0.0
+	_build_last_pos = global_position
 	if harvest:
 		harvest.reset()
 	unit_state = UnitState.BUILDING
 	print(name, " -> BUILD ", building.name)
 
 
-const BUILD_STAND_DIST := 3.0
+func _build_stand_dist(site: BaseBuilding) -> float:
+	var he: float = 2.2
+	if "nav_half_extents" in site:
+		var v: Vector3 = site.nav_half_extents
+		he = maxf(v.x, v.z)
+	return maxf(BUILD_STAND_DIST, he + BUILD_FOOTPRINT_MARGIN)
 
 
 func update_building(delta: float) -> void:
@@ -499,13 +517,28 @@ func update_building(delta: float) -> void:
 		_clear_build("already ready")
 		return
 
+	var stand_dist: float = _build_stand_dist(site)
 	var to_s := site.global_position - global_position
 	to_s.y = 0.0
 	var dist := to_s.length()
-	if dist > BUILD_STAND_DIST:
+
+	# Stuck detection: nav often cannot enter footprint; allow build from edge.
+	var moved := global_position.distance_to(_build_last_pos)
+	_build_last_pos = global_position
+	if moved < 0.04:
+		_build_stuck_time += delta
+	else:
+		_build_stuck_time = 0.0
+
+	var in_range: bool = dist <= stand_dist
+	if not in_range and _build_stuck_time > 0.7 and dist <= stand_dist + 2.0:
+		in_range = true
+
+	if not in_range:
 		var stand := site.global_position
 		if dist > 0.01:
-			stand = site.global_position - to_s.normalized() * (BUILD_STAND_DIST * 0.85)
+			# Stand just outside footprint, not at center (unreachable under nav).
+			stand = site.global_position - to_s.normalized() * (stand_dist * 0.92)
 		stand.y = 0.0
 		if movement:
 			movement.ensure_moving_to(stand, APPROACH_RETARGET_DIST)
@@ -529,5 +562,6 @@ func _clear_build(reason: String) -> void:
 	build_target = null
 	current_order = Order.none()
 	velocity = Vector3.ZERO
+	_build_stuck_time = 0.0
 	if unit_state == UnitState.BUILDING:
 		unit_state = UnitState.IDLE
