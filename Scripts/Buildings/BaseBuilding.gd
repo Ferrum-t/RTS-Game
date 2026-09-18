@@ -22,6 +22,8 @@ const _UI_MESH_NAMES: Array[String] = [
 	"SelectionRing",
 	"BuildingSelectRing",
 	"RallyFlag",
+	"Fill",
+	"Background",
 ]
 
 const HEALTH_BAR_SCENE := preload("res://Scenes/UI/HealthBar3D.tscn")
@@ -216,7 +218,6 @@ func _setup_rally_flag() -> void:
 	_rally_flag.top_level = true
 	add_child(_rally_flag)
 
-	# Pole
 	var pole := MeshInstance3D.new()
 	var cyl := CylinderMesh.new()
 	cyl.top_radius = 0.05
@@ -229,7 +230,6 @@ func _setup_rally_flag() -> void:
 	pole.material_override = pole_mat
 	_rally_flag.add_child(pole)
 
-	# Banner
 	var cloth := MeshInstance3D.new()
 	var box := BoxMesh.new()
 	box.size = Vector3(1.35, 0.75, 0.04)
@@ -243,7 +243,6 @@ func _setup_rally_flag() -> void:
 	cloth.material_override = flag_mat
 	_rally_flag.add_child(cloth)
 
-	# Ground disc so flag is easy to spot from top-down
 	var disc_mi := MeshInstance3D.new()
 	var disc := CylinderMesh.new()
 	disc.top_radius = 0.45
@@ -340,6 +339,8 @@ func begin_construction(p_build_time_sec: float) -> void:
 	is_constructed = false
 	construction_progress = 0.0
 	build_time_sec = maxf(p_build_time_sec, 0.1)
+	# Force re-scan meshes (nested under body nodes).
+	_mesh_base_scales.clear()
 	_cache_mesh_base_scales()
 	_apply_construction_visual()
 	print("[BUILD] ", name, " UNDER_CONSTRUCTION time=", build_time_sec, "s")
@@ -376,7 +377,8 @@ func is_operational() -> bool:
 func _apply_construction_visual() -> void:
 	if is_constructed:
 		return
-	_cache_mesh_base_scales()
+	if _mesh_base_scales.is_empty():
+		_cache_mesh_base_scales()
 	var p: float = clampf(construction_progress, 0.0, 1.0)
 	var sy: float = 0.22 + 0.78 * p
 
@@ -417,13 +419,28 @@ func _restore_constructed_visual() -> void:
 func _cache_mesh_base_scales() -> void:
 	if not _mesh_base_scales.is_empty():
 		return
-	for child in get_children():
-		if not (child is MeshInstance3D):
-			continue
-		var mi := child as MeshInstance3D
-		if _is_ui_mesh(mi):
-			continue
-		_mesh_base_scales[mi] = mi.scale
+	var meshes: Array = []
+	_collect_build_meshes(self, meshes)
+	for mi in meshes:
+		if mi is MeshInstance3D:
+			_mesh_base_scales[mi] = (mi as MeshInstance3D).scale
+
+
+## Recursively find body meshes; skip UI subtrees (health bar, rings, flags).
+func _collect_build_meshes(n: Node, out: Array) -> void:
+	if n == null:
+		return
+	if n is HealthBar3D:
+		return
+	var nname := str(n.name)
+	if nname in _UI_MESH_NAMES:
+		return
+	if n is MeshInstance3D:
+		var mi := n as MeshInstance3D
+		if not _is_ui_mesh(mi):
+			out.append(mi)
+	for c in n.get_children():
+		_collect_build_meshes(c, out)
 
 
 ## amount is already modified (building multipliers applied by attacker).
@@ -545,11 +562,11 @@ func _is_ui_mesh(mi: MeshInstance3D) -> bool:
 func _capture_visual_base_albedo() -> void:
 	if _visual_base_captured:
 		return
-	for child in get_children():
-		if not (child is MeshInstance3D):
-			continue
-		var mi := child as MeshInstance3D
-		if _is_ui_mesh(mi):
+	var meshes: Array = []
+	_collect_build_meshes(self, meshes)
+	for item in meshes:
+		var mi := item as MeshInstance3D
+		if mi == null:
 			continue
 		var mat: Material = mi.material_override
 		if mat == null:
@@ -563,7 +580,6 @@ func _capture_visual_base_albedo() -> void:
 
 
 ## Godot 4 MeshInstance3D has no modulate (CanvasItem only). Tint via material_override.
-## Skips deployment progress bar / range ring so they keep their own colours.
 func _apply_visual_presentation(state: int) -> void:
 	if not is_constructed and not is_destroyed:
 		return
@@ -579,11 +595,11 @@ func _apply_visual_presentation(state: int) -> void:
 		VisualState.DESTROYED:
 			tint = Color(0.3, 0.3, 0.3, 1.0)
 	var albedo: Color = _visual_base_albedo * tint
-	for child in get_children():
-		if not (child is MeshInstance3D):
-			continue
-		var mi := child as MeshInstance3D
-		if _is_ui_mesh(mi):
+	var meshes: Array = []
+	_collect_build_meshes(self, meshes)
+	for item in meshes:
+		var mi := item as MeshInstance3D
+		if mi == null:
 			continue
 		var std := StandardMaterial3D.new()
 		std.albedo_color = albedo
