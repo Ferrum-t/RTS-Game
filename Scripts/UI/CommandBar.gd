@@ -1,8 +1,8 @@
 extends PanelContainer
 
-## M10.1b — Bottom Command Bar.
+## M10.1b/c — Bottom Command Bar.
 ## Selection → context → show one command group, hide the rest.
-## Does not change train/build mechanics — only visibility routing.
+## Leaving Worker context cancels ghost placement (M10.1c).
 
 enum Context {
 	NONE,
@@ -77,6 +77,8 @@ func _apply_context(ctx: int) -> void:
 
 func _cancel_ghost() -> void:
 	var cm := get_node_or_null("/root/ConstructionManager")
+	if cm == null:
+		cm = get_tree().root.get_node_or_null("ConstructionManager")
 	if cm != null and cm.has_method("cancel_build_mode"):
 		cm.cancel_build_mode()
 
