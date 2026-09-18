@@ -5,6 +5,7 @@ class_name CombatComponent
 ## M2: reports Status; BaseUnit owns unit_state transitions.
 ## M6.3: chase must call ensure_moving_to / set_target — not only move_target + update.
 ## Polish: hysteresis — enter attack at attack_range, leave only past exit_range.
+## M13: _strike passes owner as damage source so IDLE targets can retaliate.
 
 enum Status {
 	IDLE,
@@ -112,7 +113,8 @@ func _strike(target: BaseUnit) -> void:
 		return
 
 	print(owner.name, " hits ", target.name, " for ", attack_damage, " dmg (HP ", max(target.health - attack_damage, 0), "/", target.max_health, ")")
-	target.take_damage(attack_damage)
+	# M13: pass owner so IDLE target can retaliate (unit-vs-unit only).
+	target.take_damage(attack_damage, owner)
 
 	if not is_instance_valid(target) or target.unit_state == BaseUnit.UnitState.DEAD:
 		_in_melee = false
