@@ -1,6 +1,6 @@
 extends Node3D
 
-## RTS-style floating HP bar.
+## RTS-style floating HP / construction bar.
 ## Full billboard (always faces camera) so it stays readable from high angle.
 
 class_name HealthBar3D
@@ -10,14 +10,19 @@ class_name HealthBar3D
 
 var max_health: int = 100
 var bar_width: float = 2.0
+## When true, bar stays visible at any ratio (construction site).
+var _construction_mode: bool = false
 
 
 func setup(p_max_health: int) -> void:
+	_construction_mode = false
 	max_health = maxi(p_max_health, 1)
 	set_health(max_health)
 
 
 func set_health(current: int) -> void:
+	if _construction_mode:
+		return
 	var ratio := clampf(float(current) / float(max_health), 0.0, 1.0)
 
 	# Hidden at full HP
@@ -33,6 +38,36 @@ func set_health(current: int) -> void:
 	fill.position.y = 0.0
 
 	_update_fill_color(ratio)
+
+
+## M10.2 — show construction progress 0..1, always visible until complete.
+func set_build_progress(frac: float) -> void:
+	_construction_mode = true
+	var ratio := clampf(frac, 0.0, 1.0)
+	visible = true
+
+	if fill == null:
+		return
+
+	fill.scale = Vector3(ratio, 1.0, 1.0)
+	fill.position.x = -bar_width * 0.5 * (1.0 - ratio)
+	fill.position.z = 0.0
+	fill.position.y = 0.0
+
+	var mat := fill.get_active_material(0)
+	if mat is StandardMaterial3D:
+		var m := mat as StandardMaterial3D
+		# Construction: cyan → yellow → green as it fills
+		if ratio < 0.5:
+			m.albedo_color = Color(0.25, 0.75, 1.0, 1)
+		elif ratio < 1.0:
+			m.albedo_color = Color(1.0, 0.9, 0.2, 1)
+		else:
+			m.albedo_color = Color(0.2, 1.0, 0.35, 1)
+
+
+func clear_construction_mode() -> void:
+	_construction_mode = false
 
 
 func _update_fill_color(ratio: float) -> void:
