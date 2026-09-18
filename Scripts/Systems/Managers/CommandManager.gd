@@ -69,6 +69,22 @@ func issue_build(units: Array[BaseUnit], building: BaseBuilding) -> void:
 		unit.replace_order_build(building)
 
 
+## M12 — Workers repair own damaged READY building (free cost, multi-worker).
+func issue_repair(units: Array[BaseUnit], building: BaseBuilding) -> void:
+	if not _match_allows_commands():
+		return
+	if building == null or not is_instance_valid(building):
+		return
+	if building.is_destroyed or not building.is_constructed:
+		return
+	if building.health >= building.max_health:
+		return
+	for unit: BaseUnit in _filter_valid(units):
+		if not (unit is Worker):
+			continue
+		unit.replace_order_repair(building)
+
+
 func _match_allows_commands() -> bool:
 	var mm := get_node_or_null("/root/MatchManager")
 	if mm == null:
