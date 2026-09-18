@@ -5,8 +5,10 @@ class_name TeamRules
 ## M4/M5: pure team / ownership checks. Never mutates unit_state or orders.
 ## Intentionally untyped params — avoids parse cycle with BaseUnit class_name.
 
-## Must match BaseUnit.UnitState.DEAD enum ordinal
-const UNIT_STATE_DEAD := 6
+## Must match BaseUnit.UnitState.DEAD enum ordinal.
+## Current order: IDLE, MOVING, HARVESTING, RETURNING, BUILDING, REPAIRING, ATTACKING, DEAD.
+## Prefer updating this constant when UnitState gains new values (avoid magic drift).
+const UNIT_STATE_DEAD := 7
 
 
 static func local_team_id() -> int:
