@@ -1,1 +1,1 @@
-FILE:/tmp/BaseBuilding.gd
+PLACEHOLDER
