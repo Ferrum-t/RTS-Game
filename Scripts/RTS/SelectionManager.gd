@@ -153,6 +153,15 @@ func _place_marker_on_ground(world_pos: Vector3) -> void:
 	_marker_timer = MARKER_VISIBLE_TIME
 
 
+func _cancel_ghost_if_placing() -> bool:
+	var cm := get_node_or_null("/root/ConstructionManager")
+	if cm != null and cm.has_method("is_placing") and cm.is_placing():
+		if cm.has_method("cancel_build_mode"):
+			cm.cancel_build_mode()
+		return true
+	return false
+
+
 func _unhandled_input(event: InputEvent) -> void:
 	if event is InputEventMouseButton and event.pressed:
 		if camera == null:
@@ -185,6 +194,11 @@ func _unhandled_input(event: InputEvent) -> void:
 				return
 
 		elif event.button_index == MOUSE_BUTTON_RIGHT:
+			# M10.1c: RMB during ghost placement cancels ghost only (no unit order).
+			if _cancel_ghost_if_placing():
+				get_viewport().set_input_as_handled()
+				return
+
 			_prune_selection()
 			if interaction_manager:
 				interaction_manager.handle_right_click(
