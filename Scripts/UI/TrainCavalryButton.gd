@@ -1,6 +1,6 @@
 extends Button
 
-## Trains Cavalry from the player's Barracks (100 wood + 1 horse).
+## Trains Cavalry from selected Barracks, else first owned (100 wood + 1 horse).
 
 const COST_WOOD := 100
 const COST_HORSES := 1
@@ -8,7 +8,7 @@ const PLAYER_TEAM := 0
 
 
 func _ready() -> void:
-	text = "Train Cavalry (100W + 1H)"
+	text = "Cavalry (100W+1H)"
 	pressed.connect(_on_pressed)
 
 	var rm := get_node_or_null("/root/ResourceManager")
@@ -28,18 +28,30 @@ func _on_resources_changed() -> void:
 
 
 func _on_pressed() -> void:
-	var bm := get_node_or_null("/root/BuildingManager")
-	if bm == null:
-		push_warning("BuildingManager not found")
-		return
-
-	var barracks = null
-	if bm.has_method("get_first_barracks"):
-		barracks = bm.get_first_barracks(PLAYER_TEAM)
-
+	var barracks = _resolve_barracks()
 	if barracks == null:
 		print("Train Cavalry: build a Barracks first (your team)")
 		return
-
 	if barracks.has_method("try_train_cavalry"):
 		barracks.try_train_cavalry()
+
+
+func _resolve_barracks():
+	var selected = _selected_barracks()
+	if selected != null:
+		return selected
+	var bm := get_node_or_null("/root/BuildingManager")
+	if bm != null and bm.has_method("get_first_barracks"):
+		return bm.get_first_barracks(PLAYER_TEAM)
+	return null
+
+
+func _selected_barracks():
+	var sm: Node = get_tree().get_first_node_in_group("selection_manager")
+	if sm == null or not sm.has_method("get_selected_mobile_buildings"):
+		return null
+	for b in sm.get_selected_mobile_buildings():
+		if b is Barracks and is_instance_valid(b):
+			if int(b.get("team_id")) == PLAYER_TEAM and b.get("is_destroyed") != true:
+				return b
+	return null
