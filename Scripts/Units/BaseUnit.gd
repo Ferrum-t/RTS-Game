@@ -289,11 +289,37 @@ func update_return(delta: float) -> void:
 		current_order = Order.none()
 		unit_state = UnitState.IDLE
 
-func take_damage(amount: int, _source: Node = null) -> void:
-	if unit_state == UnitState.DEAD: return
+func take_damage(amount: int, source: Node = null) -> void:
+	if unit_state == UnitState.DEAD:
+		return
 	health = maxi(0, health - amount)
-	if health_bar: health_bar.set_health(health)
-	if health <= 0: die()
+	if health_bar:
+		health_bar.set_health(health)
+	if health <= 0:
+		die()
+		return
+	# M13 — IDLE-only retaliation against enemy BaseUnit (not towers / unknown).
+	_try_retaliate(source)
+
+
+func _try_retaliate(source: Node) -> void:
+	if unit_state != UnitState.IDLE:
+		return
+	if source == null or not is_instance_valid(source):
+		return
+	if not (source is BaseUnit):
+		return
+	var attacker := source as BaseUnit
+	if attacker == self:
+		return
+	if attacker.unit_state == UnitState.DEAD:
+		return
+	if int(attacker.team_id) == int(team_id):
+		return
+	replace_order_attack(attacker)
+	if OS.is_debug_build():
+		print(name, " RETALIATE -> ", attacker.name)
+
 
 func die() -> void:
 	unit_state = UnitState.DEAD
