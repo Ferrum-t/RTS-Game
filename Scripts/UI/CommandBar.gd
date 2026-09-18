@@ -51,7 +51,6 @@ func _resolve_context() -> int:
 		if b is Watchtower:
 			return Context.WATCHTOWER
 		if b is BaseBuilding:
-			# Unknown player building → empty bar.
 			return Context.NONE
 
 	if not sm.has_method("get_valid_selection"):
@@ -66,13 +65,14 @@ func _resolve_context() -> int:
 
 
 func _apply_context(ctx: int) -> void:
+	var show_bar: bool = ctx == Context.WORKER or ctx == Context.BARRACKS or ctx == Context.TOWN_CENTER
+	visible = show_bar
 	if worker_group:
 		worker_group.visible = ctx == Context.WORKER
 	if barracks_group:
 		barracks_group.visible = ctx == Context.BARRACKS
 	if town_center_group:
 		town_center_group.visible = ctx == Context.TOWN_CENTER
-	# Watchtower / NONE → all groups hidden.
 
 
 func _cancel_ghost() -> void:
