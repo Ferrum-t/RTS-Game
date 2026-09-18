@@ -2,4 +2,546 @@ extends CharacterBody3D
 
 class_name BaseBuilding
 
-## See commit history — loading full file next.
+enum VisualState {
+	INTACT,
+	DAMAGED,
+	BURNING,
+	DESTROYED,
+}
+
+const _UI_MESH_NAMES: Array[String] = [
+	"DeploymentProgressBar",
+	"DeploymentProgressBg",
+	"AttackRangeRing",
+	"HealthBar3D",
+	"SelectionRing",
+	"BuildingSelectRing",
+	"RallyFlag",
+	"Fill",
+	"Background",
+]
+
+const HEALTH_BAR_SCENE := preload("res://Scenes/UI/HealthBar3D.tscn")
+const RALLY_GRID_COLS := 4
+const RALLY_SLOT_SPACING := 2.5
+const _CONSTRUCTION_TINT := Color(0.55, 0.58, 0.62, 0.72)
+const _CONSTRUCTION_START_HP_FRAC := 0.05
+const REPAIR_HP_PER_SEC := 25.0
+
+@export var team_id: int = 0
+@export var max_health: int = 500
+@export var nav_half_extents: Vector3 = Vector3(2.2, 1.0, 2.2)
+@export var health_bar_height: float = 3.2
+@export var spawn_offset: Vector3 = Vector3(3.5, 0.0, 0.0)
+@export var default_rally_offset: Vector3 = Vector3(12.0, 0.0, 0.0)
+@export var tier: int = 1
+@export var tier_modifiers: Array[Dictionary] = [{}, {"max_health": 1.5}, {"max_health": 2.0}]
+@export var deployment_overrides: Dictionary = {}
+@export var is_lootable: bool = true
+@export var loot_ratio: float = 0.5
+@export var raid_debug_verbose: bool = false
+
+var vulnerability_multiplier: float = 1.0
+var deployment_state: int = DeploymentState.State.DEPLOYED
+var base_max_health: int = 500
+var health: int = 500
+var is_destroyed: bool = false
+var is_constructed: bool = true
+var construction_progress: float = 1.0
+var build_time_sec: float = 25.0
+var _construction_hp_granted: int = 0
+var _repair_intent: Dictionary = {}
+var _repair_delta_acc: float = 0.0
+var _repair_flush_queued: bool = false
+var lootable: LootableComponent = null
+var health_bar: HealthBar3D = null
+var visual_state: int = VisualState.INTACT
+var _visual_base_albedo: Color = Color(1, 1, 1, 1)
+var _visual_base_captured: bool = false
+var _mesh_base_scales: Dictionary = {}
+var _raid_loot_total: Dictionary = {}
+var _raid_damage_total: int = 0
+var rally_point: Vector3 = Vector3.ZERO
+var _rally_initialized: bool = false
+var _rally_slot: int = 0
+var _rally_flag: Node3D = null
+var _building_selected: bool = false
+var _select_ring: MeshInstance3D = null
+
+func get_current_stat(stat_name: String, base_value: float) -> float:
+	var value := base_value
+	if tier >= 1 and tier <= tier_modifiers.size():
+		value *= float(tier_modifiers[tier - 1].get(stat_name, 1.0))
+	var overrides: Dictionary = deployment_overrides.get(deployment_state, {})
+	value *= float(overrides.get(stat_name, 1.0))
+	return value
+
+func recompute_stats() -> void:
+	max_health = int(get_current_stat("max_health", float(base_max_health)))
+	health = mini(health, max_health)
+	if health_bar:
+		health_bar.setup(max_health)
+		health_bar.set_health(health)
+	_refresh_visual_state()
+
+func get_door_position() -> Vector3:
+	var pos := global_position + spawn_offset
+	pos.y = 0.0
+	return pos
+
+func get_rally_point() -> Vector3:
+	if not _rally_initialized:
+		var p := global_position + default_rally_offset
+		p.y = 0.0
+		return p
+	return rally_point
+
+func next_rally_destination() -> Vector3:
+	var center := get_rally_point()
+	var i: int = _rally_slot
+	_rally_slot += 1
+	var cols: int = RALLY_GRID_COLS
+	var spacing: float = RALLY_SLOT_SPACING
+	@warning_ignore("integer_division")
+	var row: int = i / cols
+	var col: int = i % cols
+	var ox: float = (float(col) - float(cols - 1) * 0.5) * spacing
+	var oz: float = float(row) * spacing
+	var dest := center + Vector3(ox, 0.0, oz)
+	dest.y = 0.0
+	return dest
+
+func set_rally_point(world_pos: Vector3) -> void:
+	rally_point = world_pos
+	rally_point.y = 0.0
+	_rally_initialized = true
+	_rally_slot = 0
+	_update_rally_flag()
+	print(name, " rally set → ", rally_point)
+
+func set_building_selected(value: bool) -> void:
+	_building_selected = value
+	if _select_ring != null and is_instance_valid(_select_ring):
+		_select_ring.visible = value
+	if _rally_flag != null and is_instance_valid(_rally_flag):
+		_rally_flag.visible = value and team_id == 0
+		if value:
+			_update_rally_flag()
+
+func _init_default_rally() -> void:
+	if _rally_initialized:
+		_update_rally_flag()
+		return
+	rally_point = global_position + default_rally_offset
+	rally_point.y = 0.0
+	_rally_initialized = true
+	_rally_slot = 0
+	_update_rally_flag()
+
+func _setup_select_ring() -> void:
+	if _select_ring != null:
+		return
+	_select_ring = MeshInstance3D.new()
+	_select_ring.name = "BuildingSelectRing"
+	var he: float = maxf(nav_half_extents.x, nav_half_extents.z) + 0.45
+	var torus := TorusMesh.new()
+	torus.inner_radius = he
+	torus.outer_radius = he + 0.28
+	torus.rings = 10
+	torus.ring_segments = 36
+	_select_ring.mesh = torus
+	var mat := StandardMaterial3D.new()
+	mat.albedo_color = Color(1.0, 0.85, 0.15, 0.9)
+	mat.emission_enabled = true
+	mat.emission = Color(0.95, 0.8, 0.15)
+	mat.emission_energy_multiplier = 1.1
+	mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+	mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	_select_ring.material_override = mat
+	_select_ring.position = Vector3(0.0, 0.08, 0.0)
+	_select_ring.visible = false
+	add_child(_select_ring)
+
+func _setup_rally_flag() -> void:
+	if team_id != 0:
+		return
+	if _rally_flag != null:
+		return
+	_rally_flag = Node3D.new()
+	_rally_flag.name = "RallyFlag"
+	_rally_flag.top_level = true
+	add_child(_rally_flag)
+	var pole := MeshInstance3D.new()
+	var cyl := CylinderMesh.new()
+	cyl.top_radius = 0.05
+	cyl.bottom_radius = 0.07
+	cyl.height = 2.6
+	pole.mesh = cyl
+	pole.position = Vector3(0.0, 1.3, 0.0)
+	var pole_mat := StandardMaterial3D.new()
+	pole_mat.albedo_color = Color(0.32, 0.22, 0.12)
+	pole.material_override = pole_mat
+	_rally_flag.add_child(pole)
+	var cloth := MeshInstance3D.new()
+	var box := BoxMesh.new()
+	box.size = Vector3(1.35, 0.75, 0.04)
+	cloth.mesh = box
+	cloth.position = Vector3(0.72, 2.15, 0.0)
+	var flag_mat := StandardMaterial3D.new()
+	flag_mat.albedo_color = Color(0.95, 0.78, 0.12)
+	flag_mat.emission_enabled = true
+	flag_mat.emission = Color(0.95, 0.7, 0.1)
+	flag_mat.emission_energy_multiplier = 1.0
+	cloth.material_override = flag_mat
+	_rally_flag.add_child(cloth)
+	var disc_mi := MeshInstance3D.new()
+	var disc := CylinderMesh.new()
+	disc.top_radius = 0.45
+	disc.bottom_radius = 0.45
+	disc.height = 0.06
+	disc_mi.mesh = disc
+	disc_mi.position = Vector3(0.0, 0.03, 0.0)
+	var disc_mat := StandardMaterial3D.new()
+	disc_mat.albedo_color = Color(0.15, 0.55, 0.95, 0.75)
+	disc_mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+	disc_mat.emission_enabled = true
+	disc_mat.emission = Color(0.2, 0.5, 1.0)
+	disc_mat.emission_energy_multiplier = 0.6
+	disc_mi.material_override = disc_mat
+	_rally_flag.add_child(disc_mi)
+	_rally_flag.visible = false
+
+func _update_rally_flag() -> void:
+	if _rally_flag == null or not is_instance_valid(_rally_flag):
+		return
+	_rally_flag.global_position = get_rally_point()
+
+func _ready() -> void:
+	collision_layer = 1
+	collision_mask = 1
+	motion_mode = CharacterBody3D.MOTION_MODE_GROUNDED
+	base_max_health = max_health
+	max_health = int(get_current_stat("max_health", float(base_max_health)))
+	health = max_health
+	is_destroyed = false
+	deployment_state = DeploymentState.State.DEPLOYED
+	_raid_loot_total.clear()
+	_raid_damage_total = 0
+	if is_lootable:
+		_setup_lootable()
+	var bm := get_node_or_null("/root/BuildingManager")
+	if bm:
+		bm.register_building(self)
+	var nav := get_node_or_null("/root/NavigationBakeService")
+	if nav:
+		nav.register_building(self, nav_half_extents)
+	_setup_health_bar()
+	_setup_select_ring()
+	_setup_rally_flag()
+	_capture_visual_base_albedo()
+	_cache_mesh_base_scales()
+	_refresh_visual_state()
+	call_deferred("_init_default_rally")
+
+func _setup_lootable() -> void:
+	lootable = LootableComponent.new()
+	lootable.name = "LootableComponent"
+	lootable.loot_ratio = loot_ratio
+	add_child(lootable)
+	lootable.setup(self)
+
+func _setup_health_bar() -> void:
+	if HEALTH_BAR_SCENE == null:
+		return
+	health_bar = HEALTH_BAR_SCENE.instantiate() as HealthBar3D
+	if health_bar == null:
+		return
+	health_bar.name = "HealthBar3D"
+	add_child(health_bar)
+	health_bar.position = Vector3(0.0, health_bar_height, 0.0)
+	health_bar.bar_width = 3.0
+	health_bar.setup(max_health)
+	health_bar.set_health(health)
+
+func _exit_tree() -> void:
+	var bm := get_node_or_null("/root/BuildingManager")
+	if bm:
+		bm.unregister_building(self)
+	var nav := get_node_or_null("/root/NavigationBakeService")
+	if nav:
+		nav.unregister_building(self)
+
+func begin_construction(p_build_time_sec: float) -> void:
+	is_constructed = false
+	construction_progress = 0.0
+	build_time_sec = maxf(p_build_time_sec, 0.1)
+	var start_hp: int = maxi(1, int(ceil(float(max_health) * _CONSTRUCTION_START_HP_FRAC)))
+	health = start_hp
+	_construction_hp_granted = start_hp
+	_mesh_base_scales.clear()
+	_cache_mesh_base_scales()
+	_apply_construction_visual()
+	print("[BUILD] ", name, " UNDER_CONSTRUCTION time=", build_time_sec, "s")
+
+func add_construction_progress(delta_frac: float) -> bool:
+	if is_destroyed:
+		return false
+	if is_constructed:
+		return true
+	construction_progress = minf(1.0, construction_progress + maxf(delta_frac, 0.0))
+	var target_granted: int = maxi(1, int(ceil(float(max_health) * construction_progress)))
+	var gain: int = target_granted - _construction_hp_granted
+	if gain > 0:
+		health = mini(max_health, health + gain)
+		_construction_hp_granted = target_granted
+	_apply_construction_visual()
+	if construction_progress >= 1.0:
+		complete_construction()
+		return true
+	return false
+
+func complete_construction() -> void:
+	if is_constructed:
+		return
+	is_constructed = true
+	construction_progress = 1.0
+	_construction_hp_granted = max_health
+	health = clampi(health, 1, max_health)
+	_restore_constructed_visual()
+	print("[BUILD] ", name, " COMPLETE (READY)")
+
+func is_operational() -> bool:
+	return is_constructed and not is_destroyed and health > 0
+
+func request_repair_tick(worker: Node, delta: float) -> bool:
+	if is_destroyed or not is_constructed:
+		return true
+	if health >= max_health:
+		return true
+	if worker == null or not is_instance_valid(worker):
+		return false
+	_repair_intent[worker.get_instance_id()] = worker
+	_repair_delta_acc = maxf(_repair_delta_acc, delta)
+	if not _repair_flush_queued:
+		_repair_flush_queued = true
+		call_deferred("_flush_repair_ticks")
+	return health >= max_health
+
+func _flush_repair_ticks() -> void:
+	_repair_flush_queued = false
+	var d: float = _repair_delta_acc
+	_repair_delta_acc = 0.0
+	var workers: Array = []
+	for id in _repair_intent.keys():
+		var w: Variant = _repair_intent[id]
+		if w != null and is_instance_valid(w):
+			workers.append(w)
+	_repair_intent.clear()
+	if is_destroyed or not is_constructed or workers.is_empty():
+		return
+	if health >= max_health:
+		return
+	var n: int = workers.size()
+	var mult: float = 0.0
+	for i in range(1, n + 1):
+		mult += 1.0 / float(i)
+	var heal: int = maxi(1, int(round(REPAIR_HP_PER_SEC * mult * d)))
+	health = mini(max_health, health + heal)
+	if health_bar != null and is_instance_valid(health_bar):
+		health_bar.set_health(health)
+	_refresh_visual_state()
+	if OS.is_debug_build() and heal > 0:
+		print("[REPAIR] ", name, " +", heal, " HP (", health, "/", max_health, ") n=", n, " mult=", snappedf(mult, 0.01))
+
+func _apply_construction_visual() -> void:
+	if is_constructed:
+		return
+	if _mesh_base_scales.is_empty():
+		_cache_mesh_base_scales()
+	var p: float = clampf(construction_progress, 0.0, 1.0)
+	var sy: float = 0.22 + 0.78 * p
+	for mi_key in _mesh_base_scales.keys():
+		var mi: MeshInstance3D = mi_key as MeshInstance3D
+		if mi == null or not is_instance_valid(mi):
+			continue
+		var base_s: Vector3 = _mesh_base_scales[mi]
+		mi.scale = Vector3(base_s.x, base_s.y * sy, base_s.z)
+		var std := StandardMaterial3D.new()
+		std.albedo_color = _visual_base_albedo * _CONSTRUCTION_TINT
+		std.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+		std.albedo_color.a = _CONSTRUCTION_TINT.a
+		mi.material_override = std
+	_refresh_construction_bar()
+
+func _refresh_construction_bar() -> void:
+	if health_bar == null or not is_instance_valid(health_bar):
+		return
+	var hp_ratio: float = clampf(float(health) / float(maxi(max_health, 1)), 0.0, 1.0)
+	if health_bar.has_method("set_build_progress"):
+		health_bar.set_build_progress(hp_ratio)
+
+func _restore_constructed_visual() -> void:
+	for mi_key in _mesh_base_scales.keys():
+		var mi: MeshInstance3D = mi_key as MeshInstance3D
+		if mi == null or not is_instance_valid(mi):
+			continue
+		var base_s: Vector3 = _mesh_base_scales[mi]
+		mi.scale = base_s
+	if health_bar != null and is_instance_valid(health_bar):
+		if health_bar.has_method("clear_construction_mode"):
+			health_bar.clear_construction_mode()
+		health_bar.setup(max_health)
+		health_bar.set_health(health)
+	_refresh_visual_state()
+
+func _cache_mesh_base_scales() -> void:
+	if not _mesh_base_scales.is_empty():
+		return
+	var meshes: Array = []
+	_collect_build_meshes(self, meshes)
+	for mi in meshes:
+		if mi is MeshInstance3D:
+			_mesh_base_scales[mi] = (mi as MeshInstance3D).scale
+
+func _collect_build_meshes(n: Node, out: Array) -> void:
+	if n == null:
+		return
+	if n is HealthBar3D:
+		return
+	var nname := str(n.name)
+	if nname in _UI_MESH_NAMES:
+		return
+	if n is MeshInstance3D:
+		var mi := n as MeshInstance3D
+		if not _is_ui_mesh(mi):
+			out.append(mi)
+	for c in n.get_children():
+		_collect_build_meshes(c, out)
+
+func damage(amount: int, attacker_team_id: int = -1) -> void:
+	if is_destroyed:
+		return
+	var final_amount: int = amount
+	if deployment_state != DeploymentState.State.DEPLOYED and vulnerability_multiplier > 1.0:
+		final_amount = maxi(1, int(round(float(amount) * vulnerability_multiplier)))
+	health -= final_amount
+	if health_bar:
+		if is_constructed:
+			health_bar.set_health(health)
+		else:
+			_refresh_construction_bar()
+	if lootable != null and attacker_team_id >= 0 and final_amount > 0:
+		var looted: Dictionary = lootable.extract_loot(float(final_amount), attacker_team_id)
+		_raid_damage_total += final_amount
+		for k in looted.keys():
+			var key: int = int(k)
+			_raid_loot_total[key] = int(_raid_loot_total.get(key, 0)) + int(looted[k])
+	if health <= 0:
+		health = 0
+		die()
+	else:
+		if is_constructed:
+			_refresh_visual_state()
+		else:
+			_apply_construction_visual()
+
+func die() -> void:
+	if is_destroyed:
+		return
+	is_destroyed = true
+	health = 0
+	if health_bar:
+		if health_bar.has_method("clear_construction_mode"):
+			health_bar.clear_construction_mode()
+		health_bar.set_health(0)
+	_refresh_visual_state()
+	if is_lootable and _raid_damage_total > 0:
+		print("[RAID] ", name, " destroyed — total damage siphoned from: ", _raid_damage_total, " HP-equiv. Loot total: ", LootableComponent.format_stock(_raid_loot_total))
+	print(name, " destroyed (team ", team_id, ")")
+	queue_free()
+
+func _refresh_visual_state() -> void:
+	if not is_constructed and not is_destroyed:
+		_apply_construction_visual()
+		return
+	var next: int = VisualState.INTACT
+	if is_destroyed or health <= 0:
+		next = VisualState.DESTROYED
+	elif max_health <= 0:
+		next = VisualState.INTACT
+	else:
+		var ratio: float = float(health) / float(max_health)
+		if ratio > 0.75:
+			next = VisualState.INTACT
+		elif ratio > 0.25:
+			next = VisualState.DAMAGED
+		else:
+			next = VisualState.BURNING
+	if next == visual_state:
+		_apply_visual_presentation(next)
+		return
+	var prev: int = visual_state
+	visual_state = next
+	_apply_visual_presentation(next)
+	if OS.is_debug_build():
+		print("[BUILDING_VIS] ", name, " ", _visual_state_name(prev), " → ", _visual_state_name(next), " HP ", health, "/", max_health)
+
+func _visual_state_name(s: int) -> String:
+	match s:
+		VisualState.INTACT:
+			return "INTACT"
+		VisualState.DAMAGED:
+			return "DAMAGED"
+		VisualState.BURNING:
+			return "BURNING"
+		VisualState.DESTROYED:
+			return "DESTROYED"
+		_:
+			return "?"
+
+func _is_ui_mesh(mi: MeshInstance3D) -> bool:
+	return str(mi.name) in _UI_MESH_NAMES
+
+func _capture_visual_base_albedo() -> void:
+	if _visual_base_captured:
+		return
+	var meshes: Array = []
+	_collect_build_meshes(self, meshes)
+	for item in meshes:
+		var mi := item as MeshInstance3D
+		if mi == null:
+			continue
+		var mat: Material = mi.material_override
+		if mat == null:
+			mat = mi.get_active_material(0)
+		if mat is StandardMaterial3D:
+			_visual_base_albedo = (mat as StandardMaterial3D).albedo_color
+			_visual_base_captured = true
+			return
+	_visual_base_albedo = Color(0.77, 0.66, 0.46, 1.0)
+	_visual_base_captured = true
+
+func _apply_visual_presentation(state: int) -> void:
+	if not is_constructed and not is_destroyed:
+		return
+	_capture_visual_base_albedo()
+	var tint := Color(1.0, 1.0, 1.0, 1.0)
+	match state:
+		VisualState.INTACT:
+			tint = Color(1.0, 1.0, 1.0, 1.0)
+		VisualState.DAMAGED:
+			tint = Color(1.0, 0.85, 0.35, 1.0)
+		VisualState.BURNING:
+			tint = Color(1.0, 0.4, 0.2, 1.0)
+		VisualState.DESTROYED:
+			tint = Color(0.3, 0.3, 0.3, 1.0)
+	var albedo: Color = _visual_base_albedo * tint
+	var meshes: Array = []
+	_collect_build_meshes(self, meshes)
+	for item in meshes:
+		var mi := item as MeshInstance3D
+		if mi == null:
+			continue
+		var std := StandardMaterial3D.new()
+		std.albedo_color = albedo
+		mi.material_override = std
