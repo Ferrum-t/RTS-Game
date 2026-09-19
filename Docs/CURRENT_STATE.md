@@ -13,53 +13,39 @@
 
 | Field | Value |
 |--------|--------|
-| **Now** | **M17.0 — Variant C: Minimal AI 2nd TC** — **IN CODE, waiting F5** |
-| **Not now** | Stage 1.5 B–G, Economy 1.5, M17.1 combat polish, AI pack/repair |
+| **Last accepted** | **M17.0 — Variant C: Minimal AI 2nd TC** — **ACCEPTED** (F5 2026-09-19) |
+| **Next (optional)** | M17.1 combat polish / Stage 1.5 B+ only on explicit request |
 
-### M17.0 contract (implemented)
+### M17.0 ACCEPTED evidence
 
 - File: `Scripts/AI/EconomicAIController.gd`
-- After ≥1 Barracks and still 1 TC: if `wood >= expand_wood_min` (250) and `stone >= expand_stone_min` (100) → instant 2nd TC (`place_building_for_team(..., true)`)
-- `max_ai_tc = 2` (no 3rd+)
-- Offset from first TC: `second_tc_offset = (-10, 0, 6)` (away from barracks_offset)
-- Train workers from **any** free alive same-team TC; total goal still `desired_worker_count` (4)
-- Barracks / Soldier / EnemyAI unchanged
+- F5 log:
+  - Barracks then expand at W=270 S=450 → `TownCenter_3` at (-38, 0, 34), `constructed=true`
+  - `tc=2` stable; no 3rd TC
+  - Dual `TownCenter: not enough wood` when both TCs try train (multi-TC loop)
+  - Soldiers train + attack; player build/repair/towers OK
+  - Match completed (DEFEAT) with AI still reporting `tc=2`
 
-### F5 checklist
+### Parameters (exports)
 
-1. AI: TC + Barracks as before
-2. After stock threshold → log `[AI_ECO] expanding 2nd TC` / `2nd TC completed`
-3. No 3rd TC
-4. Workers can train from either TC if one is busy/destroyed
-5. Deposit nearest constructed AI TC still works
-6. Soldiers ≥ 3 → attack as before
-7. Player multi-TC / build / acquire / towers — no regression
-8. Destroy AI TC1 after expand → AI still alive on TC2
+| Export | Value |
+|--------|--------|
+| `expand_wood_min` | 250 |
+| `expand_stone_min` | 100 |
+| `max_ai_tc` | 2 |
+| `second_tc_offset` | (-10, 0, 6) |
 
 ---
 
 ## Stage 1 — ACCEPTED (2026-09-01)
 
----
-
 ## Player M10–M16 — IN CODE
-
-Construction, repair, deposit-constructed, IDLE acquire, WT Pack/Unpack UI, camera clamp. See prior sync.
-
----
-
-## AI before M17.0
-
-Single TC train path replaced by multi-TC list + expand. Attack path unchanged.
-
----
 
 ## Stage 1.5 climate — PARKED
 
 ---
 
-## Next after F5 accept M17.0
+## Known post-M17.0 noise (not blockers)
 
-1. Mark M17.0 ACCEPTED in this file
-2. Optional **M17.1** combat polish
-3. Stage 1.5 B+ only on explicit request
+- When `workers=0` and wood=0, both TCs log «not enough wood» every decision tick — Stage-1 spam, not expand bug.
+- AI still single Barracks; wood starved late-game (TD-02 heuristic).
