@@ -1,8 +1,6 @@
 # CURRENT STATE
 
 **Gameplay scope:** [`nomad_wars_v1_scope_and_architecture.md`](nomad_wars_v1_scope_and_architecture.md)  
-**Vision:** [`12_PROGRESSION_AND_TIER_SYSTEM.md`](12_PROGRESSION_AND_TIER_SYSTEM.md)  
-**Stage 1.5 design (parked):** [`DESIGN_CLIMATE_AND_MIGRATION_PRESSURE.md`](DESIGN_CLIMATE_AND_MIGRATION_PRESSURE.md)  
 **Tech debt:** [`TECH_DEBT.md`](TECH_DEBT.md)  
 **Process:** [`ACCEPTANCE_AND_PROCESS.md`](ACCEPTANCE_AND_PROCESS.md)
 
@@ -15,98 +13,53 @@
 
 | Field | Value |
 |--------|--------|
-| **Now** | **M17.0 — Variant C: Minimal AI 2nd TC expansion** (scope locked, not implemented) |
-| **Not now** | Stage 1.5 climate B–G, Economy 1.5, combat polish (M17.1), AI pack/repair |
+| **Now** | **M17.0 — Variant C: Minimal AI 2nd TC** — **IN CODE, waiting F5** |
+| **Not now** | Stage 1.5 B–G, Economy 1.5, M17.1 combat polish, AI pack/repair |
 
-Player has a full T1 eco/build loop. AI still runs Stage-1 single-base economy. That asymmetry is the current product gap.
+### M17.0 contract (implemented)
+
+- File: `Scripts/AI/EconomicAIController.gd`
+- After ≥1 Barracks and still 1 TC: if `wood >= expand_wood_min` (250) and `stone >= expand_stone_min` (100) → instant 2nd TC (`place_building_for_team(..., true)`)
+- `max_ai_tc = 2` (no 3rd+)
+- Offset from first TC: `second_tc_offset = (-10, 0, 6)` (away from barracks_offset)
+- Train workers from **any** free alive same-team TC; total goal still `desired_worker_count` (4)
+- Barracks / Soldier / EnemyAI unchanged
+
+### F5 checklist
+
+1. AI: TC + Barracks as before
+2. After stock threshold → log `[AI_ECO] expanding 2nd TC` / `2nd TC completed`
+3. No 3rd TC
+4. Workers can train from either TC if one is busy/destroyed
+5. Deposit nearest constructed AI TC still works
+6. Soldiers ≥ 3 → attack as before
+7. Player multi-TC / build / acquire / towers — no regression
+8. Destroy AI TC1 after expand → AI still alive on TC2
 
 ---
 
 ## Stage 1 — ACCEPTED (2026-09-01)
 
-T1 economic AI opponent, shared production/combat, no AI migration, no T2. Evidence: multiple F5 full matches.
+---
+
+## Player M10–M16 — IN CODE
+
+Construction, repair, deposit-constructed, IDLE acquire, WT Pack/Unpack UI, camera clamp. See prior sync.
 
 ---
 
-## Player systems M10–M16 — IN CODE (2026-09-16 … 09-19)
+## AI before M17.0
 
-Formal F5 acceptance rows are not all logged in this file; **git on `nomads-wars-grok` is the fact source**.
-
-| ID | Content |
-|----|---------|
-| **M10** | Worker construction: site + BUILD order + progress; gates on train/combat while under construction |
-| **M10.1** | Build only with selected Worker; BuildPanel/CommandBar context |
-| **M10.1b/c** | Bottom command bar; train prefers selected building; Esc/RMB ghost cancel; TC in Worker build bar |
-| **M10.2** | Under-construction visual + progress bar; resume BUILD on incomplete; footprint stand range |
-| **M11** | Spawn 4 player Workers at match start (rally cluster) |
-| **M12** | Multi-worker REPAIR (Order.Type.REPAIR, REPAIRING state, diminishing returns) |
-| **M12.1** | TeamRules DEAD ordinal aligned after REPAIRING insert |
-| **M13** | IDLE-only retaliation when damaged by enemy unit |
-| **M15** | Deposit only to **constructed** TC (skip UNDER_CONSTRUCTION) |
-| **M16** | IDLE-only auto-acquire nearest enemy (radius 12); does not interrupt work orders |
-| **Polish** | Watchtower Pack/Unpack in CommandBar; camera XZ clamp to map |
-
-**Player capability summary:** multi-building economy (place TC/Barracks/Watchtower via workers), repair, nearest constructed deposit, idle acquire, mobile pack/unpack UI.
+Single TC train path replaced by multi-TC list + expand. Attack path unchanged.
 
 ---
 
-## AI (team 1) — still Stage-1 cell
-
-| Behavior | Status |
-|----------|--------|
-| One TC via `_team_town_center()` (first alive) | Current |
-| Train workers from that one TC only | Current |
-| Instant Barracks (`place_building_for_team`, no ghost `can_build`) | Current (TD-01) |
-| `desired_worker_count=4`, dual `stock_floor=100` | Current |
-| Soldiers → `attack_threshold=3` → EnemyAIComponent once | Current |
-| 2nd TC / multi-TC train | **M17.0 target** |
+## Stage 1.5 climate — PARKED
 
 ---
 
-## Stage 1.5 climate — PARKED (not active sprint)
+## Next after F5 accept M17.0
 
-Design contract remains valid for later. Code progress beyond old status docs:
-
-| Item | Repo fact |
-|------|-----------|
-| Slice A backend (fixed regions + seasonal state) | In code; F5 of 4×r14 prototype was accepted |
-| Expanded geometry Variant B **8×r21** | **Ported** (`Port climate layout: Variant B 8×r21`) |
-| Seasonal Front v0 | Commit present |
-| Slice B visuals / C resource pressure / D horses / E neutrals / F hero / G matrix | **Not** current work |
-
-Do **not** treat climate as the next implementation request unless explicitly re-opened after M17.
-
----
-
-## Balance snapshot (Stage 1 baseline; update when values change)
-
-### Map / bases
-
-| Key | Value |
-|-----|--------|
-| Player TC | `(28.0, 0.0, -22.0)` |
-| Enemy TC | `(-28.0, 0.0, 28.0)` |
-| Nav `MAP_HALF` | **100** |
-| AI Barracks default offset | `tc + (4, 0, 3)` |
-
-### AI controller exports
-
-| Export | Value |
-|--------|--------|
-| `desired_worker_count` | **4** |
-| `attack_threshold` | **3** |
-| `decision_interval` | **1.5 s** |
-| `stock_floor` | **100** |
-
-### Costs (unchanged baseline)
-
-Worker 50W · Soldier 80W · Cavalry 100W+1H · Siege 150W+50S · Barracks 100W+50S · Watchtower 40W+20S
-
----
-
-## Next action
-
-1. **M17.0** — AI minimal 2nd TC + train workers from any alive same-team TC (`max_ai_tc=2`).
-2. **M17.1** (optional) — combat polish if tunnel-to-TC still hurts after expand.
-3. Stage 1.5 B+ only on explicit request.
-4. Keep frozen: Combat / Deployment / Match / NavBake contracts unless a slice names them.
+1. Mark M17.0 ACCEPTED in this file
+2. Optional **M17.1** combat polish
+3. Stage 1.5 B+ only on explicit request
