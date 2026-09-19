@@ -1,9 +1,5 @@
 # CURRENT STATE
 
-**Gameplay scope:** [`nomad_wars_v1_scope_and_architecture.md`](nomad_wars_v1_scope_and_architecture.md)  
-**Tech debt:** [`TECH_DEBT.md`](TECH_DEBT.md)  
-**Process:** [`ACCEPTANCE_AND_PROCESS.md`](ACCEPTANCE_AND_PROCESS.md)
-
 **Branch:** `nomads-wars-grok`  
 **HEAD fact date:** 2026-09-19
 
@@ -13,39 +9,42 @@
 
 | Field | Value |
 |--------|--------|
-| **Last accepted** | **M17.0 — Variant C: Minimal AI 2nd TC** — **ACCEPTED** (F5 2026-09-19) |
-| **Next (optional)** | M17.1 combat polish / Stage 1.5 B+ only on explicit request |
+| **Last accepted** | **M17.0** ACCEPTED |
+| **Now** | **M17.1 AI Expansion Economy** — **IN CODE, waiting F5** |
 
-### M17.0 ACCEPTED evidence
+### M17.1 scope (locked)
 
-- File: `Scripts/AI/EconomicAIController.gd`
-- F5 log:
-  - Barracks then expand at W=270 S=450 → `TownCenter_3` at (-38, 0, 34), `constructed=true`
-  - `tc=2` stable; no 3rd TC
-  - Dual `TownCenter: not enough wood` when both TCs try train (multi-TC loop)
-  - Soldiers train + attack; player build/repair/towers OK
-  - Match completed (DEFEAT) with AI still reporting `tc=2`
+| ID | Behavior |
+|----|----------|
+| **A** | `_expanded_once` — one successful 2nd TC per match; no rebuild after TC2 loss |
+| **B** | Worker goal: 4 if `tc==1`, **6** if `tc>=2` (`extra_workers_at_two_tc=2`) |
+| **C** | Soft harvest bias: score blends worker distance + distance to under-served TC (`underserved_tc_bias=0.3`); no Worker→TC assignment system |
+| **D** | Wood pressure: if `wood < production_wood_floor` (80) → force WOOD before dual-floor |
+| **E** | F5 matrix below |
 
-### Parameters (exports)
+**Out of M17.1:** 2nd Barracks, towers, AI repair, combat brain, Climate, 3rd TC, Economy 1.5 planner.
 
-| Export | Value |
-|--------|--------|
-| `expand_wood_min` | 250 |
-| `expand_stone_min` | 100 |
-| `max_ai_tc` | 2 |
-| `second_tc_offset` | (-10, 0, 6) |
+File: `Scripts/AI/EconomicAIController.gd`
 
----
+### F5 matrix (E)
 
-## Stage 1 — ACCEPTED (2026-09-01)
-
-## Player M10–M16 — IN CODE
-
-## Stage 1.5 climate — PARKED
+1. Normal expand: Barracks → threshold → 2nd TC once; log `expand_once locked`
+2. `workers` climbs toward **6** after `tc=2`
+3. Idle workers show activity near both TC neighborhoods over time (soft bias, not forced 3+3)
+4. Wood recovers when low (less permanent `wood=0 stone=2000+`)
+5. **Destroy TC2** → AI continues on TC1; **no** third/rebuild TC (`expanded=true` stays)
+6. **Destroy TC1** → AI continues on TC2; train/deposit still work
+7. No 3rd TC while both alive
+8. Player systems unchanged
 
 ---
 
-## Known post-M17.0 noise (not blockers)
+## Done
 
-- When `workers=0` and wood=0, both TCs log «not enough wood» every decision tick — Stage-1 spam, not expand bug.
-- AI still single Barracks; wood starved late-game (TD-02 heuristic).
+- Stage 1 · M10–M16 player · M17.0 second TC
+- Stage 1.5 climate **PARKED**
+
+## Next after M17.1 F5
+
+- **M17.2** AI Multi-Base Military (only if eco cycle feels real)
+- M18 Combat acquisition · M19 Climate — later
