@@ -4,17 +4,17 @@
 
 ---
 
+## Active
+
+- [x] **M17.2 Level 1 code** (2nd Barracks once + train any)
+- [ ] **M17.2 F5** matrix in CURRENT_STATE
+
 ## Done
 
-- [x] **M17.0** ACCEPTED
-- [x] **M17.1** ACCEPTED (expand-once, 4→6 workers, wood pressure, loss matrix)
+- [x] M17.0 · M17.1 ACCEPTED
 
-## Optional next
+## Later / out
 
-- [ ] M17.2 Multi-Base Military
-- [ ] M18 Combat acquisition
-- [ ] M19 / Stage 1.5 Climate (parked)
-
-## Known note (not open bug)
-
-- Soft harvest bias (M17.1-C) does not create a second deposit zone while `second_tc_offset` keeps TC2 on the same resource cluster.
+- M17.3 Watchtower (if needed)
+- M18 Combat acquisition
+- M19 Climate (parked)
