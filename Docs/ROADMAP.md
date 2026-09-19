@@ -1,34 +1,24 @@
 # ROADMAP
 
 **Do not maintain a second roadmap.**  
-Canonical phase order and status: `Docs/nomad_wars_v1_scope_and_architecture.md` §0 and §4.
+Canonical phase order and status: `Docs/nomad_wars_v1_scope_and_architecture.md` §0 and `Docs/CURRENT_STATE.md`.
 
 This file is a short pointer only.
 
 ## Done (high level)
 
-- Foundation: selection, command, nav, harvest, combat, production
-- Mobile Town Center + DeploymentComponent
-- Phase 5 Horses / Cavalry
-- Phase 6 Raid/Loot + Siege + building visual states
-- Phase 7 Enemy AI waves + match Win/Lose
-- Polish: attack hysteresis + RVO
-- Phase 8.0–8.2 Watchtower auto-attack, MobileTower cycle, DeploymentConfig / transit vuln / unpack AABB
-- Stuck detection + billboard pack bar
-- Formation-offsets
-- **Environment Zones v1.0** (blobs, harvest mult, visual priority)
-- **Enemy AI strengthen** (threat retarget, wave scaling, names)
-- **v1.0 polish** (debug keys gated, readable names)
-- **Selection-aware building control** (per-building Pack/Unpack/move + entire caravan)
+- Foundation through Phase 8.2, formation-offsets, selection-aware buildings
+- Stage 1 T1 Economic AI (single base)
+- Stage 1.5 climate design + backend geometry (parked)
+- **Player M10–M16:** construction, repair, deposit-constructed, IDLE acquire, WT pack UI
 
-## Next candidates
+## Next
 
-- Balance pass (waves / economy)
-- Zones v1.1 (seasonal migration pressure)
-- Unpack validation / Raise TC-only command
+- **M17.0** Minimal AI 2nd TC + multi-TC worker train
+- M17.1 combat polish (optional after expand)
 
-## Later
+## Later / parked
 
-- Fog of War / Minimap
-- Multiplayer
-- See `NOMAD_WORLD_BACKLOG.md`
+- Stage 1.5 B–G (visuals, resource pressure, horses, neutrals, hero, matrix)
+- Economy 1.5, AI migration, T2
+- Fog / Minimap / Multiplayer — see `NOMAD_WORLD_BACKLOG.md`
