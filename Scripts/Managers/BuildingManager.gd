@@ -34,7 +34,7 @@ func unregister_building(building) -> void:
 	watchtowers_list.erase(building)
 
 ## team_filter < 0 → any team; otherwise only matching team_id.
-## Skips destroyed / zero-health buildings.
+## Skips destroyed / zero-health / not-yet-constructed buildings (M15 deposit).
 func get_nearest_town_center(from_position: Vector3, team_filter: int = -1):
 	if town_centers.is_empty():
 		return null
@@ -46,6 +46,9 @@ func get_nearest_town_center(from_position: Vector3, team_filter: int = -1):
 		if tc.get("is_destroyed") == true:
 			continue
 		if tc.get("health") != null and int(tc.health) <= 0:
+			continue
+		# UNDER_CONSTRUCTION must not accept deposits
+		if "is_constructed" in tc and tc.is_constructed == false:
 			continue
 		if team_filter >= 0 and int(tc.team_id) != team_filter:
 			continue
