@@ -2,15 +2,15 @@ extends Node
 
 class_name EconomicAIController
 
-## Stage 1 threshold AI + M17.0 second TC + M17.1 expansion economy polish.
+## Stage 1 threshold AI + M17.0–M17.2 multi-base eco/military production.
 ## DECISION only. EXECUTION via shared systems.
 ##
-## M17.1 scope (locked):
-##   A expand once per match (_expanded_once)
-##   B desired workers 4 (1 TC) / 6 (2 TC)
-##   C soft harvest bias toward under-served TC (no worker assignment system)
-##   D wood pressure before dual-floor
-## Out of scope: 2nd Barracks, towers, repair, combat brain, Climate, 3rd TC, Economy 1.5 planner.
+## M17.2 Level 1 (locked):
+##   2nd Barracks near TC2 when tc>=2 + can_afford
+##   max_ai_barracks=2, _second_barracks_once (no rebuild)
+##   train soldiers from any free alive Barracks
+##   EnemyAI / attack_threshold unchanged
+## OUT: Watchtower, defense stance, army split, EnemyAI scoring, Climate, 3rd TC/Barracks
 
 @export var team_id: int = 1
 @export var desired_worker_count: int = 4
@@ -19,6 +19,9 @@ class_name EconomicAIController
 @export var attack_threshold: int = 3
 @export var decision_interval: float = 1.5
 @export var barracks_offset: Vector3 = Vector3(4.0, 0.0, 3.0)
+## M17.2 — offset from the TC chosen for 2nd Barracks (prefer farthest from Barracks1).
+@export var second_barracks_offset: Vector3 = Vector3(4.0, 0.0, -3.0)
+@export var max_ai_barracks: int = 2
 ## Soft floor for both wood and stone; below → prefer that resource (after wood pressure).
 @export var stock_floor: int = 100
 ## M17.1-D — if wood below this, force WOOD harvest (covers Soldier 80 / Worker 50).
@@ -40,8 +43,10 @@ var _tc_data: BuildingData = null
 var _attack_issued: bool = false
 ## Alternates preferred type when both stocks are above floor.
 var _harvest_flip: int = 0
-## M17.1-A — one expansion attempt success per match (no rebuild after TC2 loss).
+## M17.1-A — one expansion success per match (no rebuild after TC2 loss).
 var _expanded_once: bool = false
+## M17.2 — one successful 2nd Barracks per match (no rebuild).
+var _second_barracks_once: bool = false
 
 
 func _ready() -> void:
@@ -57,7 +62,8 @@ func _ready() -> void:
 		" wood_pressure=", production_wood_floor,
 		" expand_at W>=", expand_wood_min, " S>=", expand_stone_min,
 		" max_tc=", max_ai_tc,
-		" expand_once=true"
+		" max_barracks=", max_ai_barracks,
+		" expand_once=true second_barracks_once=true"
 	)
 
 
@@ -83,13 +89,16 @@ func _think() -> void:
 		wood = rm.get_stock(team_id, BaseResource.Type.WOOD)
 		stone = rm.get_stock(team_id, BaseResource.Type.STONE)
 	var tcs: Array = _team_town_centers()
+	var barracks_list: Array = _team_barracks_list()
 	var goal: int = _worker_goal(tcs.size())
 	print(
 		"[AI_ECO] workers=", workers.size(), "/", goal,
 		" soldiers=", soldiers.size(),
 		" tc=", tcs.size(),
+		" barracks=", barracks_list.size(),
 		" wood=", wood, " stone=", stone,
-		" expanded=", _expanded_once
+		" expanded=", _expanded_once,
+		" b2=", _second_barracks_once
 	)
 
 	_assign_idle_workers(workers, tcs)
@@ -97,25 +106,29 @@ func _think() -> void:
 	if tcs.is_empty():
 		return
 
-	# M17.1-B — train until soft goal (4 or 6).
 	if workers.size() < goal:
 		_try_train_worker_any_tc(tcs)
 
 	var first_tc: BaseBuilding = tcs[0] as BaseBuilding
-	var barracks := _team_barracks()
-	if barracks == null:
+	if barracks_list.is_empty():
 		_try_build_barracks(first_tc)
 		return
 
-	# M17.1-A — at most one successful expand per match.
+	# M17.0/17.1 — at most one TC expand per match.
 	if not _expanded_once and tcs.size() < max_ai_tc:
 		_try_expand_second_tc(first_tc, wood, stone)
+		tcs = _team_town_centers()
 
-	if barracks is Barracks:
-		var b := barracks as Barracks
-		if not b.is_training:
-			if b.try_train_soldier():
-				print("[AI_ECO] training Soldier")
+	# M17.2 — 2nd Barracks once near farthest TC from existing barracks (TC2).
+	if not _second_barracks_once \
+		and tcs.size() >= 2 \
+		and barracks_list.size() < max_ai_barracks:
+		var anchor: BaseBuilding = _pick_tc_for_second_barracks(tcs, barracks_list)
+		_try_build_second_barracks(anchor)
+		barracks_list = _team_barracks_list()
+
+	# M17.2 — train from any free Barracks.
+	_try_train_soldier_any_barracks(barracks_list)
 
 	soldiers = _team_soldiers()
 	if soldiers.size() >= attack_threshold:
@@ -149,6 +162,18 @@ func _try_train_worker_any_tc(tcs: Array) -> void:
 			continue
 		if tcn.try_train_worker():
 			print("[AI_ECO] training Worker at ", tcn.name)
+			return
+
+
+func _try_train_soldier_any_barracks(barracks_list: Array) -> void:
+	for node in barracks_list:
+		if not (node is Barracks):
+			continue
+		var b := node as Barracks
+		if b.is_training:
+			continue
+		if b.try_train_soldier():
+			print("[AI_ECO] training Soldier at ", b.name)
 			return
 
 
@@ -202,6 +227,63 @@ func _try_build_barracks(tc: BaseBuilding) -> void:
 		print("[AI_ECO] Barracks completed ", built.name)
 
 
+## M17.2 — second Barracks once; anchor = TC farthest from existing barracks (TC2 side).
+func _try_build_second_barracks(anchor_tc: BaseBuilding) -> void:
+	if _second_barracks_once:
+		return
+	if anchor_tc == null or not is_instance_valid(anchor_tc):
+		return
+	if _barracks_data == null:
+		return
+	var rm := get_node_or_null("/root/ResourceManager")
+	if rm == null:
+		return
+	var cost: Dictionary = _barracks_data.get_cost_dict()
+	if not rm.can_afford(cost, team_id):
+		return
+	var cm := get_node_or_null("/root/ConstructionManager")
+	if cm == null or not cm.has_method("place_building_for_team"):
+		return
+	var pos: Vector3 = anchor_tc.global_position + second_barracks_offset
+	pos.y = 0.0
+	print("[AI_ECO] building 2nd Barracks at ", pos, " near ", anchor_tc.name)
+	var built = cm.place_building_for_team(_barracks_data, pos, team_id, true)
+	if built != null:
+		_second_barracks_once = true
+		print(
+			"[AI_ECO] 2nd Barracks completed ", built.name,
+			" team=", team_id, " second_barracks_once locked"
+		)
+
+
+## Prefer the alive TC farthest from current barracks centroid (= TC2 after expand).
+func _pick_tc_for_second_barracks(tcs: Array, barracks_list: Array) -> BaseBuilding:
+	if tcs.is_empty():
+		return null
+	if barracks_list.is_empty():
+		return tcs[0] as BaseBuilding
+	var centroid := Vector3.ZERO
+	var n: int = 0
+	for b in barracks_list:
+		if b == null or not is_instance_valid(b):
+			continue
+		centroid += (b as Node3D).global_position
+		n += 1
+	if n <= 0:
+		return tcs[0] as BaseBuilding
+	centroid /= float(n)
+	var best: BaseBuilding = null
+	var best_d := -1.0
+	for tc in tcs:
+		if tc == null or not is_instance_valid(tc):
+			continue
+		var d: float = (tc as Node3D).global_position.distance_squared_to(centroid)
+		if d > best_d:
+			best_d = d
+			best = tc as BaseBuilding
+	return best
+
+
 func _assign_idle_workers(workers: Array, tcs: Array) -> void:
 	var underserved: BaseBuilding = _underserved_tc(workers, tcs)
 	for w in workers:
@@ -222,7 +304,6 @@ func _assign_idle_workers(workers: Array, tcs: Array) -> void:
 		u.replace_order_harvest(res)
 
 
-## TC with fewest workers for whom it is the nearest alive TC (soft load, not assignment).
 func _underserved_tc(workers: Array, tcs: Array) -> BaseBuilding:
 	if tcs.size() < 2:
 		return null
@@ -266,7 +347,6 @@ func _pick_resource_for_worker(u: BaseUnit, underserved: BaseBuilding) -> BaseRe
 
 	var floor: int = maxi(stock_floor, 1)
 	var prefer_type: int
-	# M17.1-D — production wood pressure first (avoid stone hoard / zero wood).
 	if wood < production_wood_floor:
 		prefer_type = BaseResource.Type.WOOD
 	elif stone < floor:
@@ -290,7 +370,6 @@ func _pick_resource_for_worker(u: BaseUnit, underserved: BaseBuilding) -> BaseRe
 			continue
 		var d_w: float = u.global_position.distance_squared_to(r.global_position)
 		var score: float = d_w
-		# M17.1-C — soft pull toward under-served TC resource neighborhood.
 		if underserved != null and bias > 0.0:
 			var d_tc: float = underserved.global_position.distance_squared_to(r.global_position)
 			score = d_w * (1.0 - bias) + d_tc * bias
@@ -351,10 +430,12 @@ func _team_town_center() -> BaseBuilding:
 	return tcs[0] as BaseBuilding
 
 
-func _team_barracks() -> BaseBuilding:
+## All alive Barracks for this team (M17.2 multi-Barracks).
+func _team_barracks_list() -> Array:
+	var out: Array = []
 	var bm := get_node_or_null("/root/BuildingManager")
 	if bm == null:
-		return null
+		return out
 	for b in bm.barracks_list:
 		if b == null or not is_instance_valid(b):
 			continue
@@ -362,8 +443,17 @@ func _team_barracks() -> BaseBuilding:
 			continue
 		if b.get("is_destroyed") == true:
 			continue
-		return b as BaseBuilding
-	return null
+		if b.get("health") != null and int(b.health) <= 0:
+			continue
+		out.append(b)
+	return out
+
+
+func _team_barracks() -> BaseBuilding:
+	var list: Array = _team_barracks_list()
+	if list.is_empty():
+		return null
+	return list[0] as BaseBuilding
 
 
 func _team_workers() -> Array:
