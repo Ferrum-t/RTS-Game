@@ -2,122 +2,83 @@
 
 **Gameplay scope:** [`nomad_wars_v1_scope_and_architecture.md`](nomad_wars_v1_scope_and_architecture.md)  
 **Vision:** [`12_PROGRESSION_AND_TIER_SYSTEM.md`](12_PROGRESSION_AND_TIER_SYSTEM.md)  
-**Stage 1.5 design contract:** [`DESIGN_CLIMATE_AND_MIGRATION_PRESSURE.md`](DESIGN_CLIMATE_AND_MIGRATION_PRESSURE.md)  
-**Stage 1.5 gameplay questions:** [`STAGE_1_5_GAMEPLAY.md`](STAGE_1_5_GAMEPLAY.md)  
-**Lore:** [`02_GEOGRAPHY_AND_CLIMATE.md`](02_GEOGRAPHY_AND_CLIMATE.md), [`08_MIGRATION_AND_NOMADISM.md`](08_MIGRATION_AND_NOMADISM.md)  
+**Stage 1.5 design (parked):** [`DESIGN_CLIMATE_AND_MIGRATION_PRESSURE.md`](DESIGN_CLIMATE_AND_MIGRATION_PRESSURE.md)  
 **Tech debt:** [`TECH_DEBT.md`](TECH_DEBT.md)  
 **Process:** [`ACCEPTANCE_AND_PROCESS.md`](ACCEPTANCE_AND_PROCESS.md)
 
-**Branch:** `nomads-wars-grok`
+**Branch:** `nomads-wars-grok`  
+**HEAD fact date:** 2026-09-19
 
 ---
 
-## Stage 1 — FORMAL SIGN-OFF
+## Active sprint
 
 | Field | Value |
 |--------|--------|
-| **Status** | **ACCEPTED** |
-| **Date** | 2026-09-01 |
-| **Evidence** | Multiple F5 full matches (VICTORY / DEFEAT); post-commit logs for attack-once and dual-floor |
-| **Scope** | T1 economic AI opponent, shared production/combat, no AI migration, no T2 |
+| **Now** | **M17.0 — Variant C: Minimal AI 2nd TC expansion** (scope locked, not implemented) |
+| **Not now** | Stage 1.5 climate B–G, Economy 1.5, combat polish (M17.1), AI pack/repair |
 
-### Accepted under Stage 1
-
-- Core RTS loop (select, harvest, build, train, fight)
-- Per-team stockpiles
-- AI: workers → Barracks → soldiers → attack threshold → combat → match end
-- Attack issue once + reinforcements
-- Harvest dual stock-floor (`stock_floor=100`)
-- Door / rally / flag / building select ring
-- Building HP / visual states / loot on destroy
-- Mobile buildings (pack/move/unpack)
-- Navigation ~200×200 (`MAP_HALF=100`), footprint rebake
-- Zones v1.0: existing motion/visual prototype + `get_multiplier_at`; **new Stage 1.5 design supersedes the moving-zone behavior as the target model**
-
-### Explicitly out of Stage 1
-
-| Item | Note |
-|------|------|
-| AI Economy 1.5 (goal→deficit→assign) | Deferred unless a later F5 proves need |
-| T2 / T3 | Not started |
-| Full Heroes | Not started |
-| AI migration | Not Stage 1 |
-| Zone → harvest / AI | Not wired |
-| TD-01 shared `can_place` | Later |
-| TD-03 residual AI after TC | OK while win = destroy TC |
-| TD-04 TeamRules `DEAD := 6` | Later |
-
-**Do not start Economy 1.5 or T2** unless a new F5 or Stage 1.5 design/implementation proves a concrete need.
+Player has a full T1 eco/build loop. AI still runs Stage-1 single-base economy. That asymmetry is the current product gap.
 
 ---
 
-## Stage 1.5 — CURRENT DESIGN PHASE
+## Stage 1 — ACCEPTED (2026-09-01)
 
-**Status:** **DESIGN ACTIVE / SLICE A PROTOTYPE IN CODE / EXPANDED GEOMETRY SIGNED OFF**
-
-Canonical contract: `DESIGN_CLIMATE_AND_MIGRATION_PRESSURE.md`.  
-Expanded map geometry (design only): `EXPANDED_CLIMATE_GEOMETRY_V0_1.md`.
-
-### Accepted design direction
-
-- Climate regions are **fixed geographic areas**.
-- Region boundaries **do not overlap** in the current map model.
-- Each region has exactly three gameplay states: `COLD`, `FAVORABLE`, `DRY`.
-- `FAVORABLE` is the most advantageous ecological state for settlement/economic development.
-- Seasonal change modifies state; it does not move region geometry.
-- Spring/autumn are currently treated as seasonal transition timing, not a fourth gameplay state.
-- Each region is designed as a potential ecological/economic package for an aul: Wood, Stone, Gold, Horses, Power Site, neutral threat and settlement space as appropriate to the map.
-- A large region may support multiple auls as a future map/multiplayer design possibility; exact capacity is not fixed.
-- Horses are a first clear gameplay response to climate.
-- Neutral Camps replace the temporary "creeper" terminology in design documents until lore naming is finalized.
-- A minimal **player hero** is planned for Stage 1.5 because the artifact carrier/drop/steal loop cannot be validated without one.
-- First artifact slice = one artifact type, one simple passive bonus; no artifact tiers yet.
-- Power Sites are future reserved infrastructure for magic/mana systems, not current implementation.
-
-### Stage 1.5 implementation order
-
-1. **A — Climate backend:** fixed regions + seasonal state lookup.
-2. **B — Environment visuals:** state presentation.
-3. **C — Resource climate pressure:** soft effect on existing resource extraction.
-4. **D — Horses:** climate-dependent availability using existing Horse/Cavalry pipeline.
-5. **E — Neutral camps:** combat + basic loot.
-6. **F — Minimal player hero + one artifact:** pickup → bonus → death drop → steal.
-7. **G — Conflict matrix:** develop / migrate / defend / raid / contest / commit.
-
-Each step requires its own explicit implementation request and F5 acceptance. No Stage 1.5 mechanic is accepted merely because it is documented.
-
-### Slice A — Climate backend (code status)
-
-- **Implemented** in `EnvironmentZoneService` as a **technical prototype**.
-- Layout in code: **4 regions × radius 14** (R0–R3), season duration **180 s** (debug).
-- F5 accepted: non-overlap OK, no motion/TRANSITION/priority, seasonal state change, `get_multiplier_at` drives harvest (`zone_mult` logs), Stage 1 match still completes.
-- This prototype proves the backend contract; it is **not** the expanded production geography.
-
-### Expanded Climate Geometry v0.1 (design only)
-
-- **Signed off 2026-09-13** — see `Docs/EXPANDED_CLIMATE_GEOMETRY_V0_1.md`.
-- **8 regions × radius 21**, Variant B centers; MIN_GAP ≈ 10 for future climate visuals.
-- **Not in code yet.** Porting layout is a separate explicit task; do not treat sign-off as an implementation order.
-- 1 region ≈ 1 future aul package; dual-aul-per-region deferred (multiplayer reserve).
-
-### Deferred
-
-- AI migration
-- AI hero
-- full hero progression
-- artifact tiers
-- terrain/settlement suitability scoring
-- animal pathfinding
-- magic / mana / Power Site gameplay
-- Economy 1.5 unless evidence requires it
-- T2/T3
-- new victory conditions
+T1 economic AI opponent, shared production/combat, no AI migration, no T2. Evidence: multiple F5 full matches.
 
 ---
 
-## Balance snapshot (canonical — repo fact, not chat-only)
+## Player systems M10–M16 — IN CODE (2026-09-16 … 09-19)
 
-Values from F5 / code exports on `nomads-wars-grok` as of 2026-09-01. Update this table in the **same session** when balance changes (`ACCEPTANCE_AND_PROCESS.md` §5).
+Formal F5 acceptance rows are not all logged in this file; **git on `nomads-wars-grok` is the fact source**.
+
+| ID | Content |
+|----|---------|
+| **M10** | Worker construction: site + BUILD order + progress; gates on train/combat while under construction |
+| **M10.1** | Build only with selected Worker; BuildPanel/CommandBar context |
+| **M10.1b/c** | Bottom command bar; train prefers selected building; Esc/RMB ghost cancel; TC in Worker build bar |
+| **M10.2** | Under-construction visual + progress bar; resume BUILD on incomplete; footprint stand range |
+| **M11** | Spawn 4 player Workers at match start (rally cluster) |
+| **M12** | Multi-worker REPAIR (Order.Type.REPAIR, REPAIRING state, diminishing returns) |
+| **M12.1** | TeamRules DEAD ordinal aligned after REPAIRING insert |
+| **M13** | IDLE-only retaliation when damaged by enemy unit |
+| **M15** | Deposit only to **constructed** TC (skip UNDER_CONSTRUCTION) |
+| **M16** | IDLE-only auto-acquire nearest enemy (radius 12); does not interrupt work orders |
+| **Polish** | Watchtower Pack/Unpack in CommandBar; camera XZ clamp to map |
+
+**Player capability summary:** multi-building economy (place TC/Barracks/Watchtower via workers), repair, nearest constructed deposit, idle acquire, mobile pack/unpack UI.
+
+---
+
+## AI (team 1) — still Stage-1 cell
+
+| Behavior | Status |
+|----------|--------|
+| One TC via `_team_town_center()` (first alive) | Current |
+| Train workers from that one TC only | Current |
+| Instant Barracks (`place_building_for_team`, no ghost `can_build`) | Current (TD-01) |
+| `desired_worker_count=4`, dual `stock_floor=100` | Current |
+| Soldiers → `attack_threshold=3` → EnemyAIComponent once | Current |
+| 2nd TC / multi-TC train | **M17.0 target** |
+
+---
+
+## Stage 1.5 climate — PARKED (not active sprint)
+
+Design contract remains valid for later. Code progress beyond old status docs:
+
+| Item | Repo fact |
+|------|-----------|
+| Slice A backend (fixed regions + seasonal state) | In code; F5 of 4×r14 prototype was accepted |
+| Expanded geometry Variant B **8×r21** | **Ported** (`Port climate layout: Variant B 8×r21`) |
+| Seasonal Front v0 | Commit present |
+| Slice B visuals / C resource pressure / D horses / E neutrals / F hero / G matrix | **Not** current work |
+
+Do **not** treat climate as the next implementation request unless explicitly re-opened after M17.
+
+---
+
+## Balance snapshot (Stage 1 baseline; update when values change)
 
 ### Map / bases
 
@@ -125,65 +86,27 @@ Values from F5 / code exports on `nomads-wars-grok` as of 2026-09-01. Update thi
 |-----|--------|
 | Player TC | `(28.0, 0.0, -22.0)` |
 | Enemy TC | `(-28.0, 0.0, 28.0)` |
-| TC distance | **~75.1** |
-| Nav `MAP_HALF` | **100** (playable ~200×200) |
-| AI Barracks default offset | `tc + (4, 0, 3)` → e.g. `(-24, 0, 31)` |
+| Nav `MAP_HALF` | **100** |
+| AI Barracks default offset | `tc + (4, 0, 3)` |
 
-### Resource nodes (starting amounts)
-
-| Node type | Amount |
-|-----------|--------|
-| Tree / EnemyTree | **2500** |
-| Stone / EnemyStone | **2500** |
-| HorseHerd / EnemyHorseHerd | **1000** |
-
-### AI controller (`EconomicAIController`)
+### AI controller exports
 
 | Export | Value |
 |--------|--------|
 | `desired_worker_count` | **4** |
 | `attack_threshold` | **3** |
 | `decision_interval` | **1.5 s** |
-| `stock_floor` | **100** (wood & stone dual check + alternate) |
-| `barracks_offset` | `(4, 0, 3)` |
+| `stock_floor` | **100** |
 
-### Unit move speeds
+### Costs (unchanged baseline)
 
-| Unit | `move_speed` |
-|------|--------------:|
-| Base / Worker default | **2.4** |
-| Soldier | **2.7** |
-| Cavalry | **3.9** |
-| SiegeUnit | **1.8** |
-
-### Training / building costs
-
-| Item | Cost |
-|------|------|
-| Worker | 50 Wood (~3 s) |
-| Soldier | 80 Wood |
-| Cavalry | 100 Wood + 1 Horse |
-| Siege | 150 Wood + 50 Stone |
-| Barracks | 100 Wood + 50 Stone |
-| Watchtower | 40 Wood + 20 Stone |
-
-### Rally defaults (`BaseBuilding`)
-
-| Key | Value |
-|-----|--------|
-| `spawn_offset` (door) | ~(3.5, 0, 0) |
-| `default_rally_offset` | **(12, 0, 0)** |
-| Rally grid | 4 cols × spacing **2.5** |
+Worker 50W · Soldier 80W · Cavalry 100W+1H · Siege 150W+50S · Barracks 100W+50S · Watchtower 40W+20S
 
 ---
 
 ## Next action
 
-1. ~~Formal Stage 1 sign-off~~ **done**
-2. ~~Balance snapshot in repo~~ **done**
-3. ~~Open Stage 1.5 design~~ **done / expanded**
-4. ~~A — Climate backend prototype (4×r14)~~ **done + F5**
-5. ~~Expanded Climate Geometry v0.1 sign-off~~ **done** (`EXPANDED_CLIMATE_GEOMETRY_V0_1.md`)
-6. **Later (explicit request only):** port Variant B (8×r21) into `EnvironmentZoneService`
-7. **Then:** Slice B — environment state visuals (world-readable climate)
-8. Economy 1.5 / T2 / AI migration / hero AI only if later evidence explicitly demands them
+1. **M17.0** — AI minimal 2nd TC + train workers from any alive same-team TC (`max_ai_tc=2`).
+2. **M17.1** (optional) — combat polish if tunnel-to-TC still hurts after expand.
+3. Stage 1.5 B+ only on explicit request.
+4. Keep frozen: Combat / Deployment / Match / NavBake contracts unless a slice names them.
