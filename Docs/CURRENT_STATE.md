@@ -9,42 +9,34 @@
 
 | Field | Value |
 |--------|--------|
-| **Last accepted** | **M17.0** ACCEPTED |
-| **Now** | **M17.1 AI Expansion Economy** — **IN CODE, waiting F5** |
+| **Last accepted** | **M17.1 AI Expansion Economy** — **ACCEPTED** (F5 2026-09-19) |
+| **Next (optional)** | M17.2 Multi-Base Military — only if needed |
 
-### M17.1 scope (locked)
+### M17.1 F5 evidence
 
-| ID | Behavior |
-|----|----------|
-| **A** | `_expanded_once` — one successful 2nd TC per match; no rebuild after TC2 loss |
-| **B** | Worker goal: 4 if `tc==1`, **6** if `tc>=2` (`extra_workers_at_two_tc=2`) |
-| **C** | Soft harvest bias: score blends worker distance + distance to under-served TC (`underserved_tc_bias=0.3`); no Worker→TC assignment system |
-| **D** | Wood pressure: if `wood < production_wood_floor` (80) → force WOOD before dual-floor |
-| **E** | F5 matrix below |
+| ID | Result |
+|----|--------|
+| **A** expand-once | One `expanding 2nd TC` → `expand_once locked`. After EnemyTownCenter die: `tc=1 expanded=true`, **no** rebuild |
+| **B** workers 4→6 | Goal `4/6` after expand; train at **both** EnemyTownCenter and TownCenter_3; reached `6/6` (brief `7/6` race OK) |
+| **C** soft bias | Code path live; **0 deposits to TownCenter_3** in this map — TC2 offset keeps same resource cluster as TC1. Soft bias cannot invent a second frontier |
+| **D** wood pressure | Wood stayed hundreds–thousands while workers alive (vs M17.0 late `wood=0 stone=2k+`) |
+| **E** loss matrix | TC1 destroyed first → AI on TC2; then TC2 destroyed → VICTORY; no 3rd TC |
 
-**Out of M17.1:** 2nd Barracks, towers, AI repair, combat brain, Climate, 3rd TC, Economy 1.5 planner.
+**Accepted with note:** C is soft-by-design; second *economic zone* needs farther expand placement or M17.2 military/anchor work — not more harvest planner in M17.1.
 
 File: `Scripts/AI/EconomicAIController.gd`
-
-### F5 matrix (E)
-
-1. Normal expand: Barracks → threshold → 2nd TC once; log `expand_once locked`
-2. `workers` climbs toward **6** after `tc=2`
-3. Idle workers show activity near both TC neighborhoods over time (soft bias, not forced 3+3)
-4. Wood recovers when low (less permanent `wood=0 stone=2000+`)
-5. **Destroy TC2** → AI continues on TC1; **no** third/rebuild TC (`expanded=true` stays)
-6. **Destroy TC1** → AI continues on TC2; train/deposit still work
-7. No 3rd TC while both alive
-8. Player systems unchanged
 
 ---
 
 ## Done
 
-- Stage 1 · M10–M16 player · M17.0 second TC
-- Stage 1.5 climate **PARKED**
+- Stage 1 · Player M10–M16 · **M17.0** second TC · **M17.1** expansion economy
+- Stage 1.5 Climate **PARKED**
 
-## Next after M17.1 F5
+## Optional next
 
-- **M17.2** AI Multi-Base Military (only if eco cycle feels real)
-- M18 Combat acquisition · M19 Climate — later
+```
+M17.2  AI Multi-Base Military   (2nd barracks / defense near TC2 — if desired)
+M18    Combat acquisition
+M19    Stage 1.5 Climate
+```
