@@ -244,6 +244,7 @@ func update_return(delta: float) -> void:
 		if return_target.get("is_destroyed") == true: return_target = null
 		elif return_target.get("health") != null and int(return_target.health) <= 0: return_target = null
 		elif return_target.get("team_id") != null and int(return_target.team_id) != team_id: return_target = null
+		elif "is_constructed" in return_target and return_target.is_constructed == false: return_target = null
 	else:
 		return_target = null
 	if return_target == null:
