@@ -1,55 +1,59 @@
 # TODO
 
-**Source of truth for Stage 1 status:** `Docs/CURRENT_STATE.md`  
-**Stage 1.5 climate/migration contract:** `Docs/DESIGN_CLIMATE_AND_MIGRATION_PRESSURE.md`  
-**Expanded geography (design):** `Docs/EXPANDED_CLIMATE_GEOMETRY_V0_1.md`  
-**Acceptance process:** `Docs/ACCEPTANCE_AND_PROCESS.md`
+**Source of truth:** `Docs/CURRENT_STATE.md`  
+**Scope:** `Docs/nomad_wars_v1_scope_and_architecture.md`  
+**Process:** `Docs/ACCEPTANCE_AND_PROCESS.md`
 
 ---
 
-## Stage 1 — ACCEPTED (2026-09-01)
+## Active — M17.0
 
-Core T1 loop, dual-floor economy, attack-once, door/rally, buildings, loot, nav rebake — closed. Do not reopen without new F5 evidence.
+- [ ] **M17.0 Variant C — Minimal AI 2nd TC**
+  - stocks ≥ thresholds + ≥1 Barracks + exactly 1 alive TC → instant 2nd TC
+  - `max_ai_tc = 2` (no 3rd+)
+  - train workers from **any** alive same-team TC
+  - workers goal still `desired_worker_count` total (4)
+  - Barracks / Soldier / EnemyAI unchanged
+  - F5: 2nd TC appears once; train from both; destroy TC1 → still alive on TC2; no player regression
+- [ ] M17.1 combat polish (only if needed after expand is stable)
 
 ---
 
-## Stage 1.5
+## Done (repo fact)
 
-- [x] Fixed-region / three-state climate design contract
-- [x] Review Stage 1.5 design contract against current repository implementation
-- [x] **A — Climate backend (prototype):** fixed non-overlapping regions + seasonal state lookup (4×r14 in code, F5 OK)
-- [x] F5 Climate A against written acceptance criteria
-- [x] **Expanded Climate Geometry v0.1** design sign-off (8×r21 Variant B) — `EXPANDED_CLIMATE_GEOMETRY_V0_1.md`
-- [ ] **Layout port (explicit task):** put Variant B table into `EnvironmentZoneService` (only when requested)
+- [x] Stage 1 T1 economic AI — ACCEPTED 2026-09-01
+- [x] M10–M10.2 Worker construction + UI/gates/visuals
+- [x] M11 start Workers ×4
+- [x] M12 / M12.1 Repair + DEAD ordinal
+- [x] M13 IDLE retaliation
+- [x] M15 deposit constructed TC only
+- [x] M16 IDLE auto-acquire r=12
+- [x] Watchtower Pack/Unpack UI + camera clamp
+- [x] Stage 1.5 design contract + Slice A prototype + 8×r21 geometry port + Seasonal Front v0 (**parked**)
+
+---
+
+## Stage 1.5 — PARKED (explicit request only)
+
+- [x] Fixed-region design + Expanded Geometry v0.1 sign-off
+- [x] A — Climate backend + layout port
 - [ ] B — Environment state visuals
-- [ ] F5 B
-- [ ] C — Soft climate pressure on existing resource extraction
-- [ ] F5 C
+- [ ] C — Soft climate pressure on extraction
 - [ ] D — Horse availability response
-- [ ] F5 D
-- [ ] E — Neutral camps + basic loot
-- [ ] F5 E
-- [ ] F — Minimal player hero + one artifact loop
-- [ ] F5 F
-- [ ] G — Conflict matrix / player decision test
+- [ ] E — Neutral camps + loot
+- [ ] F — Minimal player hero + one artifact
+- [ ] G — Conflict matrix
 
-## Deferred / blocked until evidence
+## Deferred
 
-- [ ] AI migration
-- [ ] AI hero
-- [ ] Full hero progression
-- [ ] Artifact tiers
-- [ ] Terrain / settlement suitability system
-- [ ] Animal pathfinding
-- [ ] Magic / mana / Power Site gameplay
-- [ ] Economy 1.5 goal/deficit architecture
-- [ ] T2 / T3
-- [ ] New victory conditions
+- AI migration / AI pack / AI repair / AI UNDER_CONSTRUCTION
+- AI hero / full hero / artifact tiers / magic
+- Economy 1.5 goal→deficit architecture
+- T2 / T3 / new victory conditions
 
-## Technical Debt (later)
+## Tech debt (see `TECH_DEBT.md`)
 
-- [ ] TD-01 shared `can_place`
-- [ ] TD-02 Economy 1.5 (optional)
-- [ ] TD-03 residual AI after TC
-- [ ] TD-04 TeamRules DEAD const
-- [ ] EnemySpawner config / nav stagger / aggro / MOBILE collision / multi-select buildings
+- [ ] TD-01 shared `can_place` for AI
+- [ ] TD-02 harvest heuristic → Economy 1.5 if needed
+- [ ] TD-03 residual AI after TC (OK while win = destroy TC)
+- [ ] TD-04 TeamRules DEAD const vs enum (verify after M12.1 ordinal shift)
