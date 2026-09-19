@@ -9,35 +9,38 @@
 
 | Field | Value |
 |--------|--------|
-| **Last accepted** | M17.1 Expansion Economy |
-| **Now** | **M17.2 Level 1 Multi-Base Military** — **IN CODE, waiting F5** |
+| **Last accepted** | **M17.2 Level 1 Multi-Base Military** — **ACCEPTED** (F5 2026-09-19) |
+| **Next (optional)** | M17.3 Watchtower / M18 combat acquisition / balance — on request |
 
-### M17.2 Level 1 (locked)
+### M17.2 F5 evidence
 
-| IN | OUT |
-|----|-----|
-| 2nd Barracks near TC2 (`second_barracks_offset`) | Watchtower / tower AI |
-| `max_ai_barracks=2` + `_second_barracks_once` | rebuild 2nd Barracks |
-| train Soldier from **any** free Barracks | EnemyAI scoring changes |
-| existing `attack_threshold` + attach | defend stance / army split |
-| | cavalry/siege AI mix, Climate, 3rd TC/Barracks |
+| Check | Result |
+|-------|--------|
+| TC2 → 2nd Barracks | `building 2nd Barracks at (-34,0,31) near TownCenter_3` → `Barracks_4` → `second_barracks_once locked` (once) |
+| Dual production | `training Soldier at Barracks_1` (13×) + `Barracks_4` (10×) |
+| Stable state | `tc=2 barracks=2 expanded=true b2=true`; army up to ~14 |
+| Attack path | `attack threshold` + continuous `reinforcements` |
+| No 3rd Barracks | only one 2nd-Barracks place event |
+| Player | build/towers/combat OK (player under dual-Barracks pressure — expected) |
 
-File: `Scripts/AI/EconomicAIController.gd` only.
-
-Trigger: `tc >= 2` + can_afford Barracks cost (no extra W threshold).
-
-### F5 matrix
-
-1. TC2 → log `building 2nd Barracks` / `second_barracks_once locked`
-2. `barracks=2` → `training Soldier at` both names
-3. Destroy Barracks1 → Barracks2 still trains
-4. Destroy TC2/Barracks2 → no 3rd Barracks (`b2=true`)
-5. Destroy TC1 → TC2 + Barracks2 production continues
-6. attack_threshold / EnemyAI no regression
-7. Player systems no regression
+File: `Scripts/AI/EconomicAIController.gd`
 
 ---
 
-## Done
+## Done chain
 
-M10–M16 player · M17.0 · M17.1 · Stage 1.5 Climate **PARKED**
+```
+M10–M16  Player RTS foundation     ✓
+M17.0    AI Second TC               ✓
+M17.1    Expansion Economy          ✓
+M17.2    Multi-Base Military L1     ✓
+```
+
+Stage 1.5 Climate **PARKED**
+
+## Optional next
+
+- **M17.3** AI Watchtower near TC2 (if defense gap matters)
+- **M18** Combat acquisition / stances
+- Balance (AI pressure with 2 barracks is strong — intentional)
+- Climate only after static multi-base loop feels settled
