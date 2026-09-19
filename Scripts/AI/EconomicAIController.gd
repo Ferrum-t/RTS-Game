@@ -2,7 +2,7 @@ extends Node
 
 class_name EconomicAIController
 
-## Stage 1 — threshold economic AI for one team (default team 1).
+## Stage 1 threshold AI + M17.0 minimal expansion (max 2 TC).
 ## DECISION only. EXECUTION via shared systems.
 
 @export var team_id: int = 1
@@ -10,24 +10,37 @@ class_name EconomicAIController
 @export var attack_threshold: int = 3
 @export var decision_interval: float = 1.5
 @export var barracks_offset: Vector3 = Vector3(4.0, 0.0, 3.0)
-## Soft floor for both wood and stone; below → prefer that resource (narrow fix, not Economy 1.5).
+## Soft floor for both wood and stone; below → prefer that resource.
 @export var stock_floor: int = 100
+
+## M17.0 — expand thresholds (after Barracks exists, while still on 1 TC).
+@export var expand_wood_min: int = 250
+@export var expand_stone_min: int = 100
+@export var max_ai_tc: int = 2
+## Offset from first TC; opposite side of barracks_offset to reduce overlap (TD-01).
+@export var second_tc_offset: Vector3 = Vector3(-10.0, 0.0, 6.0)
 
 var _timer: float = 0.0
 var _barracks_data: BuildingData = null
+var _tc_data: BuildingData = null
 ## True after we first crossed attack_threshold; reset when army falls below.
 var _attack_issued: bool = false
-## Alternates preferred type when both stocks are above floor (avoids permanent stick).
+## Alternates preferred type when both stocks are above floor.
 var _harvest_flip: int = 0
 
 
 func _ready() -> void:
 	_barracks_data = load("res://Data/Buildings/BarracksData.tres") as BuildingData
+	_tc_data = load("res://Data/Buildings/TownCenterData.tres") as BuildingData
 	_timer = 0.5
-	print("[AI_ECO] controller ready team=", team_id,
+	print(
+		"[AI_ECO] controller ready team=", team_id,
 		" workers_goal=", desired_worker_count,
 		" attack_at=", attack_threshold,
-		" stock_floor=", stock_floor)
+		" stock_floor=", stock_floor,
+		" expand_at W>=", expand_wood_min, " S>=", expand_stone_min,
+		" max_tc=", max_ai_tc
+	)
 
 
 func _physics_process(delta: float) -> void:
@@ -51,25 +64,30 @@ func _think() -> void:
 	if rm:
 		wood = rm.get_stock(team_id, BaseResource.Type.WOOD)
 		stone = rm.get_stock(team_id, BaseResource.Type.STONE)
-	print("[AI_ECO] workers=", workers.size(), " soldiers=", soldiers.size(),
-		" wood=", wood, " stone=", stone)
+	var tcs: Array = _team_town_centers()
+	print(
+		"[AI_ECO] workers=", workers.size(), " soldiers=", soldiers.size(),
+		" tc=", tcs.size(), " wood=", wood, " stone=", stone
+	)
 
 	_assign_idle_workers(workers)
 
-	var tc := _team_town_center()
-	if tc == null:
+	if tcs.is_empty():
 		return
 
-	if workers.size() < desired_worker_count and tc is TownCenter:
-		var tcn := tc as TownCenter
-		if not tcn.is_training and tcn.is_deployed():
-			if tcn.try_train_worker():
-				print("[AI_ECO] training Worker")
+	# M17.0 — train workers from ANY free alive TC (total goal still desired_worker_count).
+	if workers.size() < desired_worker_count:
+		_try_train_worker_any_tc(tcs)
 
+	var first_tc: BaseBuilding = tcs[0] as BaseBuilding
 	var barracks := _team_barracks()
 	if barracks == null:
-		_try_build_barracks(tc)
+		_try_build_barracks(first_tc)
 		return
+
+	# M17.0 — one expansion to max_ai_tc after Barracks exists.
+	if tcs.size() < max_ai_tc:
+		_try_expand_second_tc(first_tc, wood, stone)
 
 	if barracks is Barracks:
 		var b := barracks as Barracks
@@ -80,19 +98,58 @@ func _think() -> void:
 	soldiers = _team_soldiers()
 	if soldiers.size() >= attack_threshold:
 		if not _attack_issued:
-			# First time army crosses threshold — one decision, one log line.
 			print("[AI_ECO] attack threshold reached army=", soldiers.size())
 			_attack_issued = true
 			var n: int = _attach_ai_to_army(soldiers)
 			print("[AI_ECO] attack issued on ", n, " soldiers")
 		else:
-			# Late-trained soldiers after the wave started: attach only if missing AI.
 			var n: int = _attach_ai_to_army(soldiers)
 			if n > 0:
 				print("[AI_ECO] attack reinforcements +", n)
 	else:
-		# Army collapsed below threshold — allow a future re-issue.
 		_attack_issued = false
+
+
+func _try_train_worker_any_tc(tcs: Array) -> void:
+	for node in tcs:
+		if not (node is TownCenter):
+			continue
+		var tcn := node as TownCenter
+		if tcn.is_training:
+			continue
+		if not tcn.is_deployed():
+			continue
+		if tcn.try_train_worker():
+			print("[AI_ECO] training Worker at ", tcn.name)
+			return
+
+
+func _try_expand_second_tc(anchor_tc: BaseBuilding, wood: int, stone: int) -> void:
+	if anchor_tc == null or not is_instance_valid(anchor_tc):
+		return
+	if _tc_data == null:
+		return
+	if wood < expand_wood_min or stone < expand_stone_min:
+		return
+
+	var rm := get_node_or_null("/root/ResourceManager")
+	if rm == null:
+		return
+	var cost: Dictionary = _tc_data.get_cost_dict()
+	if not rm.can_afford(cost, team_id):
+		return
+
+	var cm := get_node_or_null("/root/ConstructionManager")
+	if cm == null or not cm.has_method("place_building_for_team"):
+		return
+
+	var pos: Vector3 = anchor_tc.global_position + second_tc_offset
+	pos.y = 0.0
+	print("[AI_ECO] expanding 2nd TC at ", pos, " (W=", wood, " S=", stone, ")")
+	# Instant READY — same Stage-1 path as Barracks (start_constructed default true).
+	var built = cm.place_building_for_team(_tc_data, pos, team_id, true)
+	if built != null:
+		print("[AI_ECO] 2nd TC completed ", built.name, " team=", team_id)
 
 
 func _try_build_barracks(tc: BaseBuilding) -> void:
@@ -134,8 +191,6 @@ func _assign_idle_workers(workers: Array) -> void:
 		u.replace_order_harvest(res)
 
 
-## Cyclic dual-floor pick: never permanently abandon stone or wood.
-## Not Economy 1.5 (no BUILDING/PRODUCTION goals) — only removes irreversible stick.
 func _pick_resource_for_worker(u: BaseUnit) -> BaseResource:
 	var rm := get_node_or_null("/root/ResourceManager")
 	var wood := 0
@@ -151,7 +206,6 @@ func _pick_resource_for_worker(u: BaseUnit) -> BaseResource:
 	elif wood < floor:
 		prefer_type = BaseResource.Type.WOOD
 	else:
-		# Both above floor — alternate so one resource cannot monopolize forever.
 		prefer_type = BaseResource.Type.WOOD if (_harvest_flip % 2 == 0) else BaseResource.Type.STONE
 		_harvest_flip += 1
 
@@ -172,14 +226,12 @@ func _pick_resource_for_worker(u: BaseUnit) -> BaseResource:
 	if best != null:
 		return best
 
-	# Fallback: nearest any non-empty node (node depleted / wrong side of map).
 	for n in u.get_tree().get_nodes_in_group("Resource"):
 		if n is BaseResource and (n as BaseResource).resource_amount > 0:
 			return n as BaseResource
 	return null
 
 
-## Attach EnemyAIComponent only to soldiers that lack it. Returns how many were newly attached.
 func _attach_ai_to_army(soldiers: Array) -> int:
 	var newly: int = 0
 	for s in soldiers:
@@ -200,10 +252,12 @@ func _attach_ai_to_army(soldiers: Array) -> int:
 	return newly
 
 
-func _team_town_center() -> BaseBuilding:
+## All alive TCs for this team (M17.0 multi-TC).
+func _team_town_centers() -> Array:
+	var out: Array = []
 	var bm := get_node_or_null("/root/BuildingManager")
 	if bm == null:
-		return null
+		return out
 	for tc in bm.town_centers:
 		if tc == null or not is_instance_valid(tc):
 			continue
@@ -211,8 +265,18 @@ func _team_town_center() -> BaseBuilding:
 			continue
 		if tc.get("is_destroyed") == true:
 			continue
-		return tc as BaseBuilding
-	return null
+		if tc.get("health") != null and int(tc.health) <= 0:
+			continue
+		out.append(tc)
+	return out
+
+
+## First alive TC (Barracks placement anchor).
+func _team_town_center() -> BaseBuilding:
+	var tcs: Array = _team_town_centers()
+	if tcs.is_empty():
+		return null
+	return tcs[0] as BaseBuilding
 
 
 func _team_barracks() -> BaseBuilding:
