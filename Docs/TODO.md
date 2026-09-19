@@ -4,15 +4,17 @@
 
 ---
 
-## Done this sprint
+## Active
 
-- [x] **M17.0** code + F5 **ACCEPTED** (2nd TC + multi-TC worker train)
+- [x] **M17.1 code** A/B/C/D (`EconomicAIController.gd`)
+- [ ] **M17.1 F5** matrix (expand-once, workers 6, wood pressure, lose TC1/TC2)
 
-## Optional next
+## Later
 
-- [ ] M17.1 combat polish (if tunnel-to-TC still hurts)
-- [ ] Stage 1.5 B+ only on explicit request
+- [ ] M17.2 Multi-Base Military
+- [ ] M18 Combat acquisition
+- [ ] M19 / Stage 1.5 Climate (parked)
 
-## Parked / deferred
+## Done
 
-AI migration/pack/repair · Economy 1.5 · T2 · TD-01…04
+- [x] M17.0 ACCEPTED
