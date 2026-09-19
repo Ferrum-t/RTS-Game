@@ -4,17 +4,13 @@
 
 ---
 
-## Active
-
-- [x] **M17.2 Level 1 code** (2nd Barracks once + train any)
-- [ ] **M17.2 F5** matrix in CURRENT_STATE
-
 ## Done
 
-- [x] M17.0 · M17.1 ACCEPTED
+- [x] M17.0 · M17.1 · **M17.2 Level 1 ACCEPTED**
 
-## Later / out
+## Optional next
 
-- M17.3 Watchtower (if needed)
-- M18 Combat acquisition
-- M19 Climate (parked)
+- [ ] M17.3 AI Watchtower (if needed)
+- [ ] M18 Combat acquisition
+- [ ] Balance pass (2-barracks AI pressure)
+- [ ] M19 / Stage 1.5 Climate (parked)
