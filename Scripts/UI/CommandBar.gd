@@ -3,6 +3,7 @@ extends PanelContainer
 ## M10.1b/c — Bottom Command Bar.
 ## Selection → context → show one command group, hide the rest.
 ## Leaving Worker context cancels ghost placement (M10.1c).
+## Polish: Watchtower → Pack / Unpack (same as TC mobility).
 
 enum Context {
 	NONE,
@@ -15,6 +16,7 @@ enum Context {
 @onready var worker_group: Control = $Margin/HBox/WorkerGroup
 @onready var barracks_group: Control = $Margin/HBox/BarracksGroup
 @onready var town_center_group: Control = $Margin/HBox/TownCenterGroup
+@onready var watchtower_group: Control = $Margin/HBox/WatchtowerGroup
 
 var _last_context: int = Context.NONE
 
@@ -48,7 +50,7 @@ func _resolve_context() -> int:
 			return Context.BARRACKS
 		if b is TownCenter:
 			return Context.TOWN_CENTER
-		if b is Watchtower:
+		if b is Watchtower or b is MobileTower:
 			return Context.WATCHTOWER
 		if b is BaseBuilding:
 			return Context.NONE
@@ -65,7 +67,12 @@ func _resolve_context() -> int:
 
 
 func _apply_context(ctx: int) -> void:
-	var show_bar: bool = ctx == Context.WORKER or ctx == Context.BARRACKS or ctx == Context.TOWN_CENTER
+	var show_bar: bool = (
+		ctx == Context.WORKER
+		or ctx == Context.BARRACKS
+		or ctx == Context.TOWN_CENTER
+		or ctx == Context.WATCHTOWER
+	)
 	visible = show_bar
 	if worker_group:
 		worker_group.visible = ctx == Context.WORKER
@@ -73,6 +80,8 @@ func _apply_context(ctx: int) -> void:
 		barracks_group.visible = ctx == Context.BARRACKS
 	if town_center_group:
 		town_center_group.visible = ctx == Context.TOWN_CENTER
+	if watchtower_group:
+		watchtower_group.visible = ctx == Context.WATCHTOWER
 
 
 func _cancel_ghost() -> void:

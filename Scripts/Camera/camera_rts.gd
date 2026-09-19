@@ -11,6 +11,12 @@ extends Node3D
 @export var min_height := 8.0
 @export var max_height := 35.0
 
+## Map playable bounds (XZ). 200×200 field with margin inside zone extremes.
+@export var map_min_x: float = -95.0
+@export var map_max_x: float = 95.0
+@export var map_min_z: float = -95.0
+@export var map_max_z: float = 95.0
+
 @export var camera: Camera3D
 
 var rotating := false
@@ -43,7 +49,7 @@ func _process(delta):
 		global_position += (right * move.x + forward * move.z) * move_speed * delta
 
 
-	# ===== Движение к краям экрана =====
+	# ===== Edge scroll =====
 
 	var mouse = get_viewport().get_mouse_position()
 	var size = get_viewport().get_visible_rect().size
@@ -73,10 +79,17 @@ func _process(delta):
 
 		global_position += movement * edge_speed * delta
 
+	_clamp_to_map()
+
+
+func _clamp_to_map() -> void:
+	global_position.x = clampf(global_position.x, map_min_x, map_max_x)
+	global_position.z = clampf(global_position.z, map_min_z, map_max_z)
+
 
 func _unhandled_input(event):
 
-	# ===== Вращение средней кнопкой =====
+	# ===== Middle-mouse rotate =====
 
 	if event is InputEventMouseButton:
 
@@ -97,7 +110,7 @@ func _unhandled_input(event):
 				max_height
 			)
 
-	# ===== Поворот камеры =====
+	# ===== Camera yaw =====
 
 	if event is InputEventMouseMotion and rotating:
 		rotation.y -= event.relative.x * rotate_speed
