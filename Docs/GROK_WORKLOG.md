@@ -3,60 +3,42 @@
 Ветка: `nomads-wars-grok`
 
 **Scope:** `Docs/nomad_wars_v1_scope_and_architecture.md`  
-**Tech debt:** `Docs/TECH_DEBT.md`  
-**Status:** `Docs/CURRENT_STATE.md`
+**Status:** `Docs/CURRENT_STATE.md`  
+**Tech debt:** `Docs/TECH_DEBT.md`
+
+---
+
+## 2026-09-19 — Doc sync + M17.0 scope lock
+
+### Problem
+
+Status docs still said Stage 1.5 climate was next (Slice A only / 8×r21 «not in code»).  
+Git already had:
+
+- Climate geometry port 8×r21 + Seasonal Front v0 (mid-September)
+- Player **M10–M16** (construction, CommandBar, repair, deposit constructed, IDLE acquire, WT UI)
+
+AI still single-TC Stage-1 cell → product gap vs player multi-base.
+
+### Doc action
+
+Synced `CURRENT_STATE`, `TODO`, scope §0, `ROADMAP`. Climate **parked**. Active = **M17.0 Variant C** (minimal 2nd TC).
+
+### M17.0 lock (not coded yet)
+
+Instant 2nd AI TC at resource threshold; `max_ai_tc=2`; train workers from any alive team TC; no AI pack/repair/construction-site; EnemyAI unchanged.
 
 ---
 
 ## 2026-08-31 — Stage 1 F5 + full GPT audit documented
 
-### Code (earlier same day)
-
-- Rally: door + offset 12, grid slots, flag, RMB set rally; select ring on all buildings.
-- AI attack: issue **once** at threshold; reinforcements only if new unit lacks AI.
-
-### Docs
-
-| ID | Topic | Action |
-|----|--------|--------|
-| — | Attack spam | **Fixed** |
-| TD-01 | AI placement ≠ `can_build` | Recorded |
-| TD-02 | stone<50 heuristic → Economy 1.5 | Recorded |
-| TD-03 | Residual AI after TC death | Recorded (no Stage 1 fix) |
-| TD-04 | TeamRules `DEAD := 6` | Recorded (not blocker) |
-| — | Zones: motion/visual/query yes, harvest/AI no | Deferred by design |
-| — | Nav MAP_HALF=100 + rebake | Confirmed OK |
-| — | Door/rally on BaseBuilding | Confirmed OK |
-| — | CURRENT_STATE lagged (“Stage 1 NEXT”) | **Synced** — Stage 1 practically confirmed |
-
-### Product stance
-
-Next meaningful step after Stage 1 sign-off: **AI Economy 1.5**, not T2. Do not wire zones into AI yet.
+Rally, attack-once, dual-floor harvest. TD-01…TD-04 recorded. Stage 1 practically confirmed.
 
 ---
 
-## 2026-08-29 — Doc sync §0 + phases 10–12 closed
+## 2026-08-28 — Formation-offsets ACCEPTED + docs cleanup
 
-### Accepted since last §0 write (F5-backed)
-
-- **Environment Zones v1.0:** 4 blobs, harvest multiplier API exists but Stage B not applied to gather; priority COLD>DRY>FAVORABLE visuals.
-- **Enemy AI / selection-aware control / billboard pack bar** — as prior logs.
-
-### Doc action
-
-Updated §0 / pointers (`CURRENT_STATE`, `TODO`, `ROADMAP`) — later superseded by 2026-08-31 Stage 1 snapshot.
-
----
-
-## 2026-08-28 — Formation-offsets ACCEPTED + billboard fix
-
-Formation-offsets ACCEPTED. MOBILE collision passthrough still tech debt (TODO list).
-
----
-
-## 2026-08-28 earlier — Docs cleanup (Claude audit)
-
-Deleted ARCHITECTURE, PROJECT_ROADMAP, PHASE_8_*, SESSION. Pointers synced.
+Formation-offsets ACCEPTED. Deleted parallel roadmaps / PHASE_8_* archives.
 
 ---
 
