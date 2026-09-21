@@ -1,38 +1,31 @@
 # GROK WORKLOG — Nomad Wars
 
-Ветка: `nomads-wars-grok`
+**Official title (EN):** Nomad Wars · technical `NomadWars`  
+Ветка: `nomads-wars-grok` *(legacy slug; do not use “Nomads Wars” as product title)*
 
 **Scope:** `Docs/nomad_wars_v1_scope_and_architecture.md`  
 **Status:** `Docs/CURRENT_STATE.md`  
+**Identity:** `Docs/GAME_DESIGN.md`  
 **Tech debt:** `Docs/TECH_DEBT.md`
 
 ---
 
-## 2026-09-19 — Doc sync + M17.0 scope lock
+## 2026-09-21 — Official title lock
 
-### Problem
+Fixed product naming in GAME_DESIGN / CURRENT_STATE / AI_CONTEXT.  
+**Nomad Wars** = EN official. **Not** Nomads Wars. Branch name left as-is (legacy).
 
-Status docs still said Stage 1.5 climate was next (Slice A only / 8×r21 «not in code»).  
-Git already had:
+---
 
-- Climate geometry port 8×r21 + Seasonal Front v0 (mid-September)
-- Player **M10–M16** (construction, CommandBar, repair, deposit constructed, IDLE acquire, WT UI)
+## 2026-09-19 — Doc sync + M17.0→M17.2
 
-AI still single-TC Stage-1 cell → product gap vs player multi-base.
-
-### Doc action
-
-Synced `CURRENT_STATE`, `TODO`, scope §0, `ROADMAP`. Climate **parked**. Active = **M17.0 Variant C** (minimal 2nd TC).
-
-### M17.0 lock (not coded yet)
-
-Instant 2nd AI TC at resource threshold; `max_ai_tc=2`; train workers from any alive team TC; no AI pack/repair/construction-site; EnemyAI unchanged.
+M17.0 / M17.1 / M17.2 Level 1 ACCEPTED (F5). Climate parked.
 
 ---
 
 ## 2026-08-31 — Stage 1 F5 + full GPT audit documented
 
-Rally, attack-once, dual-floor harvest. TD-01…TD-04 recorded. Stage 1 practically confirmed.
+Rally, attack-once, dual-floor harvest. TD-01…TD-04 recorded.
 
 ---
 
