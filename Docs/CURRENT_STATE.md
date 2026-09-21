@@ -10,24 +10,19 @@
 
 | Field | Value |
 |--------|--------|
-| **Last accepted** | M17.3 AI Watchtower L1 |
-| **Now** | **M18 Level 1 Combat acquisition (A+C)** — **IN CODE, waiting F5** |
+| **Last accepted** | **M18 Level 1 Combat acquisition (A+C)** — **ACCEPTED** (F5) |
+| **Next optional** | M18-B (idle acquire buildings) · Balance pass · Climate parked |
 
-### M18 Level 1 (locked)
+### M18 F5 evidence
 
-| IN | OUT |
-|----|-----|
-| **A** Retaliate from IDLE / MOVING / HARVESTING / RETURNING | BUILD / REPAIR interrupt |
-| **C** Immediate REACQUIRE after TARGET_DEAD/LOST in radius 12 | Idle acquire → buildings (**B** deferred) |
-| File: `Scripts/Units/BaseUnit.gd` only | Stances · EnemyAI · Climate |
-
-### F5 matrix
-
-1. Worker HARVESTING hit by enemy → `RETALIATE ->` → ATTACKING
-2. Kill unit with 2nd enemy in r12 → `REACQUIRE ->` without long idle pause
-3. BUILD/REPAIR **not** broken by random retaliate
-4. No ACQUIRE/RETALIATE spam every frame
-5. M17.2/17.3 / towers / dual Barracks no regression
+| Check | Result |
+|-------|--------|
+| RETALIATE | 8× (`Worker RETALIATE`, Worker2/4, units) |
+| REACQUIRE | 10× after kill chain |
+| Idle ACQUIRE | still works |
+| BUILD not auto-broken by A | BUILD continues on other workers; no force-cancel BUILD policy |
+| M17.2/17.3 | `b2=true w1=true`, dual train, AI tower |
+| Match | DEFEAT under dual-Barracks pressure (balance, not M18 defect) |
 
 ---
 
@@ -35,8 +30,8 @@
 
 ```
 M17.0–M17.3     ✓
-M18 A+C         in code → F5
-M18-B (buildings acquire) deferred
+M18 A+C         ✓
+M18-B           optional later
 ```
 
 Climate **PARKED**
