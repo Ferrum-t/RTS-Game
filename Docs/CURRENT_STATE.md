@@ -11,23 +11,26 @@
 
 | Field | Value |
 |--------|--------|
-| **Last accepted** | **M17.2 Level 1 Multi-Base Military** — **ACCEPTED** (F5 2026-09-19) |
-| **Now** | **Variant B — Core Gameplay Polish / Audit** (no new mechanics) |
-| **Not active** | M17.3 code · M18 · Climate · Hero / Magic |
+| **Last accepted** | **Variant B — Core Gameplay Polish / Audit** — **ACCEPTED** (F5 2026-09-21) |
+| **Prior feature** | M17.2 Level 1 Multi-Base Military — ACCEPTED |
+| **Next (optional)** | M17.3 Watchtower LOCK · **Balance pass** · M18 |
 
-### Audit goal
-
-Confirm post-M17.2 loop is stable: economy, construction, combat, AI multi-base, UI.  
-**OUT:** new systems, Watchtower AI, balance number changes unless F5 shows P0.
-
-### M17.2 evidence (baseline)
+### Variant B F5 (control match)
 
 | Check | Result |
 |-------|--------|
-| TC2 → 2nd Barracks | Barracks_4 · `second_barracks_once locked` |
-| Dual production | Barracks_1 + Barracks_4 train |
-| State | `tc=2 barracks=2 b2=true` |
-| Attack | threshold + reinforcements |
+| Player harvest + deposit | ✓ (TC + TownCenter_1) |
+| Player 2nd TC build → COMPLETE | ✓ TownCenter_1 |
+| Deposit on 2nd TC | ✓ Worker/Worker3/Worker4 |
+| Player Watchtower place + combat | ✓ Watchtower_3 / _6 acquire/hits |
+| AI Barracks → TC2 → 2nd Barracks | ✓ Barracks_5 `second_barracks_once locked` |
+| Dual train | ✓ Barracks_2 ×12 + Barracks_5 ×9 |
+| Attack path | ✓ threshold + reinforcements |
+| No 3rd TC/Barracks | ✓ `b2=true` |
+| Crashes / script errors | none in log |
+| Repair | not completed (AI wave too fast — **balance**, not P0) |
+
+**Note:** Dual-Barracks AI pressure makes solo player development hard. Not a regression of systems — intentional M17.2 outcome. Optional **balance pass** (attack_threshold / costs / train times) if desired; not required to close B.
 
 ---
 
@@ -38,10 +41,7 @@ M10–M16  Player RTS foundation     ✓
 M17.0    AI Second TC               ✓
 M17.1    Expansion Economy          ✓
 M17.2    Multi-Base Military L1     ✓
+Variant B Core Audit                ✓
 ```
 
 Stage 1.5 Climate **PARKED**
-
-## After audit
-
-- M17.3 Watchtower (if LOCK) · M18 · balance · Climate (parked)
