@@ -4,15 +4,13 @@
 
 ---
 
-## Active
-
-- [ ] **M18** Combat acquisition — PRE-CODE AUDIT first
-
 ## Done
 
-- [x] M17.0 · M17.1 · M17.2 · Variant B · **M17.3 ACCEPTED**
+- [x] M17.0–M17.3 · **M18 Level 1 A+C ACCEPTED**
 
-## Optional
+## Optional next
 
-- [ ] Balance pass (AI pressure)
+- [ ] **Balance pass** (AI dual-Barracks pressure)
+- [ ] M18-B idle acquire → buildings
+- [ ] Stances / hold (M18 Level 2)
 - [ ] Climate (parked)
