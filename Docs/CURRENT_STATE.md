@@ -2,7 +2,7 @@
 
 **Product:** **Nomad Wars** (EN official) · technical `NomadWars`  
 **Identity:** `Docs/GAME_DESIGN.md` § Official identity  
-**Branch:** `nomads-wars-grok` *(legacy slug; product name is Nomad Wars, not “Nomads Wars”)*  
+**Branch:** `nomads-wars-grok` *(legacy slug)*  
 **HEAD fact date:** 2026-09-21
 
 ---
@@ -12,19 +12,22 @@
 | Field | Value |
 |--------|--------|
 | **Last accepted** | **M17.2 Level 1 Multi-Base Military** — **ACCEPTED** (F5 2026-09-19) |
-| **Next (optional)** | M17.3 Watchtower PRE-CODE AUDIT done — lock when ready / M18 / balance |
+| **Now** | **Variant B — Core Gameplay Polish / Audit** (no new mechanics) |
+| **Not active** | M17.3 code · M18 · Climate · Hero / Magic |
 
-### M17.2 F5 evidence
+### Audit goal
+
+Confirm post-M17.2 loop is stable: economy, construction, combat, AI multi-base, UI.  
+**OUT:** new systems, Watchtower AI, balance number changes unless F5 shows P0.
+
+### M17.2 evidence (baseline)
 
 | Check | Result |
 |-------|--------|
-| TC2 → 2nd Barracks | `Barracks_4` near TownCenter_3 → `second_barracks_once locked` |
-| Dual production | train at Barracks_1 + Barracks_4 |
-| Stable state | `tc=2 barracks=2 b2=true` |
-| Attack path | threshold + reinforcements |
-| No 3rd Barracks | once policy held |
-
-File: `Scripts/AI/EconomicAIController.gd`
+| TC2 → 2nd Barracks | Barracks_4 · `second_barracks_once locked` |
+| Dual production | Barracks_1 + Barracks_4 train |
+| State | `tc=2 barracks=2 b2=true` |
+| Attack | threshold + reinforcements |
 
 ---
 
@@ -39,9 +42,6 @@ M17.2    Multi-Base Military L1     ✓
 
 Stage 1.5 Climate **PARKED**
 
-## Optional next
+## After audit
 
-- **M17.3** AI Watchtower near TC2 (audit done; needs LOCK)
-- **M18** Combat acquisition / stances
-- Balance (dual-barracks pressure)
-- Climate after multi-base loop feels settled
+- M17.3 Watchtower (if LOCK) · M18 · balance · Climate (parked)
