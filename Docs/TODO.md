@@ -6,15 +6,13 @@
 
 ## Active
 
-- [x] M17.3 Level 1 code
-- [ ] **M17.3 F5**
-- [ ] **M18** Combat acquisition (after M17.3 ACCEPTED)
+- [ ] **M18** Combat acquisition — PRE-CODE AUDIT first
 
 ## Done
 
-- [x] M17.0 · M17.1 · M17.2 · Variant B
+- [x] M17.0 · M17.1 · M17.2 · Variant B · **M17.3 ACCEPTED**
 
 ## Optional
 
-- [ ] Balance pass
+- [ ] Balance pass (AI pressure)
 - [ ] Climate (parked)
