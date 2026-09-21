@@ -4,13 +4,17 @@
 
 ---
 
+## Active
+
+- [ ] **Variant B** Core Gameplay Polish / Audit (no new mechanics)
+
 ## Done
 
-- [x] M17.0 · M17.1 · **M17.2 Level 1 ACCEPTED**
+- [x] M17.0 · M17.1 · M17.2 Level 1 ACCEPTED
 
-## Optional next
+## Optional after audit
 
-- [ ] M17.3 AI Watchtower (if needed)
+- [ ] M17.3 AI Watchtower (needs LOCK)
 - [ ] M18 Combat acquisition
-- [ ] Balance pass (2-barracks AI pressure)
-- [ ] M19 / Stage 1.5 Climate (parked)
+- [ ] Balance pass
+- [ ] Climate (parked)
