@@ -4,13 +4,16 @@
 
 ---
 
+## Active
+
+- [x] M18.1 P1+P2 code
+- [ ] **M18.1 F5**
+
 ## Done
 
-- [x] M17.0–M17.3 · **M18 Level 1 A+C ACCEPTED**
+- [x] M17.0–M17.3 · M18 A+C
 
-## Optional next
+## Optional after F5
 
-- [ ] **Balance pass** (AI dual-Barracks pressure)
-- [ ] M18-B idle acquire → buildings
-- [ ] Stances / hold (M18 Level 2)
-- [ ] Climate (parked)
+- [ ] P3 if still too early pressure
+- [ ] M18-B · stances · Climate (parked)
