@@ -1,14 +1,16 @@
 # Nomad Wars — MVP v1.0 Scope и архитектурная дорожная карта
 
-> **Единственный живой документ** по scope / статусу / порядку фаз.
-> World lore и design-vision не расширяют gameplay scope молча — при конфликте побеждает этот файл + `CURRENT_STATE.md`.
+> **Official title (EN):** **Nomad Wars** · technical `NomadWars` · identity: `Docs/GAME_DESIGN.md`  
+> **Единственный живой документ** по scope / статусу / порядку фаз.  
+> World lore и design-vision не расширяют gameplay scope молча — при конфликте побеждает этот файл + `CURRENT_STATE.md`.  
 > Stage 1.5 design (parked): `Docs/DESIGN_CLIMATE_AND_MIGRATION_PRESSURE.md`.
 
 ---
 
-## 0. CURRENT STATUS (2026-09-19, ветка `nomads-wars-grok`)
+## 0. CURRENT STATUS (2026-09-21, ветка `nomads-wars-grok`)
 
-**Репо:** `Ferrum-t/RTS-Game` → `nomads-wars-grok`  
+**Product:** Nomad Wars (not “Nomads Wars”)  
+**Репо:** `Ferrum-t/RTS-Game` → branch `nomads-wars-grok` *(legacy slug)*  
 **Движок:** Godot 4.7 stable  
 **Правило приёмки:** код из чата ≠ факт, пока нет F5-лога + чтения файла.
 
@@ -17,27 +19,14 @@
 | Layer | Status |
 |-------|--------|
 | **Stage 1** T1 economic AI | **ACCEPTED** |
-| **Player M10–M16** construction / repair / multi-TC deposit / idle acquire | **IN CODE** |
-| **AI economy** | Still **single TC**; expand = **M17.0** |
+| **Player M10–M16** construction / repair / multi-TC deposit / idle acquire | **ACCEPTED** |
+| **M17.0–M17.2** AI 2nd TC + expansion eco + dual Barracks | **ACCEPTED** |
 | **Stage 1.5 climate** | Design + backend geometry **parked** — not active sprint |
+| **M17.3** AI Watchtower | PRE-CODE AUDIT done — needs LOCK |
 
 ### Active slice
 
-**M17.0 — Variant C: Minimal AI 2nd TC expansion** (scope locked).
-
-```
-AI team 1
-  stocks >= thresholds + ≥1 Barracks + exactly 1 alive TC
-       ↓
-  instant 2nd TC (place_building_for_team, start_constructed)
-  max_ai_tc = 2
-       ↓
-  train workers from ANY alive same-team TC
-  deposit nearest constructed (already M15)
-  Barracks / Soldier / EnemyAI unchanged
-```
-
-**Out of M17.0:** AI construction sites, repair, pack, towers, 3rd TC, combat polish (M17.1), climate, player systems.
+See `Docs/CURRENT_STATE.md`. No open implementation slice until explicit READY.
 
 ### Milestones (high level)
 
@@ -47,25 +36,28 @@ AI team 1
 | Formation / selection-aware / stuck / billboard | **ACCEPTED** |
 | Stage 1 Economic AI | **ACCEPTED** |
 | Stage 1.5 design + Slice A + 8×r21 port | **PARKED** |
-| M10–M16 Player eco/build/combat QoL | **IN CODE** |
-| **M17.0** AI 2nd TC | **NEXT** |
+| M10–M16 Player eco/build/combat QoL | **ACCEPTED** |
+| M17.0 AI 2nd TC | **ACCEPTED** |
+| M17.1 Expansion Economy | **ACCEPTED** |
+| M17.2 Multi-Base Military L1 | **ACCEPTED** |
+| M17.3 AI Watchtower | audit only |
 
 ### Stage 1.5 (parked detail)
 
 Canonical design: `DESIGN_CLIMATE_AND_MIGRATION_PRESSURE.md`.  
 Code: fixed regions, seasonal state, Variant B geometry port, Seasonal Front v0.  
-**Do not** implement B–G unless an explicit request re-opens Stage 1.5 after M17.
+**Do not** implement B–G unless an explicit request re-opens Stage 1.5 after multi-base loop is settled.
 
 ---
 
 ## 1. V1.0 BASELINE
 
-Accepted baseline remains T1 RTS foundation + player construction loop.
+Accepted baseline remains T1 RTS foundation + player construction loop + AI multi-base production (M17.0–17.2).
 
 - Turan only · Wood / Stone / Gold / Horses
 - Worker / Soldier / Cavalry / SiegeUnit
 - Raid foundation · Mobile settlements / towers
-- Economic AI opponent (expanding via M17.0)
+- Economic AI opponent (2 TC, 2 Barracks, once-policies)
 - Match victory/defeat through existing Stage 1 rules
 
 Stage 1.5 may later add climate pressure / hero slice on explicit task. It does **not** authorize T2, AI migration, or full hero progression by documentation alone.
@@ -110,6 +102,7 @@ See `Docs/ACCEPTANCE_AND_PROCESS.md`.
 |------|------|
 | **This file §0** | Canonical phase order / active sprint |
 | `CURRENT_STATE.md` | Implemented table + balance + next action |
+| `GAME_DESIGN.md` | **Official product title** + high-level design |
 | `TODO.md` | Short checklist |
 | `GROK_WORKLOG.md` | Session history |
 | `TECH_DEBT.md` | Durable gaps |
