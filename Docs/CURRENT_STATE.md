@@ -11,39 +11,32 @@
 
 | Field | Value |
 |--------|--------|
-| **Last accepted** | Variant B Core Audit — ACCEPTED |
-| **Now** | **M17.3 Level 1 AI Watchtower** — **IN CODE, waiting F5** |
-| **After F5** | **M18** Combat acquisition (next) |
+| **Last accepted** | **M17.3 Level 1 AI Watchtower** — **ACCEPTED** (F5 2026-09-21) |
+| **Next** | **M18 Combat acquisition** — PRE-CODE AUDIT first |
 
-### M17.3 Level 1 (locked)
+### M17.3 F5 evidence
 
-| IN | OUT |
-|----|-----|
-| 1× Watchtower near TC2 after `_second_barracks_once` | multi-tower / TC1 tower |
-| `watchtower_offset = (-4, 0, 4)` | rebuild |
-| `_watchtower_once` | defense brain / EnemyAI edits |
-| instant `place_building_for_team` | Climate / army split |
-| `BuildingCombatComponent` as-is | |
-
-File: `Scripts/AI/EconomicAIController.gd` only.
-
-### F5 matrix
-
-1. `b2=true` → log `building Watchtower near …` → `watchtower_once locked`
-2. `[TOWER] … combat ready team=1` + Watchtower registered
-3. Player unit in range → `acquired` / `hits`
-4. Destroy tower → no 2nd AI tower (`w1=true`)
-5. Dual Barracks / expand / attack path no regression
-6. Player systems no regression
+| Check | Result |
+|-------|--------|
+| After Barracks2 | `building Watchtower at (-42,0,38) near TownCenter_4` |
+| Once lock | `Watchtower_6` · `watchtower_once locked` · `w1=true` |
+| Combat team=1 | `[TOWER] Watchtower_6 combat ready team=1` |
+| No rebuild | after tower destroy still `w1=true`, no 2nd AI tower place |
+| Dual Barracks | train Barracks_1 + Barracks_5 |
+| Match | VICTORY (player cleared AI base after resource shift) |
 
 ---
 
 ## Done chain
 
 ```
-M17.0–M17.2 · Variant B    ✓
-M17.3 Watchtower L1         in code
-M18 Combat acquisition      NEXT after F5
+M10–M16  Player foundation          ✓
+M17.0    AI Second TC               ✓
+M17.1    Expansion Economy          ✓
+M17.2    Multi-Base Military L1     ✓
+Variant B Core Audit                ✓
+M17.3    AI Watchtower L1           ✓
+M18      Combat acquisition         ← NEXT (audit → lock → code)
 ```
 
 Stage 1.5 Climate **PARKED**
