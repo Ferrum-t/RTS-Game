@@ -10,12 +10,14 @@ class_name EconomicAIController
 ##   watchtower_offset = (-4, 0, 4), _watchtower_once (no rebuild)
 ##   BuildingCombatComponent / EnemyAI unchanged
 ## OUT: defense brain, multi-tower, rebuild, Climate, army split
+##
+## M18.1 Balance P1: attack_threshold 3 → 5 (later first wave)
 
 @export var team_id: int = 1
 @export var desired_worker_count: int = 4
 ## Extra workers when alive TC count >= 2 (M17.1-B). Total goal = desired + extra.
 @export var extra_workers_at_two_tc: int = 2
-@export var attack_threshold: int = 3
+@export var attack_threshold: int = 5  ## M18.1 P1: was 3
 @export var decision_interval: float = 1.5
 @export var barracks_offset: Vector3 = Vector3(4.0, 0.0, 3.0)
 ## M17.2 — offset from the TC chosen for 2nd Barracks (prefer farthest from Barracks1).
