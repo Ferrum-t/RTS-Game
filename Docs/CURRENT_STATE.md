@@ -1,8 +1,7 @@
 # CURRENT STATE
 
 **Product:** **Nomad Wars** (EN official) · technical `NomadWars`  
-**Identity:** `Docs/GAME_DESIGN.md` § Official identity  
-**Branch:** `nomads-wars-grok` *(legacy slug)*  
+**Branch:** `nomads-wars-grok`  
 **HEAD fact date:** 2026-09-21
 
 ---
@@ -11,32 +10,33 @@
 
 | Field | Value |
 |--------|--------|
-| **Last accepted** | **M17.3 Level 1 AI Watchtower** — **ACCEPTED** (F5 2026-09-21) |
-| **Next** | **M18 Combat acquisition** — PRE-CODE AUDIT first |
+| **Last accepted** | M17.3 AI Watchtower L1 |
+| **Now** | **M18 Level 1 Combat acquisition (A+C)** — **IN CODE, waiting F5** |
 
-### M17.3 F5 evidence
+### M18 Level 1 (locked)
 
-| Check | Result |
-|-------|--------|
-| After Barracks2 | `building Watchtower at (-42,0,38) near TownCenter_4` |
-| Once lock | `Watchtower_6` · `watchtower_once locked` · `w1=true` |
-| Combat team=1 | `[TOWER] Watchtower_6 combat ready team=1` |
-| No rebuild | after tower destroy still `w1=true`, no 2nd AI tower place |
-| Dual Barracks | train Barracks_1 + Barracks_5 |
-| Match | VICTORY (player cleared AI base after resource shift) |
+| IN | OUT |
+|----|-----|
+| **A** Retaliate from IDLE / MOVING / HARVESTING / RETURNING | BUILD / REPAIR interrupt |
+| **C** Immediate REACQUIRE after TARGET_DEAD/LOST in radius 12 | Idle acquire → buildings (**B** deferred) |
+| File: `Scripts/Units/BaseUnit.gd` only | Stances · EnemyAI · Climate |
+
+### F5 matrix
+
+1. Worker HARVESTING hit by enemy → `RETALIATE ->` → ATTACKING
+2. Kill unit with 2nd enemy in r12 → `REACQUIRE ->` without long idle pause
+3. BUILD/REPAIR **not** broken by random retaliate
+4. No ACQUIRE/RETALIATE spam every frame
+5. M17.2/17.3 / towers / dual Barracks no regression
 
 ---
 
 ## Done chain
 
 ```
-M10–M16  Player foundation          ✓
-M17.0    AI Second TC               ✓
-M17.1    Expansion Economy          ✓
-M17.2    Multi-Base Military L1     ✓
-Variant B Core Audit                ✓
-M17.3    AI Watchtower L1           ✓
-M18      Combat acquisition         ← NEXT (audit → lock → code)
+M17.0–M17.3     ✓
+M18 A+C         in code → F5
+M18-B (buildings acquire) deferred
 ```
 
-Stage 1.5 Climate **PARKED**
+Climate **PARKED**
