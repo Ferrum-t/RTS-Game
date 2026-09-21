@@ -2,15 +2,14 @@ extends Node
 
 class_name EconomicAIController
 
-## Stage 1 threshold AI + M17.0–M17.2 multi-base eco/military production.
+## Stage 1 threshold AI + M17.0–M17.3 multi-base eco/military + local tower.
 ## DECISION only. EXECUTION via shared systems.
 ##
-## M17.2 Level 1 (locked):
-##   2nd Barracks near TC2 when tc>=2 + can_afford
-##   max_ai_barracks=2, _second_barracks_once (no rebuild)
-##   train soldiers from any free alive Barracks
-##   EnemyAI / attack_threshold unchanged
-## OUT: Watchtower, defense stance, army split, EnemyAI scoring, Climate, 3rd TC/Barracks
+## M17.3 Level 1 (locked):
+##   1× Watchtower once near TC2 after _second_barracks_once
+##   watchtower_offset = (-4, 0, 4), _watchtower_once (no rebuild)
+##   BuildingCombatComponent / EnemyAI unchanged
+## OUT: defense brain, multi-tower, rebuild, Climate, army split
 
 @export var team_id: int = 1
 @export var desired_worker_count: int = 4
@@ -22,6 +21,9 @@ class_name EconomicAIController
 ## M17.2 — offset from the TC chosen for 2nd Barracks (prefer farthest from Barracks1).
 @export var second_barracks_offset: Vector3 = Vector3(4.0, 0.0, -3.0)
 @export var max_ai_barracks: int = 2
+## M17.3 — offset from TC2 (farthest TC) for the single AI Watchtower.
+@export var watchtower_offset: Vector3 = Vector3(-4.0, 0.0, 4.0)
+@export var max_ai_watchtowers: int = 1
 ## Soft floor for both wood and stone; below → prefer that resource (after wood pressure).
 @export var stock_floor: int = 100
 ## M17.1-D — if wood below this, force WOOD harvest (covers Soldier 80 / Worker 50).
@@ -39,6 +41,7 @@ class_name EconomicAIController
 var _timer: float = 0.0
 var _barracks_data: BuildingData = null
 var _tc_data: BuildingData = null
+var _watchtower_data: BuildingData = null
 ## True after we first crossed attack_threshold; reset when army falls below.
 var _attack_issued: bool = false
 ## Alternates preferred type when both stocks are above floor.
@@ -47,11 +50,14 @@ var _harvest_flip: int = 0
 var _expanded_once: bool = false
 ## M17.2 — one successful 2nd Barracks per match (no rebuild).
 var _second_barracks_once: bool = false
+## M17.3 — one successful Watchtower per match (no rebuild).
+var _watchtower_once: bool = false
 
 
 func _ready() -> void:
 	_barracks_data = load("res://Data/Buildings/BarracksData.tres") as BuildingData
 	_tc_data = load("res://Data/Buildings/TownCenterData.tres") as BuildingData
+	_watchtower_data = load("res://Data/Buildings/WatchtowerData.tres") as BuildingData
 	_timer = 0.5
 	print(
 		"[AI_ECO] controller ready team=", team_id,
@@ -63,7 +69,8 @@ func _ready() -> void:
 		" expand_at W>=", expand_wood_min, " S>=", expand_stone_min,
 		" max_tc=", max_ai_tc,
 		" max_barracks=", max_ai_barracks,
-		" expand_once=true second_barracks_once=true"
+		" max_towers=", max_ai_watchtowers,
+		" expand_once=true second_barracks_once=true watchtower_once=true"
 	)
 
 
@@ -98,7 +105,8 @@ func _think() -> void:
 		" barracks=", barracks_list.size(),
 		" wood=", wood, " stone=", stone,
 		" expanded=", _expanded_once,
-		" b2=", _second_barracks_once
+		" b2=", _second_barracks_once,
+		" w1=", _watchtower_once
 	)
 
 	_assign_idle_workers(workers, tcs)
@@ -126,6 +134,14 @@ func _think() -> void:
 		var anchor: BaseBuilding = _pick_tc_for_second_barracks(tcs, barracks_list)
 		_try_build_second_barracks(anchor)
 		barracks_list = _team_barracks_list()
+
+	# M17.3 — 1× Watchtower once near TC2 after 2nd Barracks success.
+	if not _watchtower_once \
+		and _second_barracks_once \
+		and tcs.size() >= 2 \
+		and _team_watchtower_count() < max_ai_watchtowers:
+		var tower_anchor: BaseBuilding = _pick_tc_for_second_barracks(tcs, barracks_list)
+		_try_build_watchtower(tower_anchor)
 
 	# M17.2 — train from any free Barracks.
 	_try_train_soldier_any_barracks(barracks_list)
@@ -253,6 +269,35 @@ func _try_build_second_barracks(anchor_tc: BaseBuilding) -> void:
 		print(
 			"[AI_ECO] 2nd Barracks completed ", built.name,
 			" team=", team_id, " second_barracks_once locked"
+		)
+
+
+## M17.3 — one Watchtower once near TC2; combat via BuildingCombatComponent as-is.
+func _try_build_watchtower(anchor_tc: BaseBuilding) -> void:
+	if _watchtower_once:
+		return
+	if anchor_tc == null or not is_instance_valid(anchor_tc):
+		return
+	if _watchtower_data == null:
+		return
+	var rm := get_node_or_null("/root/ResourceManager")
+	if rm == null:
+		return
+	var cost: Dictionary = _watchtower_data.get_cost_dict()
+	if not rm.can_afford(cost, team_id):
+		return
+	var cm := get_node_or_null("/root/ConstructionManager")
+	if cm == null or not cm.has_method("place_building_for_team"):
+		return
+	var pos: Vector3 = anchor_tc.global_position + watchtower_offset
+	pos.y = 0.0
+	print("[AI_ECO] building Watchtower at ", pos, " near ", anchor_tc.name)
+	var built = cm.place_building_for_team(_watchtower_data, pos, team_id, true)
+	if built != null:
+		_watchtower_once = true
+		print(
+			"[AI_ECO] Watchtower completed ", built.name,
+			" team=", team_id, " watchtower_once locked"
 		)
 
 
@@ -430,7 +475,6 @@ func _team_town_center() -> BaseBuilding:
 	return tcs[0] as BaseBuilding
 
 
-## All alive Barracks for this team (M17.2 multi-Barracks).
 func _team_barracks_list() -> Array:
 	var out: Array = []
 	var bm := get_node_or_null("/root/BuildingManager")
@@ -454,6 +498,24 @@ func _team_barracks() -> BaseBuilding:
 	if list.is_empty():
 		return null
 	return list[0] as BaseBuilding
+
+
+func _team_watchtower_count() -> int:
+	var n: int = 0
+	var bm := get_node_or_null("/root/BuildingManager")
+	if bm == null:
+		return 0
+	for w in bm.watchtowers_list:
+		if w == null or not is_instance_valid(w):
+			continue
+		if int(w.team_id) != team_id:
+			continue
+		if w.get("is_destroyed") == true:
+			continue
+		if w.get("health") != null and int(w.health) <= 0:
+			continue
+		n += 1
+	return n
 
 
 func _team_workers() -> Array:
