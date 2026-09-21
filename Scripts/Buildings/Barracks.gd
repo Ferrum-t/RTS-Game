@@ -7,7 +7,7 @@ class_name Barracks
 
 @export var soldier_scene: PackedScene
 @export var soldier_cost_wood: int = 80
-@export var soldier_train_time: float = 5.0
+@export var soldier_train_time: float = 6.5  ## M18.1 P2: was 5.0
 
 @export var cavalry_scene: PackedScene
 @export var cavalry_cost_wood: int = 100
