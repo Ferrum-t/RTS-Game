@@ -11,37 +11,39 @@
 
 | Field | Value |
 |--------|--------|
-| **Last accepted** | **Variant B — Core Gameplay Polish / Audit** — **ACCEPTED** (F5 2026-09-21) |
-| **Prior feature** | M17.2 Level 1 Multi-Base Military — ACCEPTED |
-| **Next (optional)** | M17.3 Watchtower LOCK · **Balance pass** · M18 |
+| **Last accepted** | Variant B Core Audit — ACCEPTED |
+| **Now** | **M17.3 Level 1 AI Watchtower** — **IN CODE, waiting F5** |
+| **After F5** | **M18** Combat acquisition (next) |
 
-### Variant B F5 (control match)
+### M17.3 Level 1 (locked)
 
-| Check | Result |
-|-------|--------|
-| Player harvest + deposit | ✓ (TC + TownCenter_1) |
-| Player 2nd TC build → COMPLETE | ✓ TownCenter_1 |
-| Deposit on 2nd TC | ✓ Worker/Worker3/Worker4 |
-| Player Watchtower place + combat | ✓ Watchtower_3 / _6 acquire/hits |
-| AI Barracks → TC2 → 2nd Barracks | ✓ Barracks_5 `second_barracks_once locked` |
-| Dual train | ✓ Barracks_2 ×12 + Barracks_5 ×9 |
-| Attack path | ✓ threshold + reinforcements |
-| No 3rd TC/Barracks | ✓ `b2=true` |
-| Crashes / script errors | none in log |
-| Repair | not completed (AI wave too fast — **balance**, not P0) |
+| IN | OUT |
+|----|-----|
+| 1× Watchtower near TC2 after `_second_barracks_once` | multi-tower / TC1 tower |
+| `watchtower_offset = (-4, 0, 4)` | rebuild |
+| `_watchtower_once` | defense brain / EnemyAI edits |
+| instant `place_building_for_team` | Climate / army split |
+| `BuildingCombatComponent` as-is | |
 
-**Note:** Dual-Barracks AI pressure makes solo player development hard. Not a regression of systems — intentional M17.2 outcome. Optional **balance pass** (attack_threshold / costs / train times) if desired; not required to close B.
+File: `Scripts/AI/EconomicAIController.gd` only.
+
+### F5 matrix
+
+1. `b2=true` → log `building Watchtower near …` → `watchtower_once locked`
+2. `[TOWER] … combat ready team=1` + Watchtower registered
+3. Player unit in range → `acquired` / `hits`
+4. Destroy tower → no 2nd AI tower (`w1=true`)
+5. Dual Barracks / expand / attack path no regression
+6. Player systems no regression
 
 ---
 
 ## Done chain
 
 ```
-M10–M16  Player RTS foundation     ✓
-M17.0    AI Second TC               ✓
-M17.1    Expansion Economy          ✓
-M17.2    Multi-Base Military L1     ✓
-Variant B Core Audit                ✓
+M17.0–M17.2 · Variant B    ✓
+M17.3 Watchtower L1         in code
+M18 Combat acquisition      NEXT after F5
 ```
 
 Stage 1.5 Climate **PARKED**
