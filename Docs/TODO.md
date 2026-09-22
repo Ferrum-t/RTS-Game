@@ -1,23 +1,21 @@
 # TODO
 
-**Source of truth:** `Docs/CURRENT_STATE.md`
+**Source of truth:** `Docs/CURRENT_STATE.md` · `Docs/ME0_MIGRATION_INFO_SCOPE_LOCK.md`
 
 ---
 
 ## Active
 
-- [ ] **Migration Economics PRE-CODE AUDIT** (no code)
+- [x] Migration Economics PRE-CODE AUDIT
+- [x] **ME-0 SCOPE LOCK**
+- [ ] ME-0 implementation (after READY cue)
+- [ ] ME-0 F5
 
 ## Done
 
-- [x] M17–M18.2
-- [x] Climate v0.1 C1–C4 ACCEPTED
+- [x] M17–M18.2 · Climate v0.1
 
-## Later (optional, not ordered)
+## Later
 
-- [ ] Visual Climate / horse mesh hide
-- [ ] Climate v0.2 Level 2
-- [ ] 12-month UI / Tree of Life / SFX
-- [ ] Migration economics implementation (after audit LOCK)
-- [ ] Neutral camps
-- [ ] AI climate response
+- [ ] ME-1 pack cost (if ME-0 proves legibility gap remains)
+- [ ] Visual climate · Climate v0.2 · Neutral camps
