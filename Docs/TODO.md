@@ -1,16 +1,20 @@
 # TODO
 
-**Source of truth:** `Docs/CURRENT_STATE.md`
+**Source of truth:** `Docs/CURRENT_STATE.md` · `Docs/CLIMATE_V0_1_SCOPE_LOCK.md`
 
 ---
 
+## Active
+
+- [x] Climate PRE-CODE + **v0.1 SCOPE LOCK (C1–C4)**
+- [ ] Climate v0.1 implementation (after READY cue)
+- [ ] Climate v0.1 F5
+
 ## Done
 
-- [x] M17.0–M17.3 · M18 A+C · **M18.1 P1+P2 ACCEPTED**
+- [x] M17.0–M18.2
 
-## Optional next
+## Later
 
-- [ ] P3 only if still too early pressure
-- [ ] M18-B idle acquire buildings
-- [ ] Stances / hold
-- [ ] Climate (parked)
+- [ ] Climate v0.2 Level 2
+- [ ] 12-month UI / migration economics / AI climate
