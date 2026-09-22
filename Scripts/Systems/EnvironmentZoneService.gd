@@ -6,6 +6,7 @@ extends Node
 ## Public API for harvest: get_multiplier_at(world_pos) — signature preserved.
 ## No velocity / drift / bounce / TRANSITION / overlap priority / per-region schedules.
 ## Climate v0.1: C2 horse gate + C3 R0 home signal (see Docs/CLIMATE_V0_1_SCOPE_LOCK.md).
+## ME-0: enriched R0 climate feedback (mult + pressure hint; info only).
 
 enum ClimateState {
 	COLD,
@@ -213,10 +214,17 @@ func _emit_home_region_signal(region_id: String) -> void:
 	var prev: int = int(_prev_states.get(region_id, st))
 	if prev == st:
 		return
+	var mult: float = float(_MULT.get(st, 1.0))
+	# ME-0: legible pressure hint (info only — no mechanical change).
+	var pressure: String
+	if st == ClimateState.COLD or st == ClimateState.DRY:
+		pressure = "home pressure ↑ — harvest weaker, horses offline in region"
+	else:
+		pressure = "home pressure ↓ — harvest strong, horses available in region"
 	print(
 		"[CLIMATE] ", region_id, " ",
 		_state_name(prev), " → ", _state_name(st),
-		" (home region)"
+		"  mult=", mult, "  (", pressure, ")"
 	)
 
 
@@ -281,7 +289,7 @@ func _build_visuals() -> void:
 
 		var lbl := Label3D.new()
 		lbl.name = "RegionLabel_%s" % region.id
-		lbl.text = "%s\n%s" % [region.id, _state_name(st)]
+		lbl.text = "%s\n%s\nx%.1f" % [region.id, _state_name(st), float(_MULT.get(st, 1.0))]
 		lbl.font_size = 48
 		lbl.modulate = Color(1, 1, 1, 0.9)
 		lbl.billboard = BaseMaterial3D.BILLBOARD_ENABLED
@@ -303,7 +311,7 @@ func _update_visual_colors() -> void:
 			# Position stays fixed — no motion.
 			region.mesh_instance.position = Vector3(region.center.x, 0.05, region.center.z)
 		if region.label != null and is_instance_valid(region.label):
-			region.label.text = "%s\n%s" % [region.id, _state_name(st)]
+			region.label.text = "%s\n%s\nx%.1f" % [region.id, _state_name(st), float(_MULT.get(st, 1.0))]
 			region.label.position = Vector3(region.center.x, 2.5, region.center.z)
 
 
