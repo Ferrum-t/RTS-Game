@@ -10,25 +10,24 @@
 
 | Field | Value |
 |--------|--------|
-| **Last accepted** | Climate v0.1 |
-| **Now** | **ME-0 SCOPE LOCK** (info-only climate feedback) |
-| **Doc** | `Docs/ME0_MIGRATION_INFO_SCOPE_LOCK.md` |
-| **Code** | wait **`ME-0 READY FOR IMPLEMENTATION`** |
+| **Now** | **ME-0 IN CODE** — waiting **F5** |
+| **File** | `EnvironmentZoneService.gd` only |
 
-### ME-0 IN
+### Look for in log
 
-R0 signal + mult/pressure hint · existing data only · no Pack cost · no FSM/AI/economy change
+```
+[CLIMATE] R0 FAVORABLE → DRY  mult=0.5  (home pressure ↑ — harvest weaker, horses offline in region)
+[CLIMATE] R0 DRY → FAVORABLE  mult=1.5  (home pressure ↓ — harvest strong, horses available in region)
+```
 
-### ME-0 OUT
+Region Label3D also shows `x0.5` / `x1.5` when `debug_draw`.
 
-ME-1 costs · forced pack · calendar UI · v0.2 · camps · visual horse hide
+No Pack cost, no FSM/AI change.
 
 ---
 
 ## Done chain
 
 ```
-Climate v0.1     ✓
-Migration audit  ✓
-ME-0 LOCK        ✓ → READY gate
+Climate v0.1 ✓ · ME-0 in code → F5
 ```
