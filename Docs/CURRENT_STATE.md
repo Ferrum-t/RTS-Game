@@ -10,24 +10,23 @@
 
 | Field | Value |
 |--------|--------|
-| **Now** | **ME-0 IN CODE** — waiting **F5** |
-| **File** | `EnvironmentZoneService.gd` only |
+| **Last accepted** | **ME-0** (climate pressure feedback, info-only) |
+| **Next optional** | ME-1 pack cost · visual · Climate v0.2 · Neutral camps |
 
-### Look for in log
+### ME-0 F5
 
 ```
-[CLIMATE] R0 FAVORABLE → DRY  mult=0.5  (home pressure ↑ — harvest weaker, horses offline in region)
-[CLIMATE] R0 DRY → FAVORABLE  mult=1.5  (home pressure ↓ — harvest strong, horses available in region)
+[CLIMATE] R0 FAVORABLE → DRY  mult=0.5  (home pressure ↑ — …)
+[CLIMATE] R0 DRY → FAVORABLE  mult=1.5  (home pressure ↓ — …)
+[CLIMATE] R0 FAVORABLE → COLD  mult=0.5  …
 ```
 
-Region Label3D also shows `x0.5` / `x1.5` when `debug_draw`.
-
-No Pack cost, no FSM/AI change.
+Full cycles · horse suspend/resume · MATCH: VICTORY · 0 script errors · no Pack cost.
 
 ---
 
 ## Done chain
 
 ```
-Climate v0.1 ✓ · ME-0 in code → F5
+M17–M18.2 · Climate v0.1 · ME-0     ✓
 ```
