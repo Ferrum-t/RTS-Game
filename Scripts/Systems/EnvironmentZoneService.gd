@@ -5,6 +5,7 @@ extends Node
 ## T(z,s) = T0 + A * sin(2π s) - G * z   (+Z = north, colder)
 ## Public API for harvest: get_multiplier_at(world_pos) — signature preserved.
 ## No velocity / drift / bounce / TRANSITION / overlap priority / per-region schedules.
+## Climate v0.1: C2 horse gate + C3 R0 home signal (see Docs/CLIMATE_V0_1_SCOPE_LOCK.md).
 
 enum ClimateState {
 	COLD,
@@ -47,6 +48,8 @@ var regions: Array = []
 var _visual_root: Node3D = null
 ## Fingerprint of region states for change logging (F5).
 var _last_state_fingerprint: String = ""
+## Climate v0.1 C3 — previous state per region id (for home-region signal).
+var _prev_states: Dictionary = {}
 
 
 class ClimateRegion:
@@ -66,6 +69,9 @@ func _ready() -> void:
 		_build_visuals()
 	_print_startup()
 	_last_state_fingerprint = _state_fingerprint()
+	_snapshot_states()
+	# Herds may spawn after this node — apply gate once scene is ready.
+	call_deferred("_update_horse_climate_gates")
 
 
 func _process(delta: float) -> void:
@@ -168,15 +174,69 @@ func _on_climate_states_changed() -> void:
 	for r in regions:
 		var region: ClimateRegion = r
 		var st: int = get_region_state(region)
-		var t: float = _temperature_at_z(region.center.z, season_progress)
+		var temp: float = _temperature_at_z(region.center.z, season_progress)
 		print(
 			"[ZONE] ", region.id,
 			" state=", _state_name(st),
-			" T=", snappedf(t, 0.01),
+			" T=", snappedf(temp, 0.01),
 			" mult=", float(_MULT.get(st, 1.0)),
 			" center=", region.center,
 			" radius=", region.radius
 		)
+	# Climate v0.1 C3 — player home region R0 signal only.
+	_emit_home_region_signal("R0")
+	_snapshot_states()
+	# Climate v0.1 C2 — reversible horse availability.
+	_update_horse_climate_gates()
+
+
+func _snapshot_states() -> void:
+	_prev_states.clear()
+	for r in regions:
+		var region: ClimateRegion = r
+		_prev_states[region.id] = get_region_state(region)
+
+
+func _region_by_id(region_id: String) -> ClimateRegion:
+	for r in regions:
+		var region: ClimateRegion = r
+		if region.id == region_id:
+			return region
+	return null
+
+
+func _emit_home_region_signal(region_id: String) -> void:
+	var region: ClimateRegion = _region_by_id(region_id)
+	if region == null:
+		return
+	var st: int = get_region_state(region)
+	var prev: int = int(_prev_states.get(region_id, st))
+	if prev == st:
+		return
+	print(
+		"[CLIMATE] ", region_id, " ",
+		_state_name(prev), " → ", _state_name(st),
+		" (home region)"
+	)
+
+
+## Climate v0.1 C2 — suspend herds in COLD/DRY; resume in FAVORABLE.
+## Neutral land (outside regions) stays available. Never queue_free.
+func _update_horse_climate_gates() -> void:
+	var tree := get_tree()
+	if tree == null:
+		return
+	for n in tree.get_nodes_in_group("Resource"):
+		if not (n is HorseResource):
+			continue
+		var herd := n as HorseResource
+		if herd == null or not is_instance_valid(herd):
+			continue
+		var region: ClimateRegion = get_region_at(herd.global_position)
+		var favorable: bool = true
+		if region != null:
+			favorable = get_region_state(region) == ClimateState.FAVORABLE
+		herd.set_climate_suspended(not favorable)
 
 
 func _ensure_visual_root() -> void:
