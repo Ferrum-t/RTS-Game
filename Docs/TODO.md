@@ -1,20 +1,23 @@
 # TODO
 
-**Source of truth:** `Docs/CURRENT_STATE.md` · `Docs/CLIMATE_V0_1_SCOPE_LOCK.md`
+**Source of truth:** `Docs/CURRENT_STATE.md`
 
 ---
 
 ## Active
 
-- [x] Climate PRE-CODE + **v0.1 SCOPE LOCK (C1–C4)**
-- [ ] Climate v0.1 implementation (after READY cue)
-- [ ] Climate v0.1 F5
+- [ ] **Migration Economics PRE-CODE AUDIT** (no code)
 
 ## Done
 
-- [x] M17.0–M18.2
+- [x] M17–M18.2
+- [x] Climate v0.1 C1–C4 ACCEPTED
 
-## Later
+## Later (optional, not ordered)
 
+- [ ] Visual Climate / horse mesh hide
 - [ ] Climate v0.2 Level 2
-- [ ] 12-month UI / migration economics / AI climate
+- [ ] 12-month UI / Tree of Life / SFX
+- [ ] Migration economics implementation (after audit LOCK)
+- [ ] Neutral camps
+- [ ] AI climate response
