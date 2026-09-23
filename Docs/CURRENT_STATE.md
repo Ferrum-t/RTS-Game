@@ -10,22 +10,23 @@
 
 | Field | Value |
 |--------|--------|
-| **Last accepted** | **M19.1 Training Queue** |
-| **Next optional** | Map resources R2–R7 · remote train · food display |
-| **Doc** | `Docs/M19_1_TRAINING_QUEUE_SCOPE_LOCK.md` |
+| **Last accepted** | M19.1 Training Queue |
+| **Now** | **M19.2 Remote/Quick Train SCOPE LOCK** |
+| **Doc** | `Docs/M19_2_REMOTE_TRAIN_SCOPE_LOCK.md` |
+| **Code** | wait **`M19.2 READY FOR IMPLEMENTATION`** |
 
-### F5
+### M19.2 LOCK
 
-- TC: queue 3–5 Workers + progress + chain spawn
-- Barracks: Soldier queue same
-- Enqueue while training ✓
-- Cancel last / Cancel all + refund ✓
-- MATCH: VICTORY · AI train ok
+- Visibility **B** (buttons if ≥1 TC / Barracks)
+- Routing **B** (selected → free queue slot → first alive)
+- Minimal disabled + hint
+- Reuses M19.1 queue · AI/costs/climate OUT
 
 ---
 
 ## Done chain
 
 ```
-M17–M18.2 · Climate Visual · M19.1 Training Queue     ✓
+M17–M18.2 · Climate Visual · M19.1     ✓
+M19.2 Remote Train LOCK                ✓ → READY gate
 ```
