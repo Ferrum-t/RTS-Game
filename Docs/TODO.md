@@ -1,18 +1,22 @@
 # TODO
 
-**Source of truth:** `Docs/CURRENT_STATE.md`
+**Source of truth:** `Docs/CURRENT_STATE.md` · `Docs/M19_2_REMOTE_TRAIN_SCOPE_LOCK.md`
 
 ---
 
 ## Active
 
-- [ ] Next LOCK candidate (pick one): Map resources R2–R7 · remote train · food display
+- [x] **M19.2 SCOPE LOCK** (B / B / minimal disabled)
+- [ ] M19.2 implementation (after READY)
+- [ ] M19.2 F5
 
 ## Done
 
-- [x] **M19.1 Training Queue** (F5 ACCEPTED)
-- [x] Climate Visual v0.1 · ME-0 · Climate v0.1 · M17–M18.2
+- [x] M19.1 Training Queue
+- [x] Climate Visual · ME-0 · M17–M18.2
 
 ## Later
 
-- [ ] Level 2 climate · 12-month · ME-1 · yurt supply
+- [ ] Map resources R2–R7
+- [ ] Food display
+- [ ] Level 2 · 12-month · ME-1 · yurt supply
