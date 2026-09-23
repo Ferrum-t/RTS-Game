@@ -2,7 +2,7 @@
 
 **Product:** **Nomad Wars** (EN official) · technical `NomadWars`  
 **Branch:** `nomads-wars-grok`  
-**HEAD fact date:** 2026-09-22
+**HEAD fact date:** 2026-09-23
 
 ---
 
@@ -10,18 +10,19 @@
 
 | Field | Value |
 |--------|--------|
-| **Last accepted** | **ME-0** (climate pressure feedback, info-only) |
-| **Next optional** | ME-1 pack cost · visual · Climate v0.2 · Neutral camps |
+| **Last accepted** | **ME-0** (info-only climate feedback) |
+| **Playtest** | ME-0: pressure **not** felt in-game → need Visual (see notes) |
+| **Next** | **Climate Visual v0.1** (HUD + slower season) — LOCK when ready |
+| **Ideas / order** | `Docs/PLAYTEST_ME0_AND_ROADMAP_NOTES.md` |
 
-### ME-0 F5
+### Ordered after ME-0 (not all coded)
 
 ```
-[CLIMATE] R0 FAVORABLE → DRY  mult=0.5  (home pressure ↑ — …)
-[CLIMATE] R0 DRY → FAVORABLE  mult=1.5  (home pressure ↓ — …)
-[CLIMATE] R0 FAVORABLE → COLD  mult=0.5  …
+1  Climate Visual v0.1     ← NEXT
+2  Map resources R2–R7
+3  UX: remote train / queue / food display  (separate LOCKs)
+4  Level 2 climate · 12-month UI · ME-1 · yurt supply
 ```
-
-Full cycles · horse suspend/resume · MATCH: VICTORY · 0 script errors · no Pack cost.
 
 ---
 
