@@ -10,16 +10,16 @@
 
 | Field | Value |
 |--------|--------|
-| **Last accepted** | **Climate Visual v0.1** (V1–V4) |
-| **Next** | Resources in R2–R7 (LOCK when ready) |
-| **Notes** | `Docs/PLAYTEST_ME0_AND_ROADMAP_NOTES.md` |
+| **Last accepted** | Climate Visual v0.1 |
+| **Now** | **M19.1 Training Queue SCOPE LOCK** |
+| **Doc** | `Docs/M19_1_TRAINING_QUEUE_SCOPE_LOCK.md` |
+| **Code** | wait **`M19.1 READY FOR IMPLEMENTATION`** |
 
-### F5
+### M19.1 LOCK summary
 
-- HUD: `HOME REGION · R0` + state + mult (screenshot)
-- `duration_sec=360.0`
-- R0 transitions DRY/COLD/FAVORABLE + horses
-- MATCH: VICTORY · 0 script errors
+- Max queue **5** · UI **selection-only** · enqueue while training **yes**
+- Cancel last + Cancel all · spend on enqueue · full refund
+- Worker (TC) + Soldier (Barracks) only · AI / costs / times untouched
 
 ---
 
@@ -27,4 +27,5 @@
 
 ```
 M17–M18.2 · Climate v0.1 · ME-0 · Climate Visual v0.1     ✓
+M19.1 Training Queue LOCK                                  ✓ → READY gate
 ```
