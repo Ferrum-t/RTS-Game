@@ -10,20 +10,22 @@
 
 | Field | Value |
 |--------|--------|
-| **Last accepted** | Climate Visual v0.1 |
-| **Now** | **M19.1 Training Queue — IMPLEMENTED** |
+| **Last accepted** | **M19.1 Training Queue** |
+| **Next optional** | Map resources R2–R7 · remote train · food display |
 | **Doc** | `Docs/M19_1_TRAINING_QUEUE_SCOPE_LOCK.md` |
-| **F5** | pending PC |
 
-### Files
+### F5
 
-- `TownCenter.gd` / `Barracks.gd` — queue max 5, spend/refund
-- `TrainingQueuePanel.gd` + `ui.tscn`
+- TC: queue 3–5 Workers + progress + chain spawn
+- Barracks: Soldier queue same
+- Enqueue while training ✓
+- Cancel last / Cancel all + refund ✓
+- MATCH: VICTORY · AI train ok
 
 ---
 
 ## Done chain
 
 ```
-M17–M18.2 · Climate Visual · M19.1 code ✓ · F5 ⏸
+M17–M18.2 · Climate Visual · M19.1 Training Queue     ✓
 ```
