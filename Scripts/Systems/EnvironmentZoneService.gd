@@ -36,8 +36,8 @@ const _COLOR := {
 ## Minimum gap so circles neither overlap nor touch.
 const REGION_GAP := 2.0
 
-## Full season cycle length (seconds). Export for F5 tuning only.
-@export var season_duration_sec: float = 180.0
+## Full season cycle length (seconds). Climate Visual v0.1: 360s.
+@export var season_duration_sec: float = 360.0
 
 ## Debug ground discs (static). Color follows current state.
 @export var debug_draw: bool = true
@@ -271,12 +271,16 @@ func _build_visuals() -> void:
 	for r in regions:
 		var region: ClimateRegion = r
 		var st: int = get_region_state(region)
+		var is_home := region.id == "R0"
 
 		var mi := MeshInstance3D.new()
 		mi.name = "RegionDisc_%s" % region.id
 		mi.mesh = _make_ground_disc_mesh(region.radius, 48)
 		var mat := StandardMaterial3D.new()
-		mat.albedo_color = _COLOR.get(st, Color(1, 1, 1, 0.5))
+		var base_color: Color = _COLOR.get(st, Color(1, 1, 1, 0.5))
+		if is_home:
+			base_color.a = 0.85
+		mat.albedo_color = base_color
 		mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
 		mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
 		mat.cull_mode = BaseMaterial3D.CULL_DISABLED
@@ -290,10 +294,12 @@ func _build_visuals() -> void:
 		var lbl := Label3D.new()
 		lbl.name = "RegionLabel_%s" % region.id
 		lbl.text = "%s\n%s\nx%.1f" % [region.id, _state_name(st), float(_MULT.get(st, 1.0))]
-		lbl.font_size = 48
-		lbl.modulate = Color(1, 1, 1, 0.9)
+		lbl.font_size = 64 if is_home else 48
+		lbl.modulate = Color(1, 1, 1, 1.0 if is_home else 0.9)
+		lbl.outline_size = 12 if is_home else 4
+		lbl.outline_modulate = Color(0, 0, 0, 0.9)
 		lbl.billboard = BaseMaterial3D.BILLBOARD_ENABLED
-		lbl.position = Vector3(region.center.x, 2.5, region.center.z)
+		lbl.position = Vector3(region.center.x, 3.0 if is_home else 2.5, region.center.z)
 		_visual_root.add_child(lbl)
 		region.label = lbl
 
@@ -304,15 +310,21 @@ func _update_visual_colors() -> void:
 	for r in regions:
 		var region: ClimateRegion = r
 		var st: int = get_region_state(region)
+		var is_home := region.id == "R0"
 		if region.mesh_instance != null and is_instance_valid(region.mesh_instance):
 			var mat: StandardMaterial3D = region.mesh_instance.material_override as StandardMaterial3D
 			if mat != null:
-				mat.albedo_color = _COLOR.get(st, Color(1, 1, 1, 0.5))
+				var base_color: Color = _COLOR.get(st, Color(1, 1, 1, 0.5))
+				base_color.a = 0.85 if is_home else base_color.a
+				mat.albedo_color = base_color
 			# Position stays fixed — no motion.
 			region.mesh_instance.position = Vector3(region.center.x, 0.05, region.center.z)
 		if region.label != null and is_instance_valid(region.label):
 			region.label.text = "%s\n%s\nx%.1f" % [region.id, _state_name(st), float(_MULT.get(st, 1.0))]
-			region.label.position = Vector3(region.center.x, 2.5, region.center.z)
+			region.label.font_size = 64 if is_home else 48
+			region.label.modulate = Color(1, 1, 1, 1.0 if is_home else 0.9)
+			region.label.outline_size = 12 if is_home else 4
+			region.label.position = Vector3(region.center.x, 3.0 if is_home else 2.5, region.center.z)
 
 
 func _make_ground_disc_mesh(radius: float, segments: int) -> ArrayMesh:
