@@ -1,24 +1,35 @@
 # ROADMAP
 
-**Do not maintain a second roadmap.**  
-Canonical phase order and status: `Docs/nomad_wars_v1_scope_and_architecture.md` §0 and `Docs/CURRENT_STATE.md`.
+**Do not maintain a second full roadmap.**  
+Canonical status: `Docs/CURRENT_STATE.md`.  
+Playtest + ordered next steps: `Docs/PLAYTEST_ME0_AND_ROADMAP_NOTES.md`.
 
-This file is a short pointer only.
+---
 
 ## Done (high level)
 
-- Foundation through Phase 8.2, formation-offsets, selection-aware buildings
-- Stage 1 T1 Economic AI (single base)
-- Stage 1.5 climate design + backend geometry (parked)
-- **Player M10–M16:** construction, repair, deposit-constructed, IDLE acquire, WT pack UI
+- Stage 1 RTS loop M10–M18.2
+- Climate v0.1 (backend + horses) · ME-0 (console pressure signal)
+- ME-0 playtest: climate **not** felt without console → Visual required
 
 ## Next
 
-- **M17.0** Minimal AI 2nd TC + multi-TC worker train
-- M17.1 combat polish (optional after expand)
+1. **Climate Visual v0.1** (HUD + slower season)
+2. Resources in other regions
+3. RTS UX slices (remote train, queue, food display) — separate LOCKs
+4. Level 2 climate / 12-month UI / ME-1 / yurt supply — later
 
 ## Later / parked
 
-- Stage 1.5 B–G (visuals, resource pressure, horses, neutrals, hero, matrix)
-- Economy 1.5, AI migration, T2
-- Fog / Minimap / Multiplayer — see `NOMAD_WORLD_BACKLOG.md`
+- Neutral camps, minimal hero, Power Sites, magic
+- AI climate / migration brain
+- Fog / minimap / multiplayer — `NOMAD_WORLD_BACKLOG.md`
+
+## Idea files
+
+| File | Role |
+|------|------|
+| `PLAYTEST_ME0_AND_ROADMAP_NOTES.md` | Post–ME-0 playtest + ordered milestones |
+| `CLIMATE_UI_AND_PRESSURE_EXTENSIONS_IDEAS.md` | 12 moons, Tree of Life, Level 2, SFX |
+| `IDEAS.md` | Short flavor list |
+| `NOMAD_WORLD_BACKLOG.md` | Late logistics / world extras |
