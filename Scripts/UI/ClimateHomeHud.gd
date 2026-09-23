@@ -174,8 +174,9 @@ func _play_state_change_feedback() -> void:
 
 	var base_scale := scale
 	scale = base_scale * 1.04
-	modulate = Color(1.0, 1.0, 1.0, 1.0)
+	modulate = Color(1.6, 1.6, 1.6, 1.0)
 
 	_flash_tween = create_tween()
 	_flash_tween.set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
 	_flash_tween.tween_property(self, "scale", base_scale, FLASH_DURATION)
+	_flash_tween.parallel().tween_property(self, "modulate", Color(1.0, 1.0, 1.0, 1.0), FLASH_DURATION)
