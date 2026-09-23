@@ -11,6 +11,7 @@
 [ext_resource type="Script" path="res://Scripts/UI/PackButton.gd" id="8_pack"]
 [ext_resource type="Script" path="res://Scripts/UI/UnpackButton.gd" id="9_unpack"]
 [ext_resource type="Script" path="res://Scripts/UI/CommandBar.gd" id="10_cmd"]
+[ext_resource type="Script" path="res://Scripts/UI/ClimateHomeHud.gd" id="11_climate"]
 
 [node name="UI" type="CanvasLayer"]
 
@@ -26,6 +27,18 @@ theme_override_font_sizes/font_size = 18
 text = "Wood: 0    Stone: 0    Gold: 0    Food: 0    Horses: 0"
 horizontal_alignment = 1
 script = ExtResource("4_resui")
+
+[node name="ClimateHomeHud" type="PanelContainer" parent="."]
+anchors_preset = 1
+anchor_left = 1.0
+anchor_right = 1.0
+offset_left = -250.0
+offset_top = 46.0
+offset_right = -12.0
+offset_bottom = 114.0
+grow_horizontal = 0
+mouse_filter = 2
+script = ExtResource("11_climate")
 
 [node name="BottomBar" type="PanelContainer" parent="."]
 anchors_preset = 12
