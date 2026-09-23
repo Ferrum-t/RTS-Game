@@ -1,19 +1,21 @@
 # TODO
 
-**Source of truth:** `Docs/CURRENT_STATE.md`
+**Source of truth:** `Docs/CURRENT_STATE.md` · `Docs/M19_1_TRAINING_QUEUE_SCOPE_LOCK.md`
 
 ---
 
 ## Active
 
-- [ ] **Map resources R2–R7** — PRE-CODE / LOCK when ready
+- [x] **M19.1 SCOPE LOCK** (queue 5, selection UI, cancel last+all)
+- [ ] M19.1 implementation (after READY)
+- [ ] M19.1 F5
 
 ## Done
 
-- [x] Climate Visual v0.1 V1–V4 (F5 ACCEPTED)
-- [x] M17–M18.2 · Climate v0.1 · ME-0
+- [x] Climate Visual v0.1 · ME-0 · Climate v0.1 · M17–M18.2
 
 ## Later
 
-- [ ] UX remote train / queue / food
+- [ ] Map resources R2–R7
+- [ ] Remote train / food display
 - [ ] Level 2 · 12-month · ME-1 · yurt supply
