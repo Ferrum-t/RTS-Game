@@ -12,6 +12,7 @@
 [ext_resource type="Script" path="res://Scripts/UI/UnpackButton.gd" id="9_unpack"]
 [ext_resource type="Script" path="res://Scripts/UI/CommandBar.gd" id="10_cmd"]
 [ext_resource type="Script" path="res://Scripts/UI/ClimateHomeHud.gd" id="11_climate"]
+[ext_resource type="Script" path="res://Scripts/UI/TrainingQueuePanel.gd" id="12_queue"]
 
 [node name="UI" type="CanvasLayer"]
 
@@ -39,6 +40,20 @@ offset_bottom = 114.0
 grow_horizontal = 0
 mouse_filter = 2
 script = ExtResource("11_climate")
+
+[node name="TrainingQueuePanel" type="PanelContainer" parent="."]
+anchors_preset = 7
+anchor_left = 0.5
+anchor_top = 1.0
+anchor_right = 0.5
+anchor_bottom = 1.0
+offset_left = -140.0
+offset_top = -210.0
+offset_right = 140.0
+offset_bottom = -100.0
+grow_horizontal = 2
+grow_vertical = 0
+script = ExtResource("12_queue")
 
 [node name="BottomBar" type="PanelContainer" parent="."]
 anchors_preset = 12
