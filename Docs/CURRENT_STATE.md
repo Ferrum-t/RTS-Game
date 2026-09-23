@@ -11,22 +11,19 @@
 | Field | Value |
 |--------|--------|
 | **Last accepted** | M19.1 Training Queue |
-| **Now** | **M19.2 Remote/Quick Train SCOPE LOCK** |
+| **Now** | **M19.2 Remote/Quick Train — IMPLEMENTED** |
 | **Doc** | `Docs/M19_2_REMOTE_TRAIN_SCOPE_LOCK.md` |
-| **Code** | wait **`M19.2 READY FOR IMPLEMENTATION`** |
+| **F5** | pending PC |
 
-### M19.2 LOCK
+### Files
 
-- Visibility **B** (buttons if ≥1 TC / Barracks)
-- Routing **B** (selected → free queue slot → first alive)
-- Minimal disabled + hint
-- Reuses M19.1 queue · AI/costs/climate OUT
+- `QuickTrainPanel.gd` + `ui.tscn` — left bottom strip (visibility B)
+- `TrainWorkerButton.gd` / `TrainSoldierButton.gd` — routing B + disabled hints
 
 ---
 
 ## Done chain
 
 ```
-M17–M18.2 · Climate Visual · M19.1     ✓
-M19.2 Remote Train LOCK                ✓ → READY gate
+M19.1 ✓ · M19.2 code ✓ · F5 ⏸
 ```
