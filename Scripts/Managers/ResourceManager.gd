@@ -21,9 +21,11 @@ func _ready() -> void:
 	_ensure_team(1)
 	_set_stock(0, BaseResource.Type.WOOD, 100)
 	_set_stock(1, BaseResource.Type.WOOD, 100)
+	_set_stock(0, BaseResource.Type.FOOD, 15)
+	_set_stock(1, BaseResource.Type.FOOD, 15)
 	_sync_hud()
 	resources_changed.emit()
-	print("ResourceManager ready. Wood: ", wood, " Horses: ", horses, " (per-team stocks)")
+	print("ResourceManager ready. Wood: ", wood, " Food: ", food, " Horses: ", horses, " (per-team stocks)")
 
 
 func _ensure_team(team_id: int) -> void:
@@ -46,7 +48,6 @@ func _sync_hud() -> void:
 	horses = get_stock(0, BaseResource.Type.HORSES)
 
 
-## Build a cost dictionary from individual amounts.
 static func make_cost(
 	wood_amt: int = 0,
 	stone_amt: int = 0,
@@ -82,26 +83,11 @@ func get_stock(team_id: int, resource_type: int = -1) -> int:
 	return int(bag.get(resource_type, 0))
 
 
-func _set_stock(team_id: int, resource_type: int, value: int) -> void:
+func _set_stock(team_id: int, resource_type: int, amount: int) -> void:
 	_ensure_team(team_id)
-	value = maxi(value, 0)
-	(_stocks[team_id] as Dictionary)[resource_type] = value
+	_stocks[team_id][resource_type] = maxi(0, amount)
 	if team_id == 0:
 		_sync_hud()
-
-
-## Remove up to amount; returns how many were actually removed (raid siphon).
-## team_id default 0 for legacy raid calls.
-func remove(resource_type: int, amount: int, team_id: int = 0) -> int:
-	if amount <= 0:
-		return 0
-	var have: int = get_stock(team_id, resource_type)
-	var taken: int = mini(amount, have)
-	if taken <= 0:
-		return 0
-	_set_stock(team_id, resource_type, have - taken)
-	resources_changed.emit()
-	return taken
 
 
 func can_afford(cost: Dictionary, team_id: int = 0) -> bool:
@@ -130,7 +116,7 @@ func spend(cost: Dictionary, team_id: int = 0) -> bool:
 
 
 func add(resource_type: int, amount: int, team_id: int = 0) -> void:
-	if amount <= 0:
+	if amount == 0:
 		return
 	_set_stock(team_id, resource_type, get_stock(team_id, resource_type) + amount)
 	resources_changed.emit()
@@ -142,8 +128,6 @@ func add(resource_type: int, amount: int, team_id: int = 0) -> void:
 				print("Stockpile Stone: ", stone)
 			BaseResource.Type.HORSES:
 				print("Stockpile Horses: ", horses)
-			_:
-				pass
 
 
 func add_wood(amount: int, team_id: int = 0) -> void:
@@ -166,10 +150,12 @@ func add_horses(amount: int, team_id: int = 0) -> void:
 	add(BaseResource.Type.HORSES, amount, team_id)
 
 
-func debug_stock_line(team_id: int) -> String:
-	return "team=%d W=%d S=%d H=%d" % [
-		team_id,
+func debug_print_team(team_id: int) -> void:
+	print(
+		"Team ", team_id, " stocks W:",
 		get_stock(team_id, BaseResource.Type.WOOD),
+		" S:",
 		get_stock(team_id, BaseResource.Type.STONE),
+		" H:",
 		get_stock(team_id, BaseResource.Type.HORSES),
-	]
+	)
