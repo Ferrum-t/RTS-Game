@@ -12,6 +12,7 @@
 [ext_resource type="PackedScene" uid="uid://brdb78ja5f3oi" path="res://Scenes/Resorces/Stone.tscn" id="11_stone"]
 [ext_resource type="PackedScene" uid="uid://chorseherd001" path="res://Scenes/Resorces/HorseHerd.tscn" id="12_horse"]
 [ext_resource type="PackedScene" uid="uid://ctoqn17qfadcq" path="res://Scenes/UI/ui.tscn" id="15_0phyg"]
+[ext_resource type="Script" path="res://Scripts/Systems/FogOverlay.gd" id="20_fog"]
 
 [sub_resource type="PlaneMesh" id="PlaneMesh_f2orf"]
 size = Vector2(200, 200)
@@ -53,14 +54,12 @@ camera = NodePath("CameraPivot/CameraTilt/Camera3D")
 [node name="CameraPivot" type="Node3D" parent="CameraRig" unique_id=2129709358]
 
 [node name="CameraTilt" type="Node3D" parent="CameraRig/CameraPivot" unique_id=353692807]
-transform = Transform3D(1, 0, 0, 0, 0.57357645, 0.81915206, 0, -0.81915206, 0.57357645, 0, 0, 0)
+transform = Transform3D(1, 0, 0, 0, 0.707107, 0.707107, 0, -0.707107, 0.707107, 0, 0, 0)
 
 [node name="Camera3D" type="Camera3D" parent="CameraRig/CameraPivot/CameraTilt" unique_id=1781013988]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 25, 0)
-current = true
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 28)
 
 [node name="Ground2" type="StaticBody3D" parent="." unique_id=1030255354]
-collision_mask = 0
 
 [node name="MeshInstance3D" type="MeshInstance3D" parent="Ground2" unique_id=1639269703]
 mesh = SubResource("PlaneMesh_f2orf")
@@ -71,6 +70,9 @@ shape = SubResource("BoxShape3D_f2orf")
 
 [node name="NavigationRegion3D" type="NavigationRegion3D" parent="." unique_id=159477144]
 navigation_mesh = SubResource("NavigationMesh_map")
+
+[node name="FogOverlay" type="MeshInstance3D" parent="."]
+script = ExtResource("20_fog")
 
 [node name="Units" type="Node3D" parent="." unique_id=1468272970]
 
