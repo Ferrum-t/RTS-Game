@@ -2,7 +2,8 @@ extends PanelContainer
 
 ## M20 — Basic Minimap (Variant A: static background).
 ## Player units/buildings + camera rect + click-to-pan.
-## M20.1: enemy markers only when VisibilityMap says VISIBLE.
+## M20.1: enemy markers only when VISIBLE.
+## M20.2: fog overlay UNEXPLORED/EXPLORED from VisibilityMap.
 
 const PLAYER_TEAM := 0
 const MARKER_INTERVAL := 0.15
@@ -64,6 +65,7 @@ func _draw() -> void:
 		draw_texture_rect(_bg, r, false)
 	else:
 		draw_rect(r, Color(0.12, 0.18, 0.14))
+	_draw_fog_overlay()
 	draw_rect(r, Color(0.35, 0.5, 0.4, 0.9), false, 2.0)
 
 	for i in range(_building_uvs.size()):
@@ -84,6 +86,28 @@ func _draw() -> void:
 	var c: Vector2 = _cam_uv * size
 	var half := Vector2(16.0, 12.0)
 	draw_rect(Rect2(c - half, half * 2.0), Color(1.0, 0.95, 0.35, 0.95), false, 1.6)
+
+
+func _draw_fog_overlay() -> void:
+	var vm := get_node_or_null("/root/VisibilityMap")
+	if vm == null or not vm.has_method("get_grid_size"):
+		return
+	var gs: Vector2i = vm.get_grid_size()
+	if gs.x <= 0 or gs.y <= 0:
+		return
+	var cw := size.x / float(gs.x)
+	var ch := size.y / float(gs.y)
+	for z in range(gs.y):
+		for x in range(gs.x):
+			var st: int = int(vm.get_cell_state(Vector2i(x, z)))
+			if st == 2:  # VISIBLE
+				continue
+			var col: Color
+			if st == 1:  # EXPLORED
+				col = Color(0.02, 0.03, 0.05, 0.45)
+			else:  # UNEXPLORED
+				col = Color(0.0, 0.0, 0.0, 0.82)
+			draw_rect(Rect2(x * cw, z * ch, cw + 0.5, ch + 0.5), col)
 
 
 func _gui_input(event: InputEvent) -> void:
