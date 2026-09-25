@@ -2,7 +2,7 @@ extends PanelContainer
 
 ## M20 — Basic Minimap (Variant A: static background).
 ## Player units/buildings + camera rect + click-to-pan.
-## No Fog / VisibilityMap / enemy hide.
+## M20.1: enemy markers only when VisibilityMap says VISIBLE.
 
 const PLAYER_TEAM := 0
 const MARKER_INTERVAL := 0.15
@@ -17,6 +17,8 @@ var _marker_timer: float = 0.0
 var _cam_rig: Node3D = null
 var _unit_uvs: PackedVector2Array = PackedVector2Array()
 var _building_uvs: PackedVector2Array = PackedVector2Array()
+var _enemy_unit_uvs: PackedVector2Array = PackedVector2Array()
+var _enemy_building_uvs: PackedVector2Array = PackedVector2Array()
 var _cam_uv: Vector2 = Vector2(0.5, 0.5)
 var _dragging: bool = false
 
@@ -72,6 +74,13 @@ func _draw() -> void:
 		var p: Vector2 = _unit_uvs[i] * size
 		draw_circle(p, 2.8, Color(0.35, 0.9, 0.45))
 
+	for i in range(_enemy_building_uvs.size()):
+		var p: Vector2 = _enemy_building_uvs[i] * size
+		draw_rect(Rect2(p - Vector2(3.5, 3.5), Vector2(7, 7)), Color(0.95, 0.25, 0.2))
+	for i in range(_enemy_unit_uvs.size()):
+		var p: Vector2 = _enemy_unit_uvs[i] * size
+		draw_circle(p, 2.8, Color(0.95, 0.35, 0.3))
+
 	var c: Vector2 = _cam_uv * size
 	var half := Vector2(16.0, 12.0)
 	draw_rect(Rect2(c - half, half * 2.0), Color(1.0, 0.95, 0.35, 0.95), false, 1.6)
@@ -114,6 +123,8 @@ func _pan_to_local(local_pos: Vector2) -> void:
 func _collect_markers() -> void:
 	_unit_uvs = PackedVector2Array()
 	_building_uvs = PackedVector2Array()
+	_enemy_unit_uvs = PackedVector2Array()
+	_enemy_building_uvs = PackedVector2Array()
 
 	var um := get_node_or_null("/root/UnitManager")
 	if um != null and "units" in um:
@@ -124,7 +135,6 @@ func _collect_markers() -> void:
 				continue
 			if u.has_method("is_dead") and u.is_dead():
 				continue
-			# UnitState.DEAD ordinal = 7 after REPAIRING (M12.1)
 			if u.get("unit_state") != null and int(u.unit_state) == 7:
 				continue
 			_unit_uvs.append(world_to_uv(u.global_position))
@@ -135,6 +145,28 @@ func _collect_markers() -> void:
 	_append_buildings(bm.get("town_centers"))
 	_append_buildings(bm.get("barracks_list"))
 	_append_buildings(bm.get("watchtowers_list"))
+
+	var vm := get_node_or_null("/root/VisibilityMap")
+	if um != null and "units" in um:
+		for u in um.units:
+			if u == null or not is_instance_valid(u):
+				continue
+			if int(u.get("team_id")) == PLAYER_TEAM:
+				continue
+			if u.has_method("is_dead") and u.is_dead():
+				continue
+			if u.get("unit_state") != null and int(u.unit_state) == 7:
+				continue
+			if vm != null and vm.has_method("is_visible_world"):
+				if not vm.is_visible_world(u.global_position):
+					continue
+			else:
+				continue
+			_enemy_unit_uvs.append(world_to_uv(u.global_position))
+	if bm != null:
+		_append_enemy_buildings(bm.get("town_centers"), vm)
+		_append_enemy_buildings(bm.get("barracks_list"), vm)
+		_append_enemy_buildings(bm.get("watchtowers_list"), vm)
 
 
 func _append_buildings(list_val) -> void:
@@ -148,6 +180,24 @@ func _append_buildings(list_val) -> void:
 		if b.get("is_destroyed") == true:
 			continue
 		_building_uvs.append(world_to_uv((b as Node3D).global_position))
+
+
+func _append_enemy_buildings(list_val, vm) -> void:
+	if list_val == null:
+		return
+	for b in list_val:
+		if b == null or not is_instance_valid(b):
+			continue
+		if int(b.get("team_id")) == PLAYER_TEAM:
+			continue
+		if b.get("is_destroyed") == true:
+			continue
+		if vm != null and vm.has_method("is_visible_world"):
+			if not vm.is_visible_world((b as Node3D).global_position):
+				continue
+		else:
+			continue
+		_enemy_building_uvs.append(world_to_uv((b as Node3D).global_position))
 
 
 func _update_camera_uv() -> void:
