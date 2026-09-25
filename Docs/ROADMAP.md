@@ -9,6 +9,7 @@ Playtest + ordered next steps: `Docs/PLAYTEST_ME0_AND_ROADMAP_NOTES.md`.
 ## Done (high level)
 
 - Stage 1 RTS loop M10–M18.2
+- M19.x remote/quick train · M20 minimap · M20.1 VisibilityMap · M20.2 Fog B2
 - Climate v0.1 (backend + horses) · ME-0 (console pressure signal)
 - ME-0 playtest: climate **not** felt without console → Visual required
 
@@ -23,7 +24,9 @@ Playtest + ordered next steps: `Docs/PLAYTEST_ME0_AND_ROADMAP_NOTES.md`.
 
 - Neutral camps, minimal hero, Power Sites, magic
 - AI climate / migration brain
-- Fog / minimap / multiplayer — `NOMAD_WORLD_BACKLOG.md`
+- Minimap + VisibilityMap + Fog v0 (M20–M20.2) ✓ ACCEPTED
+- Fog visual polish (soft edges / filter / color) — future polish only, not M20.2
+- Multiplayer — `NOMAD_WORLD_BACKLOG.md`
 
 ## Idea files
 
