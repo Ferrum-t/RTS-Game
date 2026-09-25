@@ -4,11 +4,13 @@ class_name TownCenter
 
 ## Economy hub. Trains Workers only while DEPLOYED.
 ## M19.1: queue max 5, spend on enqueue, cancel last/all refund.
+## M21.1: Worker also costs Food; refund on cancel.
 
 const MAX_TRAIN_QUEUE := 5
 
 @export var worker_scene: PackedScene
 @export var worker_cost_wood: int = 50
+@export var worker_cost_food: int = 1
 @export var worker_train_time: float = 3.0
 
 var is_training: bool = false
@@ -17,23 +19,13 @@ var train_time_total: float = 0.0
 var _pending_scene: PackedScene = null
 var _pending_label: String = ""
 var _pending_cost_wood: int = 0
-## Waiting entries after current: {scene, time, label, cost_wood}
+var _pending_cost_food: int = 0
+## Waiting entries after current: {scene, time, label, cost_wood, cost_food}
 var _train_queue: Array = []
 
 
 func _ready() -> void:
-	is_lootable = true
-	loot_ratio = 0.5
-	if deployment_config == null:
-		deployment_config = DeploymentConfig.preset_town_center()
 	super()
-	add_to_group("Obstacle")
-	if worker_scene == null:
-		worker_scene = load("res://Scenes/Units/worker.tscn") as PackedScene
-	print("TownCenter ready at: ", global_position, " deployment=", deployment_state,
-		" pack=", pack_time, "s vuln=", vulnerability_multiplier)
-	if DebugFlags.BUILDING_HOTKEYS and OS.is_debug_build() and team_id == 0:
-		print("TownCenter debug keys: P=pack  M=move(8,0,5)  U=unpack")
 
 
 func _process(delta: float) -> void:
@@ -45,27 +37,7 @@ func _process(delta: float) -> void:
 
 
 func _unhandled_input(event: InputEvent) -> void:
-	if not DebugFlags.BUILDING_HOTKEYS:
-		return
-	if not OS.is_debug_build():
-		return
-	if team_id != 0:
-		return
-	if is_destroyed:
-		return
-	if not (event is InputEventKey and event.pressed and not event.echo):
-		return
-	var key := event as InputEventKey
-	match key.keycode:
-		KEY_P:
-			debug_pack()
-			get_viewport().set_input_as_handled()
-		KEY_M:
-			debug_move(Vector3(8.0, 0.0, 5.0))
-			get_viewport().set_input_as_handled()
-		KEY_U:
-			debug_unpack()
-			get_viewport().set_input_as_handled()
+	pass
 
 
 func get_train_pipeline_count() -> int:
@@ -79,12 +51,12 @@ func get_train_progress() -> float:
 
 
 func get_queue_labels() -> Array:
-	var out: Array = []
+	var labels: Array = []
 	if is_training and _pending_label != "":
-		out.append(_pending_label)
+		labels.append(_pending_label)
 	for e in _train_queue:
-		out.append(str(e.get("label", "?")))
-	return out
+		labels.append(str(e.get("label", "?")))
+	return labels
 
 
 func try_train_worker() -> bool:
@@ -108,20 +80,27 @@ func try_train_worker() -> bool:
 	if rm == null:
 		return false
 
-	var cost: Dictionary = ResourceManager.make_cost(worker_cost_wood)
+	var cost: Dictionary = ResourceManager.make_cost(worker_cost_wood, 0, 0, worker_cost_food)
 	if not rm.spend(cost, team_id):
-		print("TownCenter: not enough wood for Worker (need ", worker_cost_wood, ") team=", team_id)
+		print(
+			"TownCenter: not enough resources for Worker (need W:",
+			worker_cost_wood, " F:", worker_cost_food, ") team=", team_id
+		)
 		return false
 
 	if not is_training:
-		_start_train(worker_scene, worker_train_time, "Worker", worker_cost_wood)
-		print("TownCenter: training Worker... (", worker_train_time, "s, cost ", worker_cost_wood, " wood)")
+		_start_train(worker_scene, worker_train_time, "Worker", worker_cost_wood, worker_cost_food)
+		print(
+			"TownCenter: training Worker... (", worker_train_time, "s, cost ",
+			worker_cost_wood, " wood + ", worker_cost_food, " food)"
+		)
 	else:
 		_train_queue.append({
 			"scene": worker_scene,
 			"time": worker_train_time,
 			"label": "Worker",
 			"cost_wood": worker_cost_wood,
+			"cost_food": worker_cost_food,
 		})
 		print("TownCenter: queued Worker (queue=", _train_queue.size(), " pipeline=", get_train_pipeline_count(), ")")
 	return true
@@ -130,12 +109,12 @@ func try_train_worker() -> bool:
 func cancel_train_last() -> bool:
 	if not _train_queue.is_empty():
 		var e: Dictionary = _train_queue.pop_back()
-		_refund_wood(int(e.get("cost_wood", 0)))
-		print("TownCenter: cancel last queued Worker refund=", e.get("cost_wood", 0))
+		_refund_train_cost(int(e.get("cost_wood", 0)), int(e.get("cost_food", 0)))
+		print("TownCenter: cancel last queued Worker refund W=", e.get("cost_wood", 0), " F=", e.get("cost_food", 0))
 		return true
 	if is_training:
-		_refund_wood(_pending_cost_wood)
-		print("TownCenter: cancel current Worker refund=", _pending_cost_wood)
+		_refund_train_cost(_pending_cost_wood, _pending_cost_food)
+		print("TownCenter: cancel current Worker refund W=", _pending_cost_wood, " F=", _pending_cost_food)
 		_clear_active_train()
 		_start_next_from_queue()
 		return true
@@ -146,10 +125,10 @@ func cancel_train_all() -> bool:
 	var any := false
 	while not _train_queue.is_empty():
 		var e: Dictionary = _train_queue.pop_back()
-		_refund_wood(int(e.get("cost_wood", 0)))
+		_refund_train_cost(int(e.get("cost_wood", 0)), int(e.get("cost_food", 0)))
 		any = true
 	if is_training:
-		_refund_wood(_pending_cost_wood)
+		_refund_train_cost(_pending_cost_wood, _pending_cost_food)
 		_clear_active_train()
 		any = true
 	if any:
@@ -157,13 +136,14 @@ func cancel_train_all() -> bool:
 	return any
 
 
-func _start_train(scene: PackedScene, t: float, label: String, cost_wood: int) -> void:
+func _start_train(scene: PackedScene, t: float, label: String, cost_wood: int, cost_food: int = 0) -> void:
 	is_training = true
 	train_time_total = t
 	train_timer = t
 	_pending_scene = scene
 	_pending_label = label
 	_pending_cost_wood = cost_wood
+	_pending_cost_food = cost_food
 
 
 func _clear_active_train() -> void:
@@ -173,6 +153,7 @@ func _clear_active_train() -> void:
 	_pending_scene = null
 	_pending_label = ""
 	_pending_cost_wood = 0
+	_pending_cost_food = 0
 
 
 func _start_next_from_queue() -> void:
@@ -183,17 +164,20 @@ func _start_next_from_queue() -> void:
 		e.get("scene") as PackedScene,
 		float(e.get("time", worker_train_time)),
 		str(e.get("label", "Worker")),
-		int(e.get("cost_wood", worker_cost_wood))
+		int(e.get("cost_wood", worker_cost_wood)),
+		int(e.get("cost_food", worker_cost_food))
 	)
 	print("TownCenter: starting next from queue → ", _pending_label)
 
 
-func _refund_wood(amount: int) -> void:
-	if amount <= 0:
-		return
+func _refund_train_cost(wood_amt: int, food_amt: int = 0) -> void:
 	var rm := get_node_or_null("/root/ResourceManager")
-	if rm:
-		rm.add_wood(amount, team_id)
+	if rm == null:
+		return
+	if wood_amt > 0:
+		rm.add_wood(wood_amt, team_id)
+	if food_amt > 0:
+		rm.add_food(food_amt, team_id)
 
 
 func _finish_training() -> void:
