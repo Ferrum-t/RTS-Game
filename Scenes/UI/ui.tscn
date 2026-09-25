@@ -14,6 +14,7 @@
 [ext_resource type="Script" path="res://Scripts/UI/ClimateHomeHud.gd" id="11_climate"]
 [ext_resource type="Script" path="res://Scripts/UI/TrainingQueuePanel.gd" id="12_queue"]
 [ext_resource type="Script" path="res://Scripts/UI/QuickTrainPanel.gd" id="13_quick"]
+[ext_resource type="Script" path="res://Scripts/UI/Minimap.gd" id="14_minimap"]
 
 [node name="UI" type="CanvasLayer"]
 
@@ -87,12 +88,24 @@ custom_minimum_size = Vector2(84, 28)
 layout_mode = 2
 text = "Barracks"
 
+[node name="Minimap" type="PanelContainer" parent="."]
+anchors_preset = 2
+anchor_top = 1.0
+anchor_bottom = 1.0
+offset_left = 8.0
+offset_top = -180.0
+offset_right = 178.0
+offset_bottom = -10.0
+grow_vertical = 0
+mouse_filter = 0
+script = ExtResource("14_minimap")
+
 [node name="BottomBar" type="PanelContainer" parent="."]
 anchors_preset = 12
 anchor_top = 1.0
 anchor_right = 1.0
 anchor_bottom = 1.0
-offset_left = 112.0
+offset_left = 190.0
 offset_top = -64.0
 offset_right = -230.0
 offset_bottom = -8.0
