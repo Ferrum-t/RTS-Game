@@ -1,57 +1,44 @@
 extends Node
 
-var current_ghost: GhostBuilding = null
-var current_building_data: BuildingData = null
+## Construction placement + ghost. M10.1: player builds require valid Worker.
+
+var current_ghost: Node3D = null
+var current_building_data = null
 var _place_serial: int = 0
-## M10.1 — Worker locked at start_building; must still be valid at confirm.
 var _pending_builder: BaseUnit = null
 
 const BUILD_APPROACH_DIST := 3.0
 
 
 func is_placing() -> bool:
-	return current_ghost != null and is_instance_valid(current_ghost)
+	return current_ghost != null
 
 
-func start_building(data: BuildingData) -> void:
+func start_building(data) -> void:
 	if data == null:
 		return
-
-	# M10.1: player construction only from a selected Worker.
 	var builder := _first_selected_worker()
 	if builder == null:
-		print("Construction: select a Worker before placing ", data.building_name)
+		print("[BUILD] start_building: no valid Worker selected")
 		return
-
-	var cost: Dictionary = data.get_cost_dict()
-	var rm := get_node_or_null("/root/ResourceManager")
-	if rm and not rm.can_afford(cost, 0):
-		print("Construction: not enough resources for ", data.building_name,
-			" (need W:", data.wood, " S:", data.stone, " G:", data.gold, " F:", data.food, ")")
-		return
-
 	if current_ghost != null:
 		current_ghost.queue_free()
-
+		current_ghost = null
 	current_building_data = data
 	_pending_builder = builder
-
-	if data.ghost_scene == null:
-		push_error("Construction: ghost_scene is null")
-		_pending_builder = null
-		return
-
-	current_ghost = data.ghost_scene.instantiate()
+	var ghost_scene = preload("res://Scenes/Buildings/GhostBuilding.tscn")
+	current_ghost = ghost_scene.instantiate()
+	if current_ghost.has_method("setup"):
+		current_ghost.setup(data)
 	get_tree().current_scene.add_child(current_ghost)
-	print("Started building mode: ", data.building_name, " builder=", builder.name)
+	print("[BUILD] Started building mode: ", data.building_name if data.get("building_name") else data)
 
 
-## M10.1c — cancel placement only (no site, no spend).
 func cancel_build_mode() -> void:
-	var had_ghost: bool = current_ghost != null and is_instance_valid(current_ghost)
-	if had_ghost:
+	var had_ghost := current_ghost != null
+	if current_ghost != null:
 		current_ghost.queue_free()
-	current_ghost = null
+		current_ghost = null
 	current_building_data = null
 	_pending_builder = null
 	if had_ghost:
@@ -79,7 +66,6 @@ func confirm_build() -> void:
 	# Player path: site under construction (AI keeps start_constructed=true default).
 	var building := place_building_for_team(data, position, 0, false)
 	if building == null:
-		# spend failed or scene null — clear ghost
 		cancel_build_mode()
 		return
 
@@ -93,91 +79,80 @@ func confirm_build() -> void:
 
 
 ## Stage 1 — programmatic placement used by player UI and Economic AI.
-## start_constructed=true → immediately READY (AI / legacy).
-## start_constructed=false → M10 construction site for player.
-func place_building_for_team(
-	data: BuildingData,
-	world_pos: Vector3,
-	team_id: int,
-	start_constructed: bool = true
-) -> Node:
+func place_building_for_team(data, position: Vector3, team_id: int = 0, start_constructed: bool = true):
 	if data == null:
 		return null
-	if data.building_scene == null:
-		push_error("Construction: building_scene is null")
-		return null
-
-	var cost: Dictionary = data.get_cost_dict()
 	var rm := get_node_or_null("/root/ResourceManager")
-	if rm:
-		if not rm.spend(cost, team_id):
-			print(
-				"Construction: team ", team_id,
-				" cannot afford ", data.building_name,
-				" (need W:", data.wood, " S:", data.stone, ")"
-			)
-			return null
+	if rm != null and data.get("wood") != null:
+		var cost_wood: int = int(data.wood) if data.get("wood") != null else 0
+		var cost_stone: int = int(data.stone) if data.get("stone") != null else 0
+		if cost_wood > 0 or cost_stone > 0:
+			if not rm.can_afford(ResourceManager.make_cost(cost_wood, cost_stone), team_id):
+				print("Not enough resources for ", data.get("building_name"), " team=", team_id)
+				return null
+			rm.spend(ResourceManager.make_cost(cost_wood, cost_stone), team_id)
 
-	var building = data.building_scene.instantiate()
-	_place_serial += 1
-	var base_label: String = str(data.building_name).strip_edges()
-	if base_label.is_empty():
-		base_label = "Building"
-	base_label = base_label.replace(" ", "")
-	building.name = "%s_%d" % [base_label, _place_serial]
-	if "team_id" in building:
-		building.team_id = team_id
-
-	building.position = world_pos
-	var scene := get_tree().current_scene
+	var scene: PackedScene = data.scene if data.get("scene") else null
 	if scene == null:
-		building.queue_free()
+		print("No scene for building data")
 		return null
-	scene.add_child(building)
 
-	if not start_constructed and building is BaseBuilding:
-		var bt: float = 25.0
-		if data.build_time_sec > 0.0:
-			bt = data.build_time_sec
-		(building as BaseBuilding).begin_construction(bt)
+	var building = scene.instantiate()
+	building.team_id = team_id
+	building.global_position = position
+	if start_constructed:
+		if building.get("is_constructed") != null:
+			building.is_constructed = true
+	else:
+		if building.has_method("begin_construction"):
+			building.begin_construction()
+		elif building.get("is_constructed") != null:
+			building.is_constructed = false
 
-	var nav := get_node_or_null("/root/NavigationBakeService")
-	if nav != null and nav.has_method("update_building_position"):
-		nav.update_building_position(building)
-	elif nav != null and nav.has_method("register_building"):
-		var he := Vector3.ZERO
-		if "nav_half_extents" in building:
-			he = building.nav_half_extents
-		nav.register_building(building, he)
+	_place_serial += 1
+	var base_name: String = str(data.get("building_name") if data.get("building_name") else building.get_class())
+	building.name = "%s_%d" % [base_name.replace(" ", ""), _place_serial]
+
+	var scene_root := get_tree().current_scene
+	if scene_root:
+		scene_root.add_child(building)
+	else:
+		add_child(building)
 
 	print(
 		"Building placed: ", building.name,
 		" team=", team_id,
 		" constructed=", start_constructed,
-		" (cost W:", data.wood, " S:", data.stone, ")",
+		" (cost W:", data.wood if data.get("wood") else 0, " S:", data.stone if data.get("stone") else 0, ")",
 		" at ", building.global_position
 	)
 	return building
 
 
 func _resolve_pending_builder() -> BaseUnit:
+	# Freed workers must be cleared before any typed BaseUnit call (Godot type-check throws).
+	if _pending_builder != null and not is_instance_valid(_pending_builder):
+		_pending_builder = null
 	if _is_valid_builder(_pending_builder):
 		return _pending_builder
 	# Re-check selection once (worker may have been re-selected).
 	var w := _first_selected_worker()
 	if _is_valid_builder(w):
+		_pending_builder = w
 		return w
+	_pending_builder = null
 	return null
 
 
-func _is_valid_builder(w: BaseUnit) -> bool:
+func _is_valid_builder(w) -> bool:
+	## Untyped arg: previously-freed Object fails BaseUnit type check before body runs.
 	if w == null or not is_instance_valid(w):
 		return false
 	if not (w is Worker):
 		return false
-	if w.team_id != 0:
+	if int(w.team_id) != 0:
 		return false
-	if w.unit_state == BaseUnit.UnitState.DEAD:
+	if int(w.unit_state) == BaseUnit.UnitState.DEAD:
 		return false
 	return true
 
