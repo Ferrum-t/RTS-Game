@@ -109,6 +109,48 @@ transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -24, 0, 36)
 [node name="EnemyHorseHerd" parent="." unique_id=1305925391 instance=ExtResource("12_horse")]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -36, 0, 26)
 
+[node name="Tree_R2" parent="." instance=ExtResource("10_ng1ea")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 71, 0, 0)
+
+[node name="Stone_R2" parent="." instance=ExtResource("11_stone")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 82, 0, 4)
+
+[node name="Tree_R3" parent="." instance=ExtResource("10_ng1ea")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 54, 0, 72)
+
+[node name="Stone_R3" parent="." instance=ExtResource("11_stone")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 66, 0, 76)
+
+[node name="HorseHerd_R3" parent="." instance=ExtResource("12_horse")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 60, 0, 64)
+
+[node name="Tree_R4" parent="." instance=ExtResource("10_ng1ea")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -13, 0, 77)
+
+[node name="Stone_R4" parent="." instance=ExtResource("11_stone")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -1, 0, 81)
+
+[node name="Tree_R5" parent="." instance=ExtResource("10_ng1ea")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -78, 0, 60)
+
+[node name="Stone_R5" parent="." instance=ExtResource("11_stone")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -66, 0, 64)
+
+[node name="Tree_R6" parent="." instance=ExtResource("10_ng1ea")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -83, 0, -7)
+
+[node name="Stone_R6" parent="." instance=ExtResource("11_stone")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -71, 0, -3)
+
+[node name="Tree_R7" parent="." instance=ExtResource("10_ng1ea")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -6, 0, -77)
+
+[node name="Stone_R7" parent="." instance=ExtResource("11_stone")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 6, 0, -73)
+
+[node name="HorseHerd_R7" parent="." instance=ExtResource("12_horse")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, -85)
+
 [node name="Resources" type="Node" parent="." unique_id=1666807211]
 
 [node name="UI" type="CanvasLayer" parent="." unique_id=546026759]
