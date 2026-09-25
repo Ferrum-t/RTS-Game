@@ -10,6 +10,32 @@
 
 ---
 
+## 2026-09-25 — M20.2 Fog Visual ACCEPTED (B2)
+
+**LOCK:** B2 · soft edges: no · death-ghost: SKIP
+
+**IN shipped:**
+- World `FogOverlay` plane + `Shaders/fog_overlay.gdshader`
+- Minimap fog cell overlay (UNEXPLORED / EXPLORED / VISIBLE)
+- `VisibilityMap` fog `ImageTexture` + `visibility_updated`
+- Enemy 3D `visible` gated by VISIBLE (units + buildings)
+
+**F5 PASS:** vision disk, explored trail, enemy hide 3D + minimap, no script errors.
+
+**Intentional v0 look:** pixelated world fog from cell_size=4 + nearest + no soft edges.  
+**Do not** fold color/filter/soft-edge polish into M20.2 — track as future polish only.
+
+Also: ConstructionManager freed `_pending_builder` type-check crash fix (SKIP formal death-ghost F5).
+
+---
+
+## 2026-09-25 — M20 / M20.1
+
+- M20 Basic Minimap (static bg, markers, camera rect, click-pan) CLOSED
+- M20.1 VisibilityMap data + hide enemy minimap markers ACCEPTED (functional)
+
+---
+
 ## 2026-09-21 — Official title lock
 
 Fixed product naming in GAME_DESIGN / CURRENT_STATE / AI_CONTEXT.  
@@ -23,16 +49,4 @@ M17.0 / M17.1 / M17.2 Level 1 ACCEPTED (F5). Climate parked.
 
 ---
 
-## 2026-08-31 — Stage 1 F5 + full GPT audit documented
-
-Rally, attack-once, dual-floor harvest. TD-01…TD-04 recorded.
-
----
-
-## 2026-08-28 — Formation-offsets ACCEPTED + docs cleanup
-
-Formation-offsets ACCEPTED. Deleted parallel roadmaps / PHASE_8_* archives.
-
----
-
-*Older: Phase 7–8.2, polish — see git history.*
+*Older entries — see git history.*
