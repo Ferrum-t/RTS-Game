@@ -93,8 +93,6 @@ func confirm_build() -> void:
 
 
 ## Stage 1 — programmatic placement used by player UI and Economic AI.
-## start_constructed=true → immediately READY (AI / legacy).
-## start_constructed=false → M10 construction site for player.
 func place_building_for_team(
 	data: BuildingData,
 	world_pos: Vector3,
@@ -161,23 +159,29 @@ func place_building_for_team(
 
 
 func _resolve_pending_builder() -> BaseUnit:
+	# Freed workers must be cleared before any typed BaseUnit call (Godot type-check throws).
+	if _pending_builder != null and not is_instance_valid(_pending_builder):
+		_pending_builder = null
 	if _is_valid_builder(_pending_builder):
 		return _pending_builder
 	# Re-check selection once (worker may have been re-selected).
 	var w := _first_selected_worker()
 	if _is_valid_builder(w):
+		_pending_builder = w
 		return w
+	_pending_builder = null
 	return null
 
 
-func _is_valid_builder(w: BaseUnit) -> bool:
+func _is_valid_builder(w) -> bool:
+	## Untyped arg: previously-freed Object fails BaseUnit type check before body runs.
 	if w == null or not is_instance_valid(w):
 		return false
 	if not (w is Worker):
 		return false
-	if w.team_id != 0:
+	if int(w.team_id) != 0:
 		return false
-	if w.unit_state == BaseUnit.UnitState.DEAD:
+	if int(w.unit_state) == BaseUnit.UnitState.DEAD:
 		return false
 	return true
 
