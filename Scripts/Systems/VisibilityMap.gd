@@ -1,8 +1,6 @@
 extends Node
 
-## M20.1 — VisibilityMap / Fog of War data layer.
-## UNEXPLORED / EXPLORED / VISIBLE over map ±95, cell_size 4.
-## No world fog art. Minimap uses queries to hide enemies outside VISIBLE.
+## M20.1 data + M20.2 fog image + hide enemy 3D outside VISIBLE.
 
 const PLAYER_TEAM := 0
 const MAP_MIN_X := -95.0
@@ -12,7 +10,6 @@ const MAP_MAX_Z := 95.0
 const CELL_SIZE := 4.0
 const UPDATE_INTERVAL := 0.2
 const UNIT_STATE_DEAD := 7
-## Matches DeploymentState.State.DEPLOYED from logs (deployment=0).
 const DEPLOYED := 0
 
 enum CellState {
@@ -30,11 +27,14 @@ const RADIUS_TC := 15.0
 const RADIUS_BARRACKS := 12.0
 const RADIUS_WATCHTOWER := 20.0
 
+signal visibility_updated
+
 var _cols: int = 0
 var _rows: int = 0
-## PackedByteArray: 0 UNEXPLORED, 1 EXPLORED, 2 VISIBLE
 var _cells: PackedByteArray = PackedByteArray()
 var _timer: float = 0.0
+var _fog_image: Image
+var _fog_texture: ImageTexture
 
 
 func _ready() -> void:
@@ -42,6 +42,8 @@ func _ready() -> void:
 	_rows = int(ceil((MAP_MAX_Z - MAP_MIN_Z) / CELL_SIZE))
 	_cells.resize(_cols * _rows)
 	_cells.fill(CellState.UNEXPLORED)
+	_fog_image = Image.create(_cols, _rows, false, Image.FORMAT_RGB8)
+	_fog_texture = ImageTexture.create_from_image(_fog_image)
 	call_deferred("force_update")
 
 
@@ -102,6 +104,14 @@ func get_cell_size() -> float:
 	return CELL_SIZE
 
 
+func get_fog_texture() -> ImageTexture:
+	return _fog_texture
+
+
+func get_map_bounds() -> Rect2:
+	return Rect2(MAP_MIN_X, MAP_MIN_Z, MAP_MAX_X - MAP_MIN_X, MAP_MAX_Z - MAP_MIN_Z)
+
+
 func _update_visibility() -> void:
 	for i in range(_cells.size()):
 		if _cells[i] == CellState.VISIBLE:
@@ -115,11 +125,73 @@ func _update_visibility() -> void:
 			_stamp_circle((u as Node3D).global_position, _unit_radius(u))
 
 	var bm := get_node_or_null("/root/BuildingManager")
+	if bm != null:
+		_stamp_buildings(bm.get("town_centers"), RADIUS_TC)
+		_stamp_buildings(bm.get("barracks_list"), RADIUS_BARRACKS)
+		_stamp_buildings(bm.get("watchtowers_list"), RADIUS_WATCHTOWER)
+
+	_rebuild_fog_image()
+	_apply_enemy_world_visibility(um, bm)
+	visibility_updated.emit()
+
+
+func _rebuild_fog_image() -> void:
+	for z in range(_rows):
+		for x in range(_cols):
+			var s := int(_cells[z * _cols + x])
+			var v: int = 0
+			if s == CellState.VISIBLE:
+				v = 255
+			elif s == CellState.EXPLORED:
+				v = 128
+			_fog_image.set_pixel(x, z, Color8(v, v, v))
+	_fog_texture.update(_fog_image)
+
+
+func _apply_enemy_world_visibility(um, bm) -> void:
+	if um != null and "units" in um:
+		for u in um.units:
+			if u == null or not is_instance_valid(u):
+				continue
+			if not (u is Node3D):
+				continue
+			var n := u as Node3D
+			if int(u.get("team_id")) == PLAYER_TEAM:
+				n.visible = true
+				continue
+			if u.has_method("is_dead") and u.is_dead():
+				n.visible = false
+				continue
+			if u.get("unit_state") != null and int(u.unit_state) == UNIT_STATE_DEAD:
+				n.visible = false
+				continue
+			n.visible = is_visible_world(n.global_position)
+
 	if bm == null:
 		return
-	_stamp_buildings(bm.get("town_centers"), RADIUS_TC)
-	_stamp_buildings(bm.get("barracks_list"), RADIUS_BARRACKS)
-	_stamp_buildings(bm.get("watchtowers_list"), RADIUS_WATCHTOWER)
+	_set_enemy_building_vis(bm.get("town_centers"))
+	_set_enemy_building_vis(bm.get("barracks_list"))
+	_set_enemy_building_vis(bm.get("watchtowers_list"))
+	if bm.get("buildings") != null:
+		_set_enemy_building_vis(bm.get("buildings"))
+
+
+func _set_enemy_building_vis(list_val) -> void:
+	if list_val == null:
+		return
+	for b in list_val:
+		if b == null or not is_instance_valid(b):
+			continue
+		if not (b is Node3D):
+			continue
+		var n := b as Node3D
+		if int(b.get("team_id")) == PLAYER_TEAM:
+			n.visible = true
+			continue
+		if b.get("is_destroyed") == true:
+			n.visible = false
+			continue
+		n.visible = is_visible_world(n.global_position)
 
 
 func _stamp_buildings(list_val, radius: float) -> void:
