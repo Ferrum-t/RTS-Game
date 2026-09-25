@@ -115,6 +115,14 @@ func spend(cost: Dictionary, team_id: int = 0) -> bool:
 	return true
 
 
+## Deduct stock (raid loot / siphon). team 0 default for LootableComponent.
+func remove(resource_type: int, amount: int, team_id: int = 0) -> void:
+	if amount <= 0:
+		return
+	_set_stock(team_id, resource_type, get_stock(team_id, resource_type) - amount)
+	resources_changed.emit()
+
+
 func add(resource_type: int, amount: int, team_id: int = 0) -> void:
 	if amount == 0:
 		return

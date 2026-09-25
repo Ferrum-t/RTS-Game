@@ -26,6 +26,8 @@ var _train_queue: Array = []
 
 func _ready() -> void:
 	super()
+	if worker_scene == null:
+		worker_scene = load("res://Scenes/Units/worker.tscn") as PackedScene
 
 
 func _process(delta: float) -> void:
@@ -68,6 +70,8 @@ func try_train_worker() -> bool:
 		print("TownCenter: train only while DEPLOYED (state=", deployment_state, ")")
 		return false
 
+	if worker_scene == null:
+		worker_scene = load("res://Scenes/Units/worker.tscn") as PackedScene
 	if worker_scene == null:
 		push_error("TownCenter: worker_scene is null")
 		return false
