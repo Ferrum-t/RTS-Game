@@ -2,14 +2,16 @@ extends Button
 
 ## M19.2 — Train Soldier with remote routing.
 ## selected Barracks → first with free queue slot → first living player Barracks.
+## M21.1: affordability includes Food.
 
 const COST_WOOD := 80
+const COST_FOOD := 2
 const PLAYER_TEAM := 0
 const MAX_QUEUE := 5
 
 
 func _ready() -> void:
-	text = "Soldier (80W)"
+	text = "Soldier (80W+2F)"
 	pressed.connect(_on_pressed)
 	var rm := get_node_or_null("/root/ResourceManager")
 	if rm:
@@ -37,14 +39,14 @@ func _refresh_state() -> void:
 		text = "Soldier — queue full"
 		tooltip_text = "Training queue full (5)"
 		return
-	if rm == null or not rm.can_afford(ResourceManager.make_cost(COST_WOOD), PLAYER_TEAM):
+	if rm == null or not rm.can_afford(ResourceManager.make_cost(COST_WOOD, 0, 0, COST_FOOD), PLAYER_TEAM):
 		disabled = true
-		text = "Soldier — need 80W"
-		tooltip_text = "Not enough wood (80)"
+		text = "Soldier — need resources"
+		tooltip_text = "Need 80 wood + 2 food"
 		return
 	disabled = false
-	text = "Soldier (80W)"
-	tooltip_text = "Train Soldier (uses M19.1 queue)"
+	text = "Soldier (80W+2F)"
+	tooltip_text = "Train Soldier (80W + 2 Food)"
 
 
 func _on_pressed() -> void:

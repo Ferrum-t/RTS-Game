@@ -1,14 +1,16 @@
 extends Button
 
-## Trains Cavalry from selected Barracks, else first owned (100 wood + 1 horse).
+## Trains Cavalry from selected Barracks, else first owned.
+## M21.1: affordability includes Food.
 
 const COST_WOOD := 100
 const COST_HORSES := 1
+const COST_FOOD := 2
 const PLAYER_TEAM := 0
 
 
 func _ready() -> void:
-	text = "Cavalry (100W+1H)"
+	text = "Cavalry (100W+2F+1H)"
 	pressed.connect(_on_pressed)
 
 	var rm := get_node_or_null("/root/ResourceManager")
@@ -22,7 +24,7 @@ func _on_resources_changed() -> void:
 	if rm == null:
 		return
 	disabled = not rm.can_afford(
-		ResourceManager.make_cost(COST_WOOD, 0, 0, 0, COST_HORSES),
+		ResourceManager.make_cost(COST_WOOD, 0, 0, COST_FOOD, COST_HORSES),
 		PLAYER_TEAM
 	)
 
