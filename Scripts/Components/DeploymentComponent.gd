@@ -203,13 +203,7 @@ func _update_move(delta: float) -> void:
 		pos.y = 0.0
 		owner.global_position = pos
 		move_arrived.emit(pos)
-		print(owner.name, " Deployment: ARRIVED ", pos)
-		# Auto-unpack on arrival when footprint is clear (manual Unpack still works).
-		var block: String = _validate_placement()
-		if block == "":
-			request_unpack()
-		else:
-			print(owner.name, " Deployment: stay MOBILE after arrival — ", block)
+		print(owner.name, " Deployment: ARRIVED ", pos, " — waiting for Unpack")
 		return
 
 	# Progress since last frame (same pattern as unit BLOCKED / _no_progress_time).
