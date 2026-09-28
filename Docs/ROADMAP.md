@@ -26,6 +26,7 @@ Playtest + ordered next steps: `Docs/PLAYTEST_ME0_AND_ROADMAP_NOTES.md`.
 - AI climate / migration brain
 - Minimap + VisibilityMap + Fog v0 (M20–M20.2) ✓ ACCEPTED
 - Fog visual polish (soft edges / filter / color) — future polish only, not M20.2
+- **TD-DEPLOY-01** Optional auto-unpack UX toggle (default OFF; manual Unpack) — idea only
 - Multiplayer — `NOMAD_WORLD_BACKLOG.md`
 
 ## Idea files
