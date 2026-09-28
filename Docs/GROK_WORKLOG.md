@@ -10,6 +10,21 @@
 
 ---
 
+## 2026-09-28 — M21.4 AI Food + Yurt ACCEPTED
+
+**LOCK:** Food < 6 · max_yurts 2 · after 1st Barracks · constructed=true placement
+
+**IN shipped:**
+- `EconomicAIController` Yurt build + food stock in `[AI_ECO]` print
+- `_team_yurt_count` / `_try_build_yurt` / `YurtData.tres`
+- Harvest regression fix: original `_pick_resource_for_worker` (`resource_amount`)
+
+**F5 PASS:** AI harvest/deposit, Yurt when Food low, income, train resumes, 0 script errors.
+
+**Also same day:** Manual Unpack default restored; TD-DEPLOY-01 idea logged (auto-unpack toggle later).
+
+---
+
 ## 2026-09-25 — M20.2 Fog Visual ACCEPTED (B2)
 
 **LOCK:** B2 · soft edges: no · death-ghost: SKIP
@@ -38,15 +53,4 @@ Also: ConstructionManager freed `_pending_builder` type-check crash fix (SKIP fo
 
 ## 2026-09-21 — Official title lock
 
-Fixed product naming in GAME_DESIGN / CURRENT_STATE / AI_CONTEXT.  
-**Nomad Wars** = EN official. **Not** Nomads Wars. Branch name left as-is (legacy).
-
----
-
-## 2026-09-19 — Doc sync + M17.0→M17.2
-
-M17.0 / M17.1 / M17.2 Level 1 ACCEPTED (F5). Climate parked.
-
----
-
-*Older entries — see git history.*
+- Product name: **Nomad Wars** (EN)

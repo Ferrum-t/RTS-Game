@@ -2,7 +2,7 @@
 
 **Product:** **Nomad Wars** (EN official) · technical `NomadWars`  
 **Branch:** `nomads-wars-grok`  
-**HEAD fact date:** 2026-09-25
+**HEAD fact date:** 2026-09-28
 
 ---
 
@@ -10,17 +10,17 @@
 
 | Field | Value |
 |--------|--------|
-| **Last accepted** | **M20.2 Fog Visual (B2)** |
+| **Last accepted** | **M21.4 AI Food + Yurt** |
 | **Now** | — open next LOCK |
-| **F5** | M20.2 PASS (pixelated world fog = intentional v0) |
+| **F5** | M21.4 PASS (AI Yurt + harvest regression fixed) |
 
-### M20.2 accepted scope (do not expand)
+### M21.4 accepted scope (do not expand)
 
-- `VisibilityMap` single source of truth
-- cell_size = 4 · soft edges = no · nearest filtering
-- Minimap fog overlay + world FogOverlay plane
-- B2: hide enemy units/buildings outside VISIBLE
-- No visual polish inside M20.2 (color/filter/soft-edge → future polish task)
+- AI builds Yurt when Food < 6 and can_afford (max 2)
+- Priority: after 1st Barracks, before expand / 2nd Barracks / Watchtower
+- `place_building_for_team(..., constructed=true)` + existing Yurt +1 Food / 8s
+- Player Yurt / income / train path unchanged
+- Harvest pick restored (`BaseResource.resource_amount`) after M21.4 regression fix
 
 ---
 
@@ -32,7 +32,12 @@ M19.2 Remote train Worker/Soldier ✓
 M19.3 Quick Select TC/Barracks + left layout ✓
 M20   Basic Minimap           ✓
 M20.1 VisibilityMap + minimap enemy filter ✓
-M20.2 Fog visual + B2 hide 3D ✓ ACCEPTED
+M20.2 Fog visual + B2 hide 3D ✓
+MAP-R Resources R2–R7         ✓
+M21.1 Food Display            ✓
+M21.2 Yurt Food Income        ✓
+M21.3 Barracks full queue (Cav/Siege) ✓
+M21.4 AI Food + Yurt          ✓ ACCEPTED
 ```
 
-Construction pending-builder freed fix: shipped; death-ghost targeted F5 = SKIP.
+**Parked ideas:** TD-FOG-01 · TD-DEPLOY-01 (optional auto-unpack toggle, default OFF)
