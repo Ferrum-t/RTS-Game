@@ -12,6 +12,7 @@ class_name EconomicAIController
 ## OUT: defense brain, multi-tower, rebuild, Climate, army split
 ##
 ## M18.1 Balance P1: attack_threshold 3 → 5 (later first wave)
+## M21.4 — AI Yurt when Food < threshold (max 2), after 1st Barracks, before expand
 
 @export var team_id: int = 1
 @export var desired_worker_count: int = 4
@@ -26,6 +27,11 @@ class_name EconomicAIController
 ## M17.3 — offset from TC2 (farthest TC) for the single AI Watchtower.
 @export var watchtower_offset: Vector3 = Vector3(-4.0, 0.0, 4.0)
 @export var max_ai_watchtowers: int = 1
+## M21.4 — AI Yurt food supply.
+@export var yurt_offset: Vector3 = Vector3(5.0, 0.0, -4.0)
+@export var yurt_offset_2: Vector3 = Vector3(-5.0, 0.0, -4.0)
+@export var max_ai_yurts: int = 2
+@export var food_yurt_threshold: int = 6
 ## Soft floor for both wood and stone; below → prefer that resource (after wood pressure).
 @export var stock_floor: int = 100
 ## M17.1-D — if wood below this, force WOOD harvest (covers Soldier 80 / Worker 50).
@@ -44,6 +50,7 @@ var _timer: float = 0.0
 var _barracks_data: BuildingData = null
 var _tc_data: BuildingData = null
 var _watchtower_data: BuildingData = null
+var _yurt_data: BuildingData = null
 ## True after we first crossed attack_threshold; reset when army falls below.
 var _attack_issued: bool = false
 ## Alternates preferred type when both stocks are above floor.
@@ -60,6 +67,7 @@ func _ready() -> void:
 	_barracks_data = load("res://Data/Buildings/BarracksData.tres") as BuildingData
 	_tc_data = load("res://Data/Buildings/TownCenterData.tres") as BuildingData
 	_watchtower_data = load("res://Data/Buildings/WatchtowerData.tres") as BuildingData
+	_yurt_data = load("res://Data/Buildings/YurtData.tres") as BuildingData
 	_timer = 0.5
 	print(
 		"[AI_ECO] controller ready team=", team_id,
@@ -72,6 +80,8 @@ func _ready() -> void:
 		" max_tc=", max_ai_tc,
 		" max_barracks=", max_ai_barracks,
 		" max_towers=", max_ai_watchtowers,
+		" max_yurts=", max_ai_yurts,
+		" food_yurt_threshold=", food_yurt_threshold,
 		" expand_once=true second_barracks_once=true watchtower_once=true"
 	)
 
@@ -94,9 +104,11 @@ func _think() -> void:
 	var soldiers := _team_soldiers()
 	var wood := 0
 	var stone := 0
+	var food := 0
 	if rm:
 		wood = rm.get_stock(team_id, BaseResource.Type.WOOD)
 		stone = rm.get_stock(team_id, BaseResource.Type.STONE)
+		food = rm.get_stock(team_id, BaseResource.Type.FOOD)
 	var tcs: Array = _team_town_centers()
 	var barracks_list: Array = _team_barracks_list()
 	var goal: int = _worker_goal(tcs.size())
@@ -105,7 +117,8 @@ func _think() -> void:
 		" soldiers=", soldiers.size(),
 		" tc=", tcs.size(),
 		" barracks=", barracks_list.size(),
-		" wood=", wood, " stone=", stone,
+		" wood=", wood, " stone=", stone, " food=", food,
+		" yurts=", _team_yurt_count(),
 		" expanded=", _expanded_once,
 		" b2=", _second_barracks_once,
 		" w1=", _watchtower_once
@@ -123,6 +136,10 @@ func _think() -> void:
 	if barracks_list.is_empty():
 		_try_build_barracks(first_tc)
 		return
+
+	# M21.4 — Yurt when Food low (after 1st Barracks, before expand / 2nd barracks / tower).
+	if food < food_yurt_threshold and _team_yurt_count() < max_ai_yurts:
+		_try_build_yurt(first_tc)
 
 	# M17.0/17.1 — at most one TC expand per match.
 	if not _expanded_once and tcs.size() < max_ai_tc:
@@ -178,9 +195,10 @@ func _try_train_worker_any_tc(tcs: Array) -> void:
 			continue
 		if not tcn.is_deployed():
 			continue
-		if tcn.try_train_worker():
-			print("[AI_ECO] training Worker at ", tcn.name)
-			return
+		if tcn.has_method("try_train_worker"):
+			if tcn.try_train_worker():
+				print("[AI_ECO] training Worker at ", tcn.name)
+				return
 
 
 func _try_train_soldier_any_barracks(barracks_list: Array) -> void:
@@ -188,11 +206,12 @@ func _try_train_soldier_any_barracks(barracks_list: Array) -> void:
 		if not (node is Barracks):
 			continue
 		var b := node as Barracks
-		if b.is_training:
+		if b.has_method("get_train_pipeline_count") and int(b.get_train_pipeline_count()) >= 5:
 			continue
-		if b.try_train_soldier():
-			print("[AI_ECO] training Soldier at ", b.name)
-			return
+		if b.has_method("try_train_soldier"):
+			if b.try_train_soldier():
+				print("[AI_ECO] training Soldier at ", b.name)
+				return
 
 
 func _try_expand_second_tc(anchor_tc: BaseBuilding, wood: int, stone: int) -> void:
@@ -204,18 +223,15 @@ func _try_expand_second_tc(anchor_tc: BaseBuilding, wood: int, stone: int) -> vo
 		return
 	if wood < expand_wood_min or stone < expand_stone_min:
 		return
-
 	var rm := get_node_or_null("/root/ResourceManager")
 	if rm == null:
 		return
 	var cost: Dictionary = _tc_data.get_cost_dict()
 	if not rm.can_afford(cost, team_id):
 		return
-
 	var cm := get_node_or_null("/root/ConstructionManager")
 	if cm == null or not cm.has_method("place_building_for_team"):
 		return
-
 	var pos: Vector3 = anchor_tc.global_position + second_tc_offset
 	pos.y = 0.0
 	print("[AI_ECO] expanding 2nd TC at ", pos, " (W=", wood, " S=", stone, ")")
@@ -309,147 +325,187 @@ func _pick_tc_for_second_barracks(tcs: Array, barracks_list: Array) -> BaseBuild
 		return null
 	if barracks_list.is_empty():
 		return tcs[0] as BaseBuilding
-	var centroid := Vector3.ZERO
+	var cx := 0.0
+	var cz := 0.0
 	var n: int = 0
 	for b in barracks_list:
 		if b == null or not is_instance_valid(b):
 			continue
-		centroid += (b as Node3D).global_position
+		cx += b.global_position.x
+		cz += b.global_position.z
 		n += 1
 	if n <= 0:
 		return tcs[0] as BaseBuilding
-	centroid /= float(n)
+	cx /= float(n)
+	cz /= float(n)
 	var best: BaseBuilding = null
-	var best_d := -1.0
+	var best_d2 := -1.0
 	for tc in tcs:
 		if tc == null or not is_instance_valid(tc):
 			continue
-		var d: float = (tc as Node3D).global_position.distance_squared_to(centroid)
-		if d > best_d:
-			best_d = d
+		var dx: float = tc.global_position.x - cx
+		var dz: float = tc.global_position.z - cz
+		var d2: float = dx * dx + dz * dz
+		if d2 > best_d2:
+			best_d2 = d2
 			best = tc as BaseBuilding
-	return best
+	return best if best != null else tcs[0] as BaseBuilding
 
 
 func _assign_idle_workers(workers: Array, tcs: Array) -> void:
-	var underserved: BaseBuilding = _underserved_tc(workers, tcs)
+	if workers.is_empty() or tcs.is_empty():
+		return
 	for w in workers:
-		if not (w is BaseUnit):
+		if w == null or not is_instance_valid(w):
 			continue
-		var u := w as BaseUnit
+		if not (w is Worker):
+			continue
+		var u := w as Worker
 		if u.unit_state == BaseUnit.UnitState.DEAD:
 			continue
-		if u.unit_state == BaseUnit.UnitState.HARVESTING \
-			or u.unit_state == BaseUnit.UnitState.RETURNING \
-			or u.unit_state == BaseUnit.UnitState.MOVING:
+		if u.unit_state != BaseUnit.UnitState.IDLE:
 			continue
-		if u.current_order != null and u.current_order.type != Order.Type.NONE:
-			continue
-		var res := _pick_resource_for_worker(u, underserved)
+		var res = _pick_resource_for_worker(u, tcs)
 		if res == null:
 			continue
-		u.replace_order_harvest(res)
+		if u.has_method("replace_order_harvest"):
+			u.replace_order_harvest(res)
 
 
 func _underserved_tc(workers: Array, tcs: Array) -> BaseBuilding:
-	if tcs.size() < 2:
+	if tcs.is_empty():
 		return null
 	var counts: Dictionary = {}
 	for tc in tcs:
-		counts[tc] = 0
+		if tc != null and is_instance_valid(tc):
+			counts[tc] = 0
 	for w in workers:
-		if not (w is BaseUnit):
+		if w == null or not is_instance_valid(w):
 			continue
-		var u := w as BaseUnit
-		if u.unit_state == BaseUnit.UnitState.DEAD:
-			continue
-		var nearest: BaseBuilding = null
-		var best_d := INF
+		var nearest = null
+		var best := INF
 		for tc in tcs:
 			if tc == null or not is_instance_valid(tc):
 				continue
-			var d: float = u.global_position.distance_squared_to((tc as Node3D).global_position)
-			if d < best_d:
-				best_d = d
-				nearest = tc as BaseBuilding
+			var d: float = w.global_position.distance_squared_to(tc.global_position)
+			if d < best:
+				best = d
+				nearest = tc
 		if nearest != null and counts.has(nearest):
 			counts[nearest] = int(counts[nearest]) + 1
-	var under: BaseBuilding = null
-	var under_n := 999999
-	for tc in tcs:
-		var n: int = int(counts.get(tc, 0))
-		if n < under_n:
-			under_n = n
-			under = tc as BaseBuilding
-	return under
+	var pick: BaseBuilding = null
+	var pick_n := 999999
+	for tc in counts.keys():
+		var c: int = int(counts[tc])
+		if c < pick_n:
+			pick_n = c
+			pick = tc as BaseBuilding
+	return pick
 
 
-func _pick_resource_for_worker(u: BaseUnit, underserved: BaseBuilding) -> BaseResource:
+func _pick_resource_for_worker(worker: Worker, tcs: Array):
 	var rm := get_node_or_null("/root/ResourceManager")
 	var wood := 0
 	var stone := 0
 	if rm:
 		wood = rm.get_stock(team_id, BaseResource.Type.WOOD)
 		stone = rm.get_stock(team_id, BaseResource.Type.STONE)
-
-	var floor: int = maxi(stock_floor, 1)
-	var prefer_type: int
+	var floor: int = stock_floor
+	var prefer: int = BaseResource.Type.WOOD
 	if wood < production_wood_floor:
-		prefer_type = BaseResource.Type.WOOD
+		prefer = BaseResource.Type.WOOD
 	elif stone < floor:
-		prefer_type = BaseResource.Type.STONE
+		prefer = BaseResource.Type.STONE
 	elif wood < floor:
-		prefer_type = BaseResource.Type.WOOD
+		prefer = BaseResource.Type.WOOD
 	else:
-		prefer_type = BaseResource.Type.WOOD if (_harvest_flip % 2 == 0) else BaseResource.Type.STONE
-		_harvest_flip += 1
-
-	var bias: float = clampf(underserved_tc_bias, 0.0, 0.5)
-	var best: BaseResource = null
+		_harvest_flip = 1 - _harvest_flip
+		prefer = BaseResource.Type.WOOD if _harvest_flip == 0 else BaseResource.Type.STONE
+	var best = null
 	var best_score := INF
-	for n in u.get_tree().get_nodes_in_group("Resource"):
-		if not (n is BaseResource):
+	var underserved: BaseBuilding = _underserved_tc(_team_workers(), tcs)
+	for n in get_tree().get_nodes_in_group("Resource"):
+		if n == null or not is_instance_valid(n):
 			continue
-		var r := n as BaseResource
-		if r.resource_amount <= 0:
+		if not n.has_method("get_resource_type"):
 			continue
-		if int(r.resource_type) != prefer_type:
+		var rt = n.get_resource_type() if n.has_method("get_resource_type") else n.get("resource_type")
+		if int(rt) != prefer:
 			continue
-		var d_w: float = u.global_position.distance_squared_to(r.global_position)
-		var score: float = d_w
-		if underserved != null and bias > 0.0:
-			var d_tc: float = underserved.global_position.distance_squared_to(r.global_position)
-			score = d_w * (1.0 - bias) + d_tc * bias
+		if n.has_method("is_depleted") and n.is_depleted():
+			continue
+		var amount = n.get("amount") if n.get("amount") != null else 1
+		if int(amount) <= 0:
+			continue
+		var d_w: float = worker.global_position.distance_to(n.global_position)
+		var d_tc: float = 0.0
+		if underserved != null:
+			d_tc = underserved.global_position.distance_to(n.global_position)
+		var score: float = d_w * (1.0 - underserved_tc_bias) + d_tc * underserved_tc_bias
 		if score < best_score:
 			best_score = score
-			best = r
-	if best != null:
-		return best
-
-	for n in u.get_tree().get_nodes_in_group("Resource"):
-		if n is BaseResource and (n as BaseResource).resource_amount > 0:
-			return n as BaseResource
-	return null
+			best = n
+	return best
 
 
 func _attach_ai_to_army(soldiers: Array) -> int:
-	var newly: int = 0
-	for s in soldiers:
-		if not (s is BaseUnit):
+	var n: int = 0
+	for u in soldiers:
+		if u == null or not is_instance_valid(u):
 			continue
-		var u := s as BaseUnit
-		if u.unit_state == BaseUnit.UnitState.DEAD:
+		if u.get_node_or_null("EnemyAIComponent") != null:
 			continue
-		var had_ai := false
-		for c in u.get_children():
-			if c is EnemyAIComponent:
-				had_ai = true
-				break
-		if had_ai:
+		var ai := EnemyAIComponent.new()
+		u.add_child(ai)
+		n += 1
+	return n
+
+
+## M21.4 — AI Yurt near first TC; constructed=true (instant READY + income).
+func _try_build_yurt(anchor_tc: BaseBuilding) -> void:
+	if anchor_tc == null or not is_instance_valid(anchor_tc):
+		return
+	if _yurt_data == null:
+		return
+	var count: int = _team_yurt_count()
+	if count >= max_ai_yurts:
+		return
+	var rm := get_node_or_null("/root/ResourceManager")
+	if rm == null:
+		return
+	var cost: Dictionary = _yurt_data.get_cost_dict()
+	if not rm.can_afford(cost, team_id):
+		return
+	var cm := get_node_or_null("/root/ConstructionManager")
+	if cm == null or not cm.has_method("place_building_for_team"):
+		return
+	var off: Vector3 = yurt_offset if count == 0 else yurt_offset_2
+	var pos: Vector3 = anchor_tc.global_position + off
+	pos.y = 0.0
+	print("[AI_ECO] building Yurt at ", pos, " near ", anchor_tc.name, " (food low, yurts=", count, "/", max_ai_yurts, ")")
+	var built = cm.place_building_for_team(_yurt_data, pos, team_id, true)
+	if built != null:
+		print("[AI_ECO] Yurt completed ", built.name, " team=", team_id)
+
+
+func _team_yurt_count() -> int:
+	var n: int = 0
+	var bm := get_node_or_null("/root/BuildingManager")
+	if bm == null:
+		return 0
+	for b in bm.buildings:
+		if b == null or not is_instance_valid(b):
 			continue
-		EnemyAIComponent.attach_to(u, 24.0)
-		newly += 1
-	return newly
+		if not (b is Yurt):
+			continue
+		if int(b.team_id) != team_id:
+			continue
+		if b.get("is_destroyed") == true:
+			continue
+		if b.get("health") != null and int(b.health) <= 0:
+			continue
+		n += 1
+	return n
 
 
 func _team_town_centers() -> Array:
