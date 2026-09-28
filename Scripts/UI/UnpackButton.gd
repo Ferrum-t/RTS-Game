@@ -32,8 +32,13 @@ func _unpackable_targets() -> Array:
 	for b in _candidate_buildings():
 		if b.get("is_destroyed") == true:
 			continue
-		if int(b.get("deployment_state")) == DeploymentState.State.MOBILE:
-			out.append(b)
+		if int(b.get("deployment_state")) != DeploymentState.State.MOBILE:
+			continue
+		# Skip while still moving toward target (request_unpack would fail).
+		var dep = b.get("deployment")
+		if dep != null and dep.has_method("can_unpack") and not dep.can_unpack():
+			continue
+		out.append(b)
 	return out
 
 

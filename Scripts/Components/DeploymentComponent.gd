@@ -101,21 +101,24 @@ func request_move_to(world_pos: Vector3) -> bool:
 	if not can_move():
 		print(owner.name, " Deployment: cannot move (need MOBILE)")
 		return false
-	_move_target = world_pos
-	_move_target.y = 0.0
+	var t: Vector3 = world_pos
+	t.y = 0.0
+	_move_target = t
 	_moving = true
 	_reset_stuck()
 	_last_move_pos = owner.global_position
 	_last_move_pos.y = 0.0
-	_apply_mobile_collision()
-	move_started.emit(_move_target)
-	print(owner.name, " Deployment: move to ", _move_target)
+	move_started.emit(t)
+	print(owner.name, " Deployment: MOVE → ", t)
 	return true
 
 
 func request_unpack() -> bool:
 	if not can_unpack():
-		print(owner.name, " Deployment: cannot unpack")
+		if _moving:
+			print(owner.name, " Deployment: cannot unpack (still moving)")
+		else:
+			print(owner.name, " Deployment: cannot unpack (need MOBILE, not moving)")
 		return false
 	# Phase 8.2 — refuse unpack if footprint overlaps other buildings.
 	var reason: String = _validate_placement()
@@ -201,6 +204,12 @@ func _update_move(delta: float) -> void:
 		owner.global_position = pos
 		move_arrived.emit(pos)
 		print(owner.name, " Deployment: ARRIVED ", pos)
+		# Auto-unpack on arrival when footprint is clear (manual Unpack still works).
+		var block: String = _validate_placement()
+		if block == "":
+			request_unpack()
+		else:
+			print(owner.name, " Deployment: stay MOBILE after arrival — ", block)
 		return
 
 	# Progress since last frame (same pattern as unit BLOCKED / _no_progress_time).
@@ -239,6 +248,8 @@ func _on_move_stuck() -> void:
 
 func _reset_stuck() -> void:
 	_stuck_time = 0.0
+	_last_move_pos = owner.global_position
+	_last_move_pos.y = 0.0
 
 
 func _set_state(new_state: int) -> void:
@@ -246,12 +257,11 @@ func _set_state(new_state: int) -> void:
 	if old_state == new_state:
 		return
 	owner.set("deployment_state", new_state)
-	if owner.has_method("recompute_stats"):
-		owner.recompute_stats()
+	if owner.has_method("_on_deployment_state_changed"):
+		pass
 	state_changed.emit(old_state, new_state)
 
 
-## Returns empty string if OK, else human-readable block reason.
 func _validate_placement() -> String:
 	var bm := owner.get_node_or_null("/root/BuildingManager")
 	if bm == null:
