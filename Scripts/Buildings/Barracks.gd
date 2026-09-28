@@ -3,7 +3,7 @@ extends BaseBuilding
 class_name Barracks
 
 ## Military production. Soldiers + Cavalry + SiegeUnit.
-## M19.1: Soldier queue max 5; Cavalry/Siege remain single-slot.
+## M19.1 / M21.3: shared train queue max 5 (Soldier, Cavalry, Siege).
 ## M21.1: Soldier/Cavalry cost Food; refund on cancel.
 
 const MAX_TRAIN_QUEUE := 5
@@ -103,9 +103,6 @@ func try_train_soldier() -> bool:
 	if soldier_scene == null:
 		push_error("Barracks: soldier_scene is null")
 		return false
-	if is_training and _pending_label != "Soldier":
-		print("Barracks: busy training ", _pending_label)
-		return false
 	if get_train_pipeline_count() >= MAX_TRAIN_QUEUE:
 		print("Barracks: train queue full (", MAX_TRAIN_QUEUE, ")")
 		return false
@@ -137,11 +134,11 @@ func try_train_cavalry() -> bool:
 	if not is_constructed:
 		print("Barracks: still under construction")
 		return false
-	if is_training or not _train_queue.is_empty():
-		print("Barracks: already training")
-		return false
 	if cavalry_scene == null:
 		push_error("Barracks: cavalry_scene is null")
+		return false
+	if get_train_pipeline_count() >= MAX_TRAIN_QUEUE:
+		print("Barracks: train queue full (", MAX_TRAIN_QUEUE, ")")
 		return false
 	var rm := get_node_or_null("/root/ResourceManager")
 	if rm == null:
@@ -149,13 +146,23 @@ func try_train_cavalry() -> bool:
 	var cost: Dictionary = ResourceManager.make_cost(
 		cavalry_cost_wood, 0, 0, cavalry_cost_food, cavalry_cost_horses
 	)
-	if not rm.can_afford(cost, team_id):
-		print("Barracks: not enough resources for Cavalry (need W:", cavalry_cost_wood, " F:", cavalry_cost_food, " H:", cavalry_cost_horses, ")")
-		return false
 	if not rm.spend(cost, team_id):
+		print("Barracks: not enough resources for Cavalry (need W:", cavalry_cost_wood, " F:", cavalry_cost_food, " H:", cavalry_cost_horses, ") team=", team_id)
 		return false
-	_start_train(cavalry_scene, cavalry_train_time, "Cavalry", cavalry_cost_wood, 0, cavalry_cost_horses, cavalry_cost_food)
-	print("Barracks: training Cavalry... (", cavalry_train_time, "s, cost ", cavalry_cost_wood, " wood + ", cavalry_cost_food, " food + ", cavalry_cost_horses, " horse)")
+	if not is_training:
+		_start_train(cavalry_scene, cavalry_train_time, "Cavalry", cavalry_cost_wood, 0, cavalry_cost_horses, cavalry_cost_food)
+		print("Barracks: training Cavalry... (", cavalry_train_time, "s, cost ", cavalry_cost_wood, " wood + ", cavalry_cost_food, " food + ", cavalry_cost_horses, " horse)")
+	else:
+		_train_queue.append({
+			"scene": cavalry_scene,
+			"time": cavalry_train_time,
+			"label": "Cavalry",
+			"cost_wood": cavalry_cost_wood,
+			"cost_stone": 0,
+			"cost_horses": cavalry_cost_horses,
+			"cost_food": cavalry_cost_food,
+		})
+		print("Barracks: queued Cavalry (queue=", _train_queue.size(), " pipeline=", get_train_pipeline_count(), ")")
 	return true
 
 
@@ -163,23 +170,33 @@ func try_train_siege() -> bool:
 	if not is_constructed:
 		print("Barracks: still under construction")
 		return false
-	if is_training or not _train_queue.is_empty():
-		print("Barracks: already training")
-		return false
 	if siege_scene == null:
 		push_error("Barracks: siege_scene is null")
+		return false
+	if get_train_pipeline_count() >= MAX_TRAIN_QUEUE:
+		print("Barracks: train queue full (", MAX_TRAIN_QUEUE, ")")
 		return false
 	var rm := get_node_or_null("/root/ResourceManager")
 	if rm == null:
 		return false
 	var cost: Dictionary = ResourceManager.make_cost(siege_cost_wood, siege_cost_stone)
-	if not rm.can_afford(cost, team_id):
-		print("Barracks: not enough resources for Siege (need W:", siege_cost_wood, " S:", siege_cost_stone, ")")
-		return false
 	if not rm.spend(cost, team_id):
+		print("Barracks: not enough resources for Siege (need W:", siege_cost_wood, " S:", siege_cost_stone, ") team=", team_id)
 		return false
-	_start_train(siege_scene, siege_train_time, "Siege", siege_cost_wood, siege_cost_stone, 0, 0)
-	print("Barracks: training SiegeUnit... (", siege_train_time, "s, cost ", siege_cost_wood, " wood + ", siege_cost_stone, " stone)")
+	if not is_training:
+		_start_train(siege_scene, siege_train_time, "Siege", siege_cost_wood, siege_cost_stone, 0, 0)
+		print("Barracks: training SiegeUnit... (", siege_train_time, "s, cost ", siege_cost_wood, " wood + ", siege_cost_stone, " stone)")
+	else:
+		_train_queue.append({
+			"scene": siege_scene,
+			"time": siege_train_time,
+			"label": "Siege",
+			"cost_wood": siege_cost_wood,
+			"cost_stone": siege_cost_stone,
+			"cost_horses": 0,
+			"cost_food": 0,
+		})
+		print("Barracks: queued Siege (queue=", _train_queue.size(), " pipeline=", get_train_pipeline_count(), ")")
 	return true
 
 
@@ -189,9 +206,10 @@ func cancel_train_last() -> bool:
 		_refund_entry(e)
 		print("Barracks: cancel last queued ", e.get("label", "?"))
 		return true
-	if is_training and _pending_label == "Soldier":
+	if is_training:
+		var lab := _pending_label
 		_refund_active()
-		print("Barracks: cancel current Soldier")
+		print("Barracks: cancel current ", lab)
 		_clear_active_train()
 		_start_next_from_queue()
 		return true
@@ -204,12 +222,12 @@ func cancel_train_all() -> bool:
 		var e: Dictionary = _train_queue.pop_back()
 		_refund_entry(e)
 		any = true
-	if is_training and _pending_label == "Soldier":
+	if is_training:
 		_refund_active()
 		_clear_active_train()
 		any = true
 	if any:
-		print("Barracks: cancel all Soldier training")
+		print("Barracks: cancel all training")
 	return any
 
 
