@@ -61,7 +61,6 @@ const HEALTH_BAR_SCENE := preload("res://Scenes/UI/HealthBar3D.tscn")
 const APPROACH_RETARGET_DIST := 0.9
 const BUILD_STAND_DIST := 3.0
 const BUILD_FOOTPRINT_MARGIN := 1.25
-## M16 — idle auto-acquire radius (between tower 14 and AI threat 12).
 const ACQUIRE_RADIUS := 12.0
 const ACQUIRE_SCAN_INTERVAL := 0.4
 
@@ -573,12 +572,16 @@ func update_repairing(delta: float) -> void:
 		return
 	if movement and movement.status == MovementComponent.Status.MOVING: movement.cancel()
 	velocity = Vector3.ZERO
-	if site.has_method("apply_worker_repair"):
-		site.apply_worker_repair(self, delta)
-	elif site.has_method("add_repair_progress"):
-		site.add_repair_progress(delta, self)
-	else:
-		site.health = mini(site.max_health, site.health + int(25.0 * delta))
+	if site.has_method("request_repair_tick"):
+		var done: bool = site.request_repair_tick(self, delta)
+		if done or site.health >= site.max_health:
+			print(name, " finished REPAIR ", site.name)
+			_clear_repair("complete")
+		return
+	var gain: int = maxi(1, int(round(25.0 * delta)))
+	site.health = mini(site.max_health, site.health + gain)
+	if site.health_bar != null and is_instance_valid(site.health_bar):
+		site.health_bar.set_health(site.health)
 	if site.health >= site.max_health:
 		print(name, " finished REPAIR ", site.name)
 		_clear_repair("complete")
