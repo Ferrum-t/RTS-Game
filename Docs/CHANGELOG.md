@@ -1,5 +1,12 @@
 # CHANGELOG
 
+## 2026-09-30 — M24 Fog Visual Polish (F5 pending)
+
+- World fog: linear sample + smoothstep edges, pure black color
+- Alphas: unexplored ~0.96, explored ~0.60
+- Minimap fog darker to match world
+- VisibilityMap / B2 hide unchanged
+
 ## 2026-09-30 — M23.1 Projectile Combat ACCEPTED
 
 - Damage on arrival for Mergen / Watchtower (arrow) and Siege (stone)
@@ -13,10 +20,6 @@
 - Foot archer: train from Barracks (60W+1F, queue max 5 with Soldier/Cav/Siege)
 - Stats: HP 70, dmg 14, range 11, cd 1.1, speed 2.5, DamageType.RANGED
 - CommandBar Mergen button; no AI train Mergen
-
-## 2026-09-30 — Horse visual on climate suspend
-
-- HorseHerd `visible=false` while climate-suspended; resume restores mesh
 
 ## Recent (condensed)
 
