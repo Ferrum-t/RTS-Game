@@ -10,9 +10,10 @@ extends Node3D
 @export var edge_size := 12
 
 ## Dolly distance along CameraTilt +Z (was incorrectly zooming position.y).
-@export var min_distance := 12.0
+@export var min_distance := 10.0
 @export var max_distance := 40.0
-@export var start_distance := 20.0
+## Closer start so TC sits nearer screen center under 45° tilt.
+@export var start_distance := 14.0
 
 ## Map playable bounds (XZ). 200×200 field with margin inside zone extremes.
 @export var map_min_x: float = -95.0
@@ -23,9 +24,13 @@ extends Node3D
 ## Player team for start focus (Warcraft-style).
 @export var player_team_id: int = 0
 
+## Ignore edge-scroll briefly after focus so cursor at screen edge doesn't yank camera.
+@export var edge_grace_sec: float = 0.85
+
 @export var camera: Camera3D
 
 var rotating := false
+var _edge_grace: float = 0.0
 
 
 func _ready() -> void:
@@ -34,18 +39,11 @@ func _ready() -> void:
 
 
 func _focus_player_town_center() -> void:
-	var bm := get_node_or_null("/root/BuildingManager")
-	if bm == null:
-		return
-	var tc: Node3D = null
-	if bm.has_method("get_nearest_town_center"):
-		tc = bm.get_nearest_town_center(Vector3.ZERO, player_team_id)
+	var tc := _find_player_tc()
 	if tc == null or not is_instance_valid(tc):
-		var list: Array = bm.get("town_centers") if "town_centers" in bm else []
-		for b in list:
-			if b != null and is_instance_valid(b) and int(b.get("team_id")) == player_team_id:
-				tc = b
-				break
+		# One retry next frame if TC not registered yet.
+		await get_tree().process_frame
+		tc = _find_player_tc()
 	if tc == null or not is_instance_valid(tc):
 		return
 	var p: Vector3 = tc.global_position
@@ -53,8 +51,24 @@ func _focus_player_town_center() -> void:
 	global_position.z = p.z
 	_clamp_to_map()
 	_set_camera_distance(start_distance)
+	_edge_grace = edge_grace_sec
 	if OS.is_debug_build():
 		print("[CAMERA] start focus on ", tc.name, " at (", snappedf(p.x, 0.1), ", ", snappedf(p.z, 0.1), ") dist=", snappedf(start_distance, 0.1))
+
+
+func _find_player_tc() -> Node3D:
+	var bm := get_node_or_null("/root/BuildingManager")
+	if bm == null:
+		return null
+	if bm.has_method("get_nearest_town_center"):
+		var tc: Node3D = bm.get_nearest_town_center(Vector3.ZERO, player_team_id)
+		if tc != null and is_instance_valid(tc):
+			return tc
+	var list: Array = bm.get("town_centers") if "town_centers" in bm else []
+	for b in list:
+		if b != null and is_instance_valid(b) and int(b.get("team_id")) == player_team_id:
+			return b as Node3D
+	return null
 
 
 func _set_camera_distance(dist: float) -> void:
@@ -80,6 +94,9 @@ func _mouse_over_ui() -> bool:
 
 
 func _process(delta):
+	if _edge_grace > 0.0:
+		_edge_grace -= delta
+
 	var move = Vector3.ZERO
 
 	# ===== WASD =====
@@ -98,8 +115,8 @@ func _process(delta):
 		var right = transform.basis.x
 		global_position += (right * move.x + forward * move.z) * move_speed * delta
 
-	# ===== Edge scroll (skip while cursor is over HUD / menus) =====
-	if not _mouse_over_ui():
+	# ===== Edge scroll (skip while grace / cursor over HUD) =====
+	if _edge_grace <= 0.0 and not _mouse_over_ui():
 		var mouse = get_viewport().get_mouse_position()
 		var size = get_viewport().get_visible_rect().size
 		var edge_move = Vector3.ZERO
