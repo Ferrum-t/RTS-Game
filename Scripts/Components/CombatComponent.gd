@@ -6,6 +6,7 @@ class_name CombatComponent
 ## M6.3: chase must call ensure_moving_to / set_target — not only move_target + update.
 ## Polish: hysteresis — enter attack at attack_range, leave only past exit_range.
 ## M13: _strike passes owner as damage source so IDLE targets can retaliate.
+## M23.1: RANGED/SIEGE spawn Projectile (damage on arrival); MELEE instant.
 
 enum Status {
 	IDLE,
@@ -112,6 +113,13 @@ func _strike(target: BaseUnit) -> void:
 		status = Status.TARGET_DEAD
 		return
 
+	# M23.1: ranged/siege fire projectile; damage on arrival. Melee stays instant.
+	if _uses_projectile():
+		var is_stone: bool = int(owner.damage_type) == int(DamageType.Type.SIEGE)
+		print(owner.name, " fires projectile at ", target.name, " for ", attack_damage, " dmg (stone=" , is_stone, ")")
+		Projectile.fire(owner, target, attack_damage, owner, is_stone)
+		return
+
 	print(owner.name, " hits ", target.name, " for ", attack_damage, " dmg (HP ", max(target.health - attack_damage, 0), "/", target.max_health, ")")
 	# M13: pass owner so IDLE target can retaliate (unit-vs-unit only).
 	target.take_damage(attack_damage, owner)
@@ -119,3 +127,10 @@ func _strike(target: BaseUnit) -> void:
 	if not is_instance_valid(target) or target.unit_state == BaseUnit.UnitState.DEAD:
 		_in_melee = false
 		status = Status.TARGET_DEAD
+
+
+func _uses_projectile() -> bool:
+	if owner == null:
+		return false
+	var dt: int = int(owner.damage_type)
+	return dt == int(DamageType.Type.RANGED) or dt == int(DamageType.Type.SIEGE)

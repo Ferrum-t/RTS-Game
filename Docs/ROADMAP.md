@@ -10,30 +10,20 @@ Playtest + ordered next steps: `Docs/PLAYTEST_ME0_AND_ROADMAP_NOTES.md`.
 
 - Stage 1 RTS loop M10–M18.2
 - M19.x remote/quick train · M20 minimap · M20.1 VisibilityMap · M20.2 Fog B2
+- MAP-R · M21.x Food/Yurt/queue · M22 AI eco · **M23 Mergen** ✓
 - Climate v0.1 (backend + horses) · ME-0 (console pressure signal)
-- ME-0 playtest: climate **not** felt without console → Visual required
 
 ## Next
 
-1. **Climate Visual v0.1** (HUD + slower season)
-2. Resources in other regions
-3. RTS UX slices (remote train, queue, food display) — separate LOCKs
-4. Level 2 climate / 12-month UI / ME-1 / yurt supply — later
+1. Open next LOCK from playtest (AI combat, map bounds, climate visual, etc.)
+2. **M23.1** Projectile VFX — only when READY (visual only; no damage/miss change)
+3. Climate Visual v0.1 (HUD + slower season) — when prioritized
 
 ## Later / parked
 
+- **M23.1** Arrow/stone VFX (Mergen + Tower + Siege) — visual only
 - Neutral camps, minimal hero, Power Sites, magic
 - AI climate / migration brain
-- Minimap + VisibilityMap + Fog v0 (M20–M20.2) ✓ ACCEPTED
-- Fog visual polish (soft edges / filter / color) — future polish only, not M20.2
-- **TD-DEPLOY-01** Optional auto-unpack UX toggle (default OFF; manual Unpack) — idea only
+- Fog visual polish (TD-FOG-01)
+- **TD-DEPLOY-01** Optional auto-unpack UX toggle (default OFF)
 - Multiplayer — `NOMAD_WORLD_BACKLOG.md`
-
-## Idea files
-
-| File | Role |
-|------|------|
-| `PLAYTEST_ME0_AND_ROADMAP_NOTES.md` | Post–ME-0 playtest + ordered milestones |
-| `CLIMATE_UI_AND_PRESSURE_EXTENSIONS_IDEAS.md` | 12 moons, Tree of Life, Level 2, SFX |
-| `IDEAS.md` | Short flavor list |
-| `NOMAD_WORLD_BACKLOG.md` | Late logistics / world extras |

@@ -1,38 +1,17 @@
 # CHANGELOG
 
-## 2026-09-28 — M21.4 AI Food + Yurt ACCEPTED
+## 2026-09-30 — M23 Mergen ACCEPTED
 
-- `EconomicAIController`: Food < 6 → build Yurt (max 2) after 1st Barracks
-- Restored AI harvest resource pick (`BaseResource.resource_amount`) after regression
-- AI income via existing Yurt tick; train resumes when Food recovers
-- F5: harvest/deposit, yurts 1–2, expand flags, 0 script errors
+- Foot archer: train from Barracks (60W+1F, queue max 5 with Soldier/Cav/Siege)
+- Stats: HP 70, dmg 14, range 11, cd 1.1, speed 2.5, DamageType.RANGED, instant hit
+- CommandBar Mergen button; no AI train Mergen
+- **M23.1** projectile VFX deferred (visual only when READY)
 
-## 2026-09-28 — Mobility / deploy notes
+## 2026-09-30 — Horse visual on climate suspend
 
-- Manual Unpack remains default (no auto-unpack on ARRIVED)
-- TD-DEPLOY-01: optional auto-unpack UX toggle — idea only in TECH_DEBT
+- HorseHerd `visible=false` while climate-suspended; resume restores mesh
 
-## 2026-09-25 — M20.2 Fog Visual (B2) ACCEPTED
+## Recent (condensed)
 
-- World + minimap fog from shared `VisibilityMap` (cell 4, no soft edges)
-- Enemy units/buildings hidden in 3D outside VISIBLE
-- Pixelated world fog accepted as intentional v0; polish out of scope
-- ConstructionManager: safe handling of freed pending builder
-
-
-## v0.1
-
-- Selection system
-- Multi-selection
-- Building placement
-- Ghost building
-- Command system
-- MovementComponent
-- Base FSM
-- Unit registration
-
----
-
-## Next
-
-Open next LOCK from CURRENT_STATE / playtest priorities
+- M22 AI Eco · M21.4 AI Yurt · M21.1–M21.3 Food/Yurt/queue
+- M20–M20.2 Minimap + FoW · MAP-R R2–R7 resources

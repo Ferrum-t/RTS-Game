@@ -185,12 +185,10 @@ func update_attacking(delta: float) -> void:
 			current_order = Order.none()
 			velocity = Vector3.ZERO
 			unit_state = UnitState.IDLE
-			# M18-C — immediate re-acquire if another enemy is still in radius (no 0.4s idle wait).
 			_try_reacquire_after_kill()
 		_: pass
 
 
-## M18-C — after kill/lost, snap to next unit in ACQUIRE_RADIUS if any.
 func _try_reacquire_after_kill() -> void:
 	if unit_state != UnitState.IDLE:
 		return
@@ -240,6 +238,11 @@ func _siege_hold_and_strike(delta: float, building: BaseBuilding) -> void:
 	_building_attack_timer -= delta
 	if _building_attack_timer > 0.0: return
 	_building_attack_timer = attack_cooldown
+	var dt: int = int(damage_type)
+	if dt == int(DamageType.Type.SIEGE) or dt == int(DamageType.Type.RANGED):
+		var is_stone: bool = dt == int(DamageType.Type.SIEGE)
+		Projectile.fire(self, building, attack_damage, self, is_stone)
+		return
 	if building.has_method("damage"):
 		building.damage(attack_damage, team_id)
 	elif building.has_method("apply_damage"):
@@ -319,11 +322,9 @@ func take_damage(amount: int, source: Node = null) -> void:
 	if health <= 0:
 		die()
 		return
-	# M13 + M18-A — retaliate vs enemy BaseUnit when not building/repairing/already fighting.
 	_try_retaliate(source)
 
 
-## M16 — only IDLE auto-acquires nearest enemy in radius.
 func _try_idle_acquire(delta: float) -> void:
 	_acquire_timer -= delta
 	if _acquire_timer > 0.0:
@@ -360,7 +361,6 @@ func _find_nearest_acquire_target() -> BaseUnit:
 	return best
 
 
-## M18-A — retaliate from IDLE / MOVING / HARVESTING / RETURNING (not BUILD/REPAIR/ATTACKING).
 func _try_retaliate(source: Node) -> void:
 	match unit_state:
 		UnitState.IDLE, UnitState.MOVING, UnitState.HARVESTING, UnitState.RETURNING:
@@ -378,7 +378,6 @@ func _try_retaliate(source: Node) -> void:
 		return
 	if int(attacker.team_id) == int(team_id):
 		return
-	# Same target already under attack — avoid order thrash.
 	if unit_state == UnitState.ATTACKING and attack_target == attacker:
 		return
 	replace_order_attack(attacker)
@@ -574,16 +573,17 @@ func update_repairing(delta: float) -> void:
 		return
 	if movement and movement.status == MovementComponent.Status.MOVING: movement.cancel()
 	velocity = Vector3.ZERO
-	var done: bool = false
-	if site.has_method("request_repair_tick"):
-		done = site.request_repair_tick(self, delta)
-	if done or site.health >= site.max_health:
+	if site.has_method("apply_worker_repair"):
+		site.apply_worker_repair(self, delta)
+	elif site.has_method("add_repair_progress"):
+		site.add_repair_progress(delta, self)
+	else:
+		site.health = mini(site.max_health, site.health + int(25.0 * delta))
+	if site.health >= site.max_health:
 		print(name, " finished REPAIR ", site.name)
 		_clear_repair("complete")
 
 func _clear_build(reason: String) -> void:
-	if OS.is_debug_build() and build_target != null:
-		print(name, " BUILD end (", reason, ")")
 	build_target = null
 	_build_stuck_time = 0.0
 	velocity = Vector3.ZERO
@@ -591,8 +591,6 @@ func _clear_build(reason: String) -> void:
 	unit_state = UnitState.IDLE
 
 func _clear_repair(reason: String) -> void:
-	if OS.is_debug_build() and repair_target != null:
-		print(name, " REPAIR end (", reason, ")")
 	repair_target = null
 	_build_stuck_time = 0.0
 	velocity = Vector3.ZERO
