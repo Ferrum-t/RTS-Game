@@ -5,6 +5,7 @@ class_name HorseResource
 ## Semi-static herd — harvest like Tree/Stone (v1.0, no AI flee).
 ## Climate v0.1 C2: reversible suspend in COLD/DRY; resume on FAVORABLE.
 ## queue_free only via normal depletion in BaseResource.harvest.
+## Visual: climate-suspended herds are hidden (amount 0 = not harvestable).
 
 var climate_suspended: bool = false
 var _climate_cached_amount: int = 0
@@ -25,6 +26,7 @@ func set_climate_suspended(suspended: bool) -> void:
 		climate_suspended = true
 		_climate_cached_amount = resource_amount
 		resource_amount = 0
+		_apply_availability_visual(false)
 		print("[CLIMATE] horse suspended ", name, " cached=", _climate_cached_amount)
 	else:
 		if not climate_suspended:
@@ -32,11 +34,17 @@ func set_climate_suspended(suspended: bool) -> void:
 		climate_suspended = false
 		resource_amount = maxi(_climate_cached_amount, 0)
 		_climate_cached_amount = 0
+		_apply_availability_visual(true)
 		print("[CLIMATE] horse resumed ", name, " amount=", resource_amount)
 
 
 func is_climate_suspended() -> bool:
 	return climate_suspended
+
+
+func _apply_availability_visual(available: bool) -> void:
+	# Match gameplay: no amount → not visible as a herd.
+	visible = available
 
 
 func harvest(amount: int) -> int:
