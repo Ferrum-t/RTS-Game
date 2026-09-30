@@ -1,16 +1,21 @@
 extends MeshInstance3D
 
-## M20.2 — World fog plane driven by VisibilityMap (single source of truth).
+## M20.2 / M24 — World fog plane driven by VisibilityMap.
+## Plane slightly larger than playable bounds so camera edges stay black.
 
 const MAP_MIN := -95.0
 const MAP_MAX := 95.0
-const PLANE_Y := 0.12
+## Extra margin past map bounds (kills gray void strip at viewport edge).
+const PLANE_MARGIN := 24.0
+const PLANE_Y := 0.15
 
 
 func _ready() -> void:
-	var size := MAP_MAX - MAP_MIN
+	_ensure_black_background()
+
+	var extent := (MAP_MAX - MAP_MIN) + PLANE_MARGIN * 2.0
 	var plane := PlaneMesh.new()
-	plane.size = Vector2(size, size)
+	plane.size = Vector2(extent, extent)
 	mesh = plane
 	position = Vector3(0.0, PLANE_Y, 0.0)
 	cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
@@ -30,6 +35,19 @@ func _ready() -> void:
 		_apply_texture(vm)
 	else:
 		call_deferred("_try_bind_vm")
+
+
+func _ensure_black_background() -> void:
+	# Default Godot clear is gray — reads as a frame past the fog.
+	var w3d := get_viewport().world_3d
+	if w3d == null:
+		return
+	var env: Environment = w3d.environment
+	if env == null:
+		env = Environment.new()
+		w3d.environment = env
+	env.background_mode = Environment.BG_COLOR
+	env.background_color = Color(0.0, 0.0, 0.0, 1.0)
 
 
 func _try_bind_vm() -> void:
