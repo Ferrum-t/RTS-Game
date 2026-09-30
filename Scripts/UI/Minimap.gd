@@ -4,6 +4,7 @@ extends PanelContainer
 ## Player units/buildings + camera rect + click-to-pan.
 ## M20.1: enemy markers only when VISIBLE.
 ## M20.2: fog overlay UNEXPLORED/EXPLORED from VisibilityMap.
+## M24: darker fog tones aligned with world near-black FoW.
 
 const PLAYER_TEAM := 0
 const MARKER_INTERVAL := 0.15
@@ -103,10 +104,10 @@ func _draw_fog_overlay() -> void:
 			if st == 2:  # VISIBLE
 				continue
 			var col: Color
-			if st == 1:  # EXPLORED
-				col = Color(0.02, 0.03, 0.05, 0.45)
-			else:  # UNEXPLORED
-				col = Color(0.0, 0.0, 0.0, 0.82)
+			if st == 1:  # EXPLORED — dark dim (M24 match world)
+				col = Color(0.0, 0.0, 0.0, 0.58)
+			else:  # UNEXPLORED — near-black
+				col = Color(0.0, 0.0, 0.0, 0.94)
 			draw_rect(Rect2(x * cw, z * ch, cw + 0.5, ch + 0.5), col)
 
 
