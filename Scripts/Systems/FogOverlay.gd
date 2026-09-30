@@ -1,11 +1,9 @@
 extends MeshInstance3D
 
 ## M20.2 / M24 — World fog plane driven by VisibilityMap.
-## Plane slightly larger than playable bounds so camera edges stay black.
+## Plane slightly larger than playable bounds; shader UV maps fog_tex to ±95 only.
 
-const MAP_MIN := -95.0
-const MAP_MAX := 95.0
-## Extra margin past map bounds (kills gray void strip at viewport edge).
+const MAP_HALF := 95.0
 const PLANE_MARGIN := 24.0
 const PLANE_Y := 0.15
 
@@ -13,9 +11,9 @@ const PLANE_Y := 0.15
 func _ready() -> void:
 	_ensure_black_background()
 
-	var extent := (MAP_MAX - MAP_MIN) + PLANE_MARGIN * 2.0
+	var plane_half := MAP_HALF + PLANE_MARGIN
 	var plane := PlaneMesh.new()
-	plane.size = Vector2(extent, extent)
+	plane.size = Vector2(plane_half * 2.0, plane_half * 2.0)
 	mesh = plane
 	position = Vector3(0.0, PLANE_Y, 0.0)
 	cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
@@ -26,6 +24,8 @@ func _ready() -> void:
 		push_error("FogOverlay: missing fog_overlay.gdshader")
 		return
 	mat.shader = sh
+	mat.set_shader_parameter("map_half", MAP_HALF)
+	mat.set_shader_parameter("plane_half", plane_half)
 	material_override = mat
 
 	var vm := get_node_or_null("/root/VisibilityMap")
@@ -38,7 +38,6 @@ func _ready() -> void:
 
 
 func _ensure_black_background() -> void:
-	# Default Godot clear is gray — reads as a frame past the fog.
 	var w3d := get_viewport().world_3d
 	if w3d == null:
 		return
