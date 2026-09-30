@@ -57,18 +57,17 @@ Setting ON
 
 **Related:** `DeploymentComponent` ARRIVED leaves MOBILE; `UnpackButton` gated by `can_unpack()` (not while moving).
 
-## M23.1 — Projectile VFX (post–M23)
+## TD-FIRE-MOVE-01 — Ranged fire while moving (idea)
 
-**Status:** Parked — implement only under `M23.1 READY`.
+**Status:** IDEA only — not implemented (2026-09-30 discussion).
 
-**Intent:** Visual-only flying mesh on strike:
-- Mergen: thin long cylinder (arrow)
-- Watchtower: same or bolt
-- Siege: short sphere/stone
+**Intent (if ever LOCK):**
+- Ranged units (Mergen) may strike while `MOVING` (kite)
+- Melee stays stop-to-hit
+- **Watchtower MOBILE stays mute** (pack/unpack trade-off; no drive-by fortress)
 
-**Rules:**
-- Damage / range / cooldown / miss / ballistics **unchanged** (instant hit remains truth)
-- Short lifetime lerp start→target then `queue_free`
-- No new combat systems
+**OUT until LOCK:** mobile-tower full DPS, stance system, attack-move redesign.
 
-**OUT until LOCK:** real physics projectiles, dodge, ballistic arc redesign.
+## M23.1 — CLOSED (was parked as VFX-only)
+
+Shipped as **real** projectile combat (damage on arrival), not visual-only. See `CURRENT_STATE.md` / `CHANGELOG.md`.

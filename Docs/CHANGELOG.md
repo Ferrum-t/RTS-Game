@@ -1,11 +1,18 @@
 # CHANGELOG
 
+## 2026-09-30 — M23.1 Projectile Combat ACCEPTED
+
+- Damage on arrival for Mergen / Watchtower (arrow) and Siege (stone)
+- Speeds: arrow 32, stone 20 · fly_time clamp 0.12–0.50 · straight path
+- Freed attacker mid-flight: no crash (`is_instance_valid` source)
+- Melee unchanged · cooldown at fire
+- **Polish same day:** camera start on player TC, dolly zoom, edge-scroll UI skip, unit face-on-move, repair `request_repair_tick` restore
+
 ## 2026-09-30 — M23 Mergen ACCEPTED
 
 - Foot archer: train from Barracks (60W+1F, queue max 5 with Soldier/Cav/Siege)
-- Stats: HP 70, dmg 14, range 11, cd 1.1, speed 2.5, DamageType.RANGED, instant hit
+- Stats: HP 70, dmg 14, range 11, cd 1.1, speed 2.5, DamageType.RANGED
 - CommandBar Mergen button; no AI train Mergen
-- **M23.1** projectile VFX deferred (visual only when READY)
 
 ## 2026-09-30 — Horse visual on climate suspend
 
