@@ -56,3 +56,19 @@ Setting ON
 **Why deferred:** Explicit unpack preserves nomad control; auto is convenience. Implement only under a dedicated LOCK after core mobility is stable.
 
 **Related:** `DeploymentComponent` ARRIVED leaves MOBILE; `UnpackButton` gated by `can_unpack()` (not while moving).
+
+## M23.1 — Projectile VFX (post–M23)
+
+**Status:** Parked — implement only under `M23.1 READY`.
+
+**Intent:** Visual-only flying mesh on strike:
+- Mergen: thin long cylinder (arrow)
+- Watchtower: same or bolt
+- Siege: short sphere/stone
+
+**Rules:**
+- Damage / range / cooldown / miss / ballistics **unchanged** (instant hit remains truth)
+- Short lifetime lerp start→target then `queue_free`
+- No new combat systems
+
+**OUT until LOCK:** real physics projectiles, dodge, ballistic arc redesign.
