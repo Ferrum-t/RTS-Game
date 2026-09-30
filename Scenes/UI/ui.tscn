@@ -8,6 +8,7 @@
 [ext_resource type="Script" path="res://Scripts/UI/TrainSoldierButton.gd" id="6_soldier"]
 [ext_resource type="Script" path="res://Scripts/UI/TrainCavalryButton.gd" id="7_cav"]
 [ext_resource type="Script" path="res://Scripts/UI/TrainSiegeButton.gd" id="7b_siege"]
+[ext_resource type="Script" path="res://Scripts/UI/TrainMergenButton.gd" id="7c_mergen"]
 [ext_resource type="Script" path="res://Scripts/UI/PackButton.gd" id="8_pack"]
 [ext_resource type="Script" path="res://Scripts/UI/UnpackButton.gd" id="9_unpack"]
 [ext_resource type="Script" path="res://Scripts/UI/CommandBar.gd" id="10_cmd"]
@@ -149,6 +150,12 @@ custom_minimum_size = Vector2(120, 28)
 layout_mode = 2
 text = "Soldier (80W)"
 script = ExtResource("6_soldier")
+
+[node name="TrainMergenButton" type="Button" parent="BottomBar/Margin/HBox/BarracksGroup"]
+custom_minimum_size = Vector2(120, 28)
+layout_mode = 2
+text = "Mergen (60W+1F)"
+script = ExtResource("7c_mergen")
 
 [node name="TrainCavalryButton" type="Button" parent="BottomBar/Margin/HBox/BarracksGroup"]
 custom_minimum_size = Vector2(130, 28)
