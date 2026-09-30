@@ -294,6 +294,7 @@ func update(delta: float) -> void:
 	else:
 		owner.velocity.x = desired.x
 		owner.velocity.z = desired.z
+		_face_move_dir(owner.velocity)
 		owner.move_and_slide()
 
 
@@ -307,6 +308,7 @@ func _on_velocity_computed(safe_velocity: Vector3) -> void:
 		return
 	owner.velocity.x = safe_velocity.x
 	owner.velocity.z = safe_velocity.z
+	_face_move_dir(owner.velocity)
 	owner.move_and_slide()
 
 
@@ -320,6 +322,7 @@ func _direct_steer(_delta: float, final_target: Vector3) -> void:
 	status = Status.MOVING
 	owner.velocity.x = direction.x * owner.move_speed
 	owner.velocity.z = direction.z * owner.move_speed
+	_face_move_dir(owner.velocity)
 	owner.move_and_slide()
 
 
@@ -353,6 +356,17 @@ func _set_failed() -> void:
 	status = Status.FAILED
 	if agent and agent.avoidance_enabled:
 		agent.set_velocity(Vector3.ZERO)
+
+
+func _face_move_dir(vel: Vector3) -> void:
+	if owner == null or not is_instance_valid(owner):
+		return
+	var d := Vector3(vel.x, 0.0, vel.z)
+	if d.length_squared() < 0.0004:
+		return
+	d = d.normalized()
+	# Model forward = -Z (Godot default). Ready for 3D mesh import.
+	owner.rotation.y = atan2(-d.x, -d.z)
 
 
 func _separation() -> Vector3:

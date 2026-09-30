@@ -17,9 +17,42 @@ extends Node3D
 @export var map_min_z: float = -95.0
 @export var map_max_z: float = 95.0
 
+## Player team for start focus (Warcraft-style).
+@export var player_team_id: int = 0
+
 @export var camera: Camera3D
 
 var rotating := false
+
+
+func _ready() -> void:
+	# Defer so BuildingManager has registered player TC.
+	call_deferred("_focus_player_town_center")
+
+
+func _focus_player_town_center() -> void:
+	var bm := get_node_or_null("/root/BuildingManager")
+	if bm == null:
+		return
+	var tc: Node3D = null
+	if bm.has_method("get_nearest_town_center"):
+		# Any player TC near origin; first registered is fine for start.
+		tc = bm.get_nearest_town_center(Vector3.ZERO, player_team_id)
+	if tc == null or not is_instance_valid(tc):
+		# Fallback: scan registered list if exposed.
+		var list: Array = bm.get("town_centers") if "town_centers" in bm else []
+		for b in list:
+			if b != null and is_instance_valid(b) and int(b.get("team_id")) == player_team_id:
+				tc = b
+				break
+	if tc == null or not is_instance_valid(tc):
+		return
+	var p: Vector3 = tc.global_position
+	global_position.x = p.x
+	global_position.z = p.z
+	_clamp_to_map()
+	if OS.is_debug_build():
+		print("[CAMERA] start focus on ", tc.name, " at (", snappedf(p.x, 0.1), ", ", snappedf(p.z, 0.1), ")")
 
 
 func _process(delta):
