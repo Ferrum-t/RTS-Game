@@ -12,7 +12,8 @@ const HEIGHT_OFFSET := 1.0
 
 var _target: Object = null
 var _damage: int = 0
-var _source: Node = null
+## Untyped Object so a freed attacker does not trip Node typed-arg checks.
+var _source: Object = null
 var _fly_time: float = 0.2
 var _elapsed: float = 0.0
 var _start: Vector3 = Vector3.ZERO
@@ -115,20 +116,30 @@ func _process(delta: float) -> void:
 		queue_free()
 
 
+## Attacker may die mid-flight; never pass a freed Node into take_damage.
+func _alive_source() -> Node:
+	if _source == null or not is_instance_valid(_source):
+		return null
+	if _source is Node:
+		return _source as Node
+	return null
+
+
 func _apply_damage() -> void:
 	if _target == null or not is_instance_valid(_target):
 		return
+	var src: Node = _alive_source()
 	if _target is BaseUnit:
 		var u := _target as BaseUnit
 		if u.unit_state == BaseUnit.UnitState.DEAD:
 			return
-		u.take_damage(_damage, _source)
+		u.take_damage(_damage, src)
 		return
 	if _target is BaseBuilding:
 		var b := _target as BaseBuilding
 		if b.is_destroyed or b.health <= 0:
 			return
 		if b.has_method("take_damage"):
-			b.take_damage(_damage, _source)
+			b.take_damage(_damage, src)
 		elif b.has_method("damage"):
 			b.damage(_damage, 0)
