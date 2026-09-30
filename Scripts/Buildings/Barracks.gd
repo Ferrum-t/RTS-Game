@@ -2,9 +2,10 @@ extends BaseBuilding
 
 class_name Barracks
 
-## Military production. Soldiers + Cavalry + SiegeUnit.
-## M19.1 / M21.3: shared train queue max 5 (Soldier, Cavalry, Siege).
+## Military production. Soldiers + Cavalry + SiegeUnit + Mergen.
+## M19.1 / M21.3: shared train queue max 5 (Soldier, Cavalry, Siege, Mergen).
 ## M21.1: Soldier/Cavalry cost Food; refund on cancel.
+## M23: Mergen foot archer (instant ranged, player-only).
 
 const MAX_TRAIN_QUEUE := 5
 
@@ -23,6 +24,11 @@ const MAX_TRAIN_QUEUE := 5
 @export var siege_cost_wood: int = 150
 @export var siege_cost_stone: int = 50
 @export var siege_train_time: float = 8.0
+
+@export var mergen_scene: PackedScene
+@export var mergen_cost_wood: int = 60
+@export var mergen_cost_food: int = 1
+@export var mergen_train_time: float = 5.5
 
 var is_training: bool = false
 var train_timer: float = 0.0
@@ -45,6 +51,8 @@ func _ready() -> void:
 		cavalry_scene = load("res://Scenes/Units/cavalry.tscn") as PackedScene
 	if siege_scene == null:
 		siege_scene = load("res://Scenes/Units/siege_unit.tscn") as PackedScene
+	if mergen_scene == null:
+		mergen_scene = load("res://Scenes/Units/mergen.tscn") as PackedScene
 	print("Barracks ready at: ", global_position)
 	if DebugFlags.BUILDING_HOTKEYS and OS.is_debug_build() and team_id == 0:
 		print("Barracks debug: C=Cavalry  R=Siege (150W+50S)")
@@ -200,6 +208,40 @@ func try_train_siege() -> bool:
 	return true
 
 
+func try_train_mergen() -> bool:
+	if not is_constructed:
+		print("Barracks: still under construction")
+		return false
+	if mergen_scene == null:
+		push_error("Barracks: mergen_scene is null")
+		return false
+	if get_train_pipeline_count() >= MAX_TRAIN_QUEUE:
+		print("Barracks: train queue full (", MAX_TRAIN_QUEUE, ")")
+		return false
+	var rm := get_node_or_null("/root/ResourceManager")
+	if rm == null:
+		return false
+	var cost: Dictionary = ResourceManager.make_cost(mergen_cost_wood, 0, 0, mergen_cost_food)
+	if not rm.spend(cost, team_id):
+		print("Barracks: not enough resources for Mergen (need W:", mergen_cost_wood, " F:", mergen_cost_food, ") team=", team_id)
+		return false
+	if not is_training:
+		_start_train(mergen_scene, mergen_train_time, "Mergen", mergen_cost_wood, 0, 0, mergen_cost_food)
+		print("Barracks: training Mergen... (", mergen_train_time, "s, cost ", mergen_cost_wood, " wood + ", mergen_cost_food, " food)")
+	else:
+		_train_queue.append({
+			"scene": mergen_scene,
+			"time": mergen_train_time,
+			"label": "Mergen",
+			"cost_wood": mergen_cost_wood,
+			"cost_stone": 0,
+			"cost_horses": 0,
+			"cost_food": mergen_cost_food,
+		})
+		print("Barracks: queued Mergen (queue=", _train_queue.size(), " pipeline=", get_train_pipeline_count(), ")")
+	return true
+
+
 func cancel_train_last() -> bool:
 	if not _train_queue.is_empty():
 		var e: Dictionary = _train_queue.pop_back()
@@ -335,6 +377,8 @@ func _finish_training() -> void:
 		out_label = "SiegeUnit"
 	elif unit is Cavalry:
 		out_label = "Cavalry"
+	elif unit is Mergen:
+		out_label = "Mergen"
 	elif unit is Soldier:
 		out_label = "Soldier"
 	print("Barracks: ", out_label, " trained at door ", door, " → slot ", dest)
