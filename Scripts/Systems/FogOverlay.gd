@@ -1,19 +1,18 @@
 extends MeshInstance3D
 
 ## M20.2 / M24 — World fog plane driven by VisibilityMap.
-## Plane slightly larger than playable bounds; shader UV maps fog_tex to ±95 only.
 
-const MAP_HALF := 95.0
-const PLANE_MARGIN := 24.0
+const MAP_MIN := -95.0
+const MAP_MAX := 95.0
 const PLANE_Y := 0.15
 
 
 func _ready() -> void:
-	_ensure_black_background()
+	_ensure_black_void_not_black_world()
 
-	var plane_half := MAP_HALF + PLANE_MARGIN
+	var size := MAP_MAX - MAP_MIN
 	var plane := PlaneMesh.new()
-	plane.size = Vector2(plane_half * 2.0, plane_half * 2.0)
+	plane.size = Vector2(size, size)
 	mesh = plane
 	position = Vector3(0.0, PLANE_Y, 0.0)
 	cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
@@ -24,8 +23,6 @@ func _ready() -> void:
 		push_error("FogOverlay: missing fog_overlay.gdshader")
 		return
 	mat.shader = sh
-	mat.set_shader_parameter("map_half", MAP_HALF)
-	mat.set_shader_parameter("plane_half", plane_half)
 	material_override = mat
 
 	var vm := get_node_or_null("/root/VisibilityMap")
@@ -37,7 +34,9 @@ func _ready() -> void:
 		call_deferred("_try_bind_vm")
 
 
-func _ensure_black_background() -> void:
+func _ensure_black_void_not_black_world() -> void:
+	## Black clear color for off-map void, but ambient must NOT sample that black
+	## (AMBIENT_SOURCE_BG + black BG was making the entire lit scene pitch black).
 	var w3d := get_viewport().world_3d
 	if w3d == null:
 		return
@@ -47,6 +46,9 @@ func _ensure_black_background() -> void:
 		w3d.environment = env
 	env.background_mode = Environment.BG_COLOR
 	env.background_color = Color(0.0, 0.0, 0.0, 1.0)
+	env.ambient_light_source = Environment.AMBIENT_SOURCE_COLOR
+	env.ambient_light_color = Color(0.42, 0.42, 0.48)
+	env.ambient_light_energy = 0.9
 
 
 func _try_bind_vm() -> void:
