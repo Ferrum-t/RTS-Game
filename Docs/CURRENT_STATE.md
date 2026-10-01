@@ -11,28 +11,26 @@
 | Field | Value |
 |--------|--------|
 | **Last accepted** | **M24 Fog Visual Polish** |
-| **Now** | idle — next candidate Horse Archer |
-| **Next** | Horse Archer (ranged + horses cost) |
+| **Now** | **M25 Horse Archer** — shipped, **F5 pending** |
+| **Next** | after F5 ACCEPTED |
 
-### M24 closed (summary)
+### M25 scope
 
-- World fog: near-black UNEXPLORED, dark EXPLORED, soft GPU edges
-- SunLight + lower ambient (form readable for future hand-paint)
-- Perf: minimap fog = one texture; VisibilityMap buffer write; 0.5s interval
-- VisibilityMap / cell_size / B2 — unchanged
-- F5: no hang to VICTORY with large armies
+- Horse Archer: 80W+2F+1H, train ~6s, shared queue max 5
+- HP 90 · dmg 13 · range 10 · speed 4.2 · cd 1.0 · RANGED projectile
+- Player only (no AI train)
+- Stop-to-shoot (no shoot-on-move)
 
 ---
 
 ## Done chain (recent)
 
 ```
-M20–M20.2 Minimap + FoW data/visual ✓
-M21.x Food / Yurt / AI Yurt         ✓
-M22   AI Eco                        ✓
-M23   Mergen                        ✓
-M23.1 Projectile combat             ✓
-M24   Fog visual polish             ✓ ACCEPTED
+M20–M20.2 Minimap + FoW   ✓
+M21–M22 Food/Yurt/AI Eco  ✓
+M23–M23.1 Mergen + proj   ✓
+M24 Fog polish            ✓ ACCEPTED
+M25 Horse Archer          shipped / F5
 ```
 
-**Parked:** TD-DEPLOY-01 · TD-FIRE-MOVE-01 · TD-FOG soft polish (optional later)
+**Parked:** TD-DEPLOY-01 · TD-FIRE-MOVE-01

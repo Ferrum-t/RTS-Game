@@ -9,6 +9,7 @@
 [ext_resource type="Script" path="res://Scripts/UI/TrainCavalryButton.gd" id="7_cav"]
 [ext_resource type="Script" path="res://Scripts/UI/TrainSiegeButton.gd" id="7b_siege"]
 [ext_resource type="Script" path="res://Scripts/UI/TrainMergenButton.gd" id="7c_mergen"]
+[ext_resource type="Script" path="res://Scripts/UI/TrainHorseArcherButton.gd" id="7d_ha"]
 [ext_resource type="Script" path="res://Scripts/UI/PackButton.gd" id="8_pack"]
 [ext_resource type="Script" path="res://Scripts/UI/UnpackButton.gd" id="9_unpack"]
 [ext_resource type="Script" path="res://Scripts/UI/CommandBar.gd" id="10_cmd"]
@@ -29,18 +30,15 @@ offset_bottom = 26.0
 grow_horizontal = 2
 theme_override_font_sizes/font_size = 14
 text = "Wood: 0    Stone: 0    Gold: 0    Food: 0    Horses: 0"
-horizontal_alignment = 1
 script = ExtResource("4_resui")
 
-[node name="ClimateHomeHud" type="PanelContainer" parent="."]
-anchors_preset = 1
-anchor_left = 1.0
-anchor_right = 1.0
-offset_left = -180.0
-offset_top = 4.0
-offset_right = -8.0
-offset_bottom = 56.0
-grow_horizontal = 0
+[node name="ClimateHomeHud" type="Label" parent="."]
+offset_left = 8.0
+offset_top = 28.0
+offset_right = 420.0
+offset_bottom = 52.0
+theme_override_font_sizes/font_size = 13
+text = "Home climate: —"
 script = ExtResource("11_climate")
 
 [node name="TrainingQueuePanel" type="PanelContainer" parent="."]
@@ -50,65 +48,63 @@ anchor_top = 1.0
 anchor_right = 1.0
 anchor_bottom = 1.0
 offset_left = -220.0
-offset_top = -160.0
-offset_right = -8.0
-offset_bottom = -8.0
+offset_top = -140.0
+offset_right = -12.0
+offset_bottom = -12.0
 grow_horizontal = 0
 grow_vertical = 0
 script = ExtResource("12_queue")
 
 [node name="QuickTrainPanel" type="PanelContainer" parent="."]
-anchors_preset = 2
-anchor_top = 1.0
-anchor_bottom = 1.0
 offset_left = 8.0
 offset_top = -280.0
-offset_right = 100.0
+offset_right = 120.0
 offset_bottom = -188.0
+anchor_top = 1.0
+anchor_bottom = 1.0
 grow_vertical = 0
 script = ExtResource("13_quick")
 
 [node name="Margin" type="MarginContainer" parent="QuickTrainPanel"]
 layout_mode = 2
-theme_override_constants/margin_left = 4
-theme_override_constants/margin_top = 4
-theme_override_constants/margin_right = 4
-theme_override_constants/margin_bottom = 4
+theme_override_constants/margin_left = 6
+theme_override_constants/margin_top = 6
+theme_override_constants/margin_right = 6
+theme_override_constants/margin_bottom = 6
 
 [node name="HBox" type="VBoxContainer" parent="QuickTrainPanel/Margin"]
 layout_mode = 2
 theme_override_constants/separation = 4
 
 [node name="QuickWorker" type="Button" parent="QuickTrainPanel/Margin/HBox"]
-custom_minimum_size = Vector2(84, 28)
+custom_minimum_size = Vector2(100, 28)
 layout_mode = 2
 text = "TC"
 
 [node name="QuickSoldier" type="Button" parent="QuickTrainPanel/Margin/HBox"]
-custom_minimum_size = Vector2(84, 28)
+custom_minimum_size = Vector2(100, 28)
 layout_mode = 2
 text = "Barracks"
 
 [node name="Minimap" type="PanelContainer" parent="."]
-anchors_preset = 2
-anchor_top = 1.0
-anchor_bottom = 1.0
 offset_left = 8.0
 offset_top = -180.0
 offset_right = 178.0
-offset_bottom = -10.0
+offset_bottom = -8.0
+anchor_top = 1.0
+anchor_bottom = 1.0
 grow_vertical = 0
-mouse_filter = 0
 script = ExtResource("14_minimap")
 
 [node name="BottomBar" type="PanelContainer" parent="."]
-anchors_preset = 12
+anchors_preset = 7
+anchor_left = 0.5
 anchor_top = 1.0
-anchor_right = 1.0
+anchor_right = 0.5
 anchor_bottom = 1.0
-offset_left = 190.0
-offset_top = -64.0
-offset_right = -230.0
+offset_left = -320.0
+offset_top = -56.0
+offset_right = 320.0
 offset_bottom = -8.0
 grow_horizontal = 2
 grow_vertical = 0
@@ -117,24 +113,24 @@ script = ExtResource("10_cmd")
 [node name="Margin" type="MarginContainer" parent="BottomBar"]
 layout_mode = 2
 theme_override_constants/margin_left = 8
-theme_override_constants/margin_top = 4
+theme_override_constants/margin_top = 6
 theme_override_constants/margin_right = 8
-theme_override_constants/margin_bottom = 4
+theme_override_constants/margin_bottom = 6
 
 [node name="HBox" type="HBoxContainer" parent="BottomBar/Margin"]
 layout_mode = 2
+theme_override_constants/separation = 10
 alignment = 1
-theme_override_constants/separation = 6
 
 [node name="WorkerGroup" type="HBoxContainer" parent="BottomBar/Margin/HBox"]
 visible = false
 layout_mode = 2
 theme_override_constants/separation = 6
 
-[node name="BuildPanel" type="PanelContainer" parent="BottomBar/Margin/HBox/WorkerGroup"]
+[node name="BuildPanel" type="HBoxContainer" parent="BottomBar/Margin/HBox/WorkerGroup"]
 layout_mode = 2
 script = ExtResource("1_ahcct")
-build_catalog = ExtResource("2_de23q")
+catalog = ExtResource("2_de23q")
 build_button_scene = ExtResource("3_c7mb3")
 
 [node name="VBoxContainer" type="HBoxContainer" parent="BottomBar/Margin/HBox/WorkerGroup/BuildPanel"]
@@ -163,6 +159,12 @@ layout_mode = 2
 text = "Cavalry (100W+1H)"
 script = ExtResource("7_cav")
 
+[node name="TrainHorseArcherButton" type="Button" parent="BottomBar/Margin/HBox/BarracksGroup"]
+custom_minimum_size = Vector2(150, 28)
+layout_mode = 2
+text = "Horse Archer (80W+2F+1H)"
+script = ExtResource("7d_ha")
+
 [node name="TrainSiegeButton" type="Button" parent="BottomBar/Margin/HBox/BarracksGroup"]
 custom_minimum_size = Vector2(120, 28)
 layout_mode = 2
@@ -181,13 +183,13 @@ text = "Worker (50W)"
 script = ExtResource("5_train")
 
 [node name="PackButton" type="Button" parent="BottomBar/Margin/HBox/TownCenterGroup"]
-custom_minimum_size = Vector2(72, 28)
+custom_minimum_size = Vector2(80, 28)
 layout_mode = 2
 text = "Pack"
 script = ExtResource("8_pack")
 
 [node name="UnpackButton" type="Button" parent="BottomBar/Margin/HBox/TownCenterGroup"]
-custom_minimum_size = Vector2(72, 28)
+custom_minimum_size = Vector2(80, 28)
 layout_mode = 2
 text = "Unpack"
 script = ExtResource("9_unpack")
@@ -198,13 +200,13 @@ layout_mode = 2
 theme_override_constants/separation = 6
 
 [node name="PackButton" type="Button" parent="BottomBar/Margin/HBox/WatchtowerGroup"]
-custom_minimum_size = Vector2(72, 28)
+custom_minimum_size = Vector2(80, 28)
 layout_mode = 2
 text = "Pack"
 script = ExtResource("8_pack")
 
 [node name="UnpackButton" type="Button" parent="BottomBar/Margin/HBox/WatchtowerGroup"]
-custom_minimum_size = Vector2(72, 28)
+custom_minimum_size = Vector2(80, 28)
 layout_mode = 2
 text = "Unpack"
 script = ExtResource("9_unpack")
