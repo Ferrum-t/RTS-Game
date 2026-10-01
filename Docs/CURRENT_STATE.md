@@ -10,16 +10,16 @@
 
 | Field | Value |
 |--------|--------|
-| **Last accepted** | **M24 Fog Visual Polish** |
-| **Now** | **M25 Horse Archer** — shipped, **F5 pending** |
-| **Next** | after F5 ACCEPTED |
+| **Last accepted** | **M25 Horse Archer** |
+| **Now** | idle |
+| **Next** | open — suggest after playtest |
 
-### M25 scope
+### M25 closed
 
-- Horse Archer: 80W+2F+1H, train ~6s, shared queue max 5
+- Horse Archer: 80W+2F+1H · ~6s · queue max 5
 - HP 90 · dmg 13 · range 10 · speed 4.2 · cd 1.0 · RANGED projectile
-- Player only (no AI train)
-- Stop-to-shoot (no shoot-on-move)
+- Train / queue / combat / ACQUIRE verified in playtest → VICTORY
+- AI train: no · shoot-on-move: no
 
 ---
 
@@ -29,8 +29,8 @@
 M20–M20.2 Minimap + FoW   ✓
 M21–M22 Food/Yurt/AI Eco  ✓
 M23–M23.1 Mergen + proj   ✓
-M24 Fog polish            ✓ ACCEPTED
-M25 Horse Archer          shipped / F5
+M24 Fog polish            ✓
+M25 Horse Archer          ✓ ACCEPTED
 ```
 
 **Parked:** TD-DEPLOY-01 · TD-FIRE-MOVE-01
