@@ -1,7 +1,7 @@
 extends Node
 
 ## M20.1 data + M20.2 fog image + hide enemy 3D outside VISIBLE.
-## M24: soft edges via GPU filter_linear (no CPU upscale — avoids hitch every 0.2s).
+## M24: soft edges via GPU filter_linear (no CPU upscale).
 
 const PLAYER_TEAM := 0
 const MAP_MIN_X := -95.0
@@ -9,7 +9,7 @@ const MAP_MAX_X := 95.0
 const MAP_MIN_Z := -95.0
 const MAP_MAX_Z := 95.0
 const CELL_SIZE := 4.0
-const UPDATE_INTERVAL := 0.2
+const UPDATE_INTERVAL := 0.3
 const UNIT_STATE_DEAD := 7
 const DEPLOYED := 0
 
@@ -137,7 +137,6 @@ func _update_visibility() -> void:
 
 
 func _rebuild_fog_image() -> void:
-	# Native cell grid only (~48×48). Soft edges = GPU filter_linear in shader.
 	for z in range(_rows):
 		for x in range(_cols):
 			var s := int(_cells[z * _cols + x])
