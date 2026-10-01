@@ -1,7 +1,7 @@
 extends Node
 
 ## M20.1 data + M20.2 fog image + hide enemy 3D outside VISIBLE.
-## M24: hi-res fog texture for smoother edges (cell logic still CELL_SIZE=4).
+## M24: soft edges via GPU filter_linear (no CPU upscale — avoids hitch every 0.2s).
 
 const PLAYER_TEAM := 0
 const MAP_MIN_X := -95.0
@@ -9,8 +9,6 @@ const MAP_MAX_X := 95.0
 const MAP_MIN_Z := -95.0
 const MAP_MAX_Z := 95.0
 const CELL_SIZE := 4.0
-## Display-only upscale (does not change vision grid / B2).
-const FOG_TEX_SCALE := 4
 const UPDATE_INTERVAL := 0.2
 const UNIT_STATE_DEAD := 7
 const DEPLOYED := 0
@@ -38,8 +36,6 @@ var _cells: PackedByteArray = PackedByteArray()
 var _timer: float = 0.0
 var _fog_image: Image
 var _fog_texture: ImageTexture
-var _fog_w: int = 0
-var _fog_h: int = 0
 
 
 func _ready() -> void:
@@ -47,9 +43,7 @@ func _ready() -> void:
 	_rows = int(ceil((MAP_MAX_Z - MAP_MIN_Z) / CELL_SIZE))
 	_cells.resize(_cols * _rows)
 	_cells.fill(CellState.UNEXPLORED)
-	_fog_w = _cols * FOG_TEX_SCALE
-	_fog_h = _rows * FOG_TEX_SCALE
-	_fog_image = Image.create(_fog_w, _fog_h, false, Image.FORMAT_RGB8)
+	_fog_image = Image.create(_cols, _rows, false, Image.FORMAT_RGB8)
 	_fog_texture = ImageTexture.create_from_image(_fog_image)
 	call_deferred("force_update")
 
@@ -142,34 +136,17 @@ func _update_visibility() -> void:
 	visibility_updated.emit()
 
 
-func _cell_value(s: int) -> float:
-	if s == CellState.VISIBLE:
-		return 1.0
-	if s == CellState.EXPLORED:
-		return 0.5
-	return 0.0
-
-
 func _rebuild_fog_image() -> void:
-	# Hi-res soft sample: bilinear from cell grid → smoother circles, same data.
-	var scale := float(FOG_TEX_SCALE)
-	for py in range(_fog_h):
-		for px in range(_fog_w):
-			var fx := (float(px) + 0.5) / scale - 0.5
-			var fz := (float(py) + 0.5) / scale - 0.5
-			var x0 := int(floor(fx))
-			var z0 := int(floor(fz))
-			var tx := fx - float(x0)
-			var tz := fz - float(z0)
-			var v00 := _cell_value(get_cell_state(Vector2i(x0, z0)))
-			var v10 := _cell_value(get_cell_state(Vector2i(x0 + 1, z0)))
-			var v01 := _cell_value(get_cell_state(Vector2i(x0, z0 + 1)))
-			var v11 := _cell_value(get_cell_state(Vector2i(x0 + 1, z0 + 1)))
-			var v0 := lerpf(v00, v10, tx)
-			var v1 := lerpf(v01, v11, tx)
-			var v := lerpf(v0, v1, tz)
-			var b: int = int(clampf(v * 255.0, 0.0, 255.0))
-			_fog_image.set_pixel(px, py, Color8(b, b, b))
+	# Native cell grid only (~48×48). Soft edges = GPU filter_linear in shader.
+	for z in range(_rows):
+		for x in range(_cols):
+			var s := int(_cells[z * _cols + x])
+			var v: int = 0
+			if s == CellState.VISIBLE:
+				v = 255
+			elif s == CellState.EXPLORED:
+				v = 128
+			_fog_image.set_pixel(x, z, Color8(v, v, v))
 	_fog_texture.update(_fog_image)
 
 
