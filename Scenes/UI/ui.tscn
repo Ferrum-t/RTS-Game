@@ -32,13 +32,11 @@ theme_override_font_sizes/font_size = 14
 text = "Wood: 0    Stone: 0    Gold: 0    Food: 0    Horses: 0"
 script = ExtResource("4_resui")
 
-[node name="ClimateHomeHud" type="Label" parent="."]
+[node name="ClimateHomeHud" type="PanelContainer" parent="."]
 offset_left = 8.0
 offset_top = 28.0
 offset_right = 420.0
 offset_bottom = 52.0
-theme_override_font_sizes/font_size = 13
-text = "Home climate: —"
 script = ExtResource("11_climate")
 
 [node name="TrainingQueuePanel" type="PanelContainer" parent="."]
@@ -56,12 +54,13 @@ grow_vertical = 0
 script = ExtResource("12_queue")
 
 [node name="QuickTrainPanel" type="PanelContainer" parent="."]
+anchors_preset = 2
+anchor_top = 1.0
+anchor_bottom = 1.0
 offset_left = 8.0
 offset_top = -280.0
 offset_right = 120.0
 offset_bottom = -188.0
-anchor_top = 1.0
-anchor_bottom = 1.0
 grow_vertical = 0
 script = ExtResource("13_quick")
 
@@ -87,12 +86,13 @@ layout_mode = 2
 text = "Barracks"
 
 [node name="Minimap" type="PanelContainer" parent="."]
+anchors_preset = 2
+anchor_top = 1.0
+anchor_bottom = 1.0
 offset_left = 8.0
 offset_top = -180.0
 offset_right = 178.0
 offset_bottom = -8.0
-anchor_top = 1.0
-anchor_bottom = 1.0
 grow_vertical = 0
 script = ExtResource("14_minimap")
 
@@ -102,9 +102,9 @@ anchor_left = 0.5
 anchor_top = 1.0
 anchor_right = 0.5
 anchor_bottom = 1.0
-offset_left = -320.0
+offset_left = -360.0
 offset_top = -56.0
-offset_right = 320.0
+offset_right = 360.0
 offset_bottom = -8.0
 grow_horizontal = 2
 grow_vertical = 0
