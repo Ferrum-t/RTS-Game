@@ -1,7 +1,7 @@
 extends Node
 
-## M20.1 data + M20.2 fog image + hide enemy 3D outside VISIBLE.
-## M24: soft edges via GPU filter_linear (no CPU upscale).
+## M20.1 data + M20.2 fog + B2 hide enemies.
+## Perf: PackedByteArray fog write (no set_pixel), 0.5s interval.
 
 const PLAYER_TEAM := 0
 const MAP_MIN_X := -95.0
@@ -9,7 +9,7 @@ const MAP_MAX_X := 95.0
 const MAP_MIN_Z := -95.0
 const MAP_MAX_Z := 95.0
 const CELL_SIZE := 4.0
-const UPDATE_INTERVAL := 0.3
+const UPDATE_INTERVAL := 0.5
 const UNIT_STATE_DEAD := 7
 const DEPLOYED := 0
 
@@ -36,6 +36,7 @@ var _cells: PackedByteArray = PackedByteArray()
 var _timer: float = 0.0
 var _fog_image: Image
 var _fog_texture: ImageTexture
+var _fog_bytes: PackedByteArray = PackedByteArray()
 
 
 func _ready() -> void:
@@ -43,7 +44,8 @@ func _ready() -> void:
 	_rows = int(ceil((MAP_MAX_Z - MAP_MIN_Z) / CELL_SIZE))
 	_cells.resize(_cols * _rows)
 	_cells.fill(CellState.UNEXPLORED)
-	_fog_image = Image.create(_cols, _rows, false, Image.FORMAT_RGB8)
+	_fog_bytes.resize(_cols * _rows * 3)
+	_fog_image = Image.create_from_data(_cols, _rows, false, Image.FORMAT_RGB8, _fog_bytes)
 	_fog_texture = ImageTexture.create_from_image(_fog_image)
 	call_deferred("force_update")
 
@@ -137,15 +139,19 @@ func _update_visibility() -> void:
 
 
 func _rebuild_fog_image() -> void:
-	for z in range(_rows):
-		for x in range(_cols):
-			var s := int(_cells[z * _cols + x])
-			var v: int = 0
-			if s == CellState.VISIBLE:
-				v = 255
-			elif s == CellState.EXPLORED:
-				v = 128
-			_fog_image.set_pixel(x, z, Color8(v, v, v))
+	var n := _cols * _rows
+	for i in range(n):
+		var s := int(_cells[i])
+		var v: int = 0
+		if s == CellState.VISIBLE:
+			v = 255
+		elif s == CellState.EXPLORED:
+			v = 128
+		var o := i * 3
+		_fog_bytes[o] = v
+		_fog_bytes[o + 1] = v
+		_fog_bytes[o + 2] = v
+	_fog_image.set_data(_cols, _rows, false, Image.FORMAT_RGB8, _fog_bytes)
 	_fog_texture.update(_fog_image)
 
 
@@ -158,7 +164,8 @@ func _apply_enemy_world_visibility(um, bm) -> void:
 				continue
 			var n := u as Node3D
 			if int(u.get("team_id")) == PLAYER_TEAM:
-				n.visible = true
+				if not n.visible:
+					n.visible = true
 				continue
 			if u.has_method("is_dead") and u.is_dead():
 				n.visible = false
@@ -166,7 +173,9 @@ func _apply_enemy_world_visibility(um, bm) -> void:
 			if u.get("unit_state") != null and int(u.unit_state) == UNIT_STATE_DEAD:
 				n.visible = false
 				continue
-			n.visible = is_visible_world(n.global_position)
+			var show := is_visible_world(n.global_position)
+			if n.visible != show:
+				n.visible = show
 
 	if bm == null:
 		return
@@ -187,12 +196,15 @@ func _set_enemy_building_vis(list_val) -> void:
 			continue
 		var n := b as Node3D
 		if int(b.get("team_id")) == PLAYER_TEAM:
-			n.visible = true
+			if not n.visible:
+				n.visible = true
 			continue
 		if b.get("is_destroyed") == true:
 			n.visible = false
 			continue
-		n.visible = is_visible_world(n.global_position)
+		var show := is_visible_world(n.global_position)
+		if n.visible != show:
+			n.visible = show
 
 
 func _stamp_buildings(list_val, radius: float) -> void:

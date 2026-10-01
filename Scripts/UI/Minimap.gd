@@ -1,13 +1,10 @@
 extends PanelContainer
 
-## M20 — Basic Minimap (Variant A: static background).
-## Player units/buildings + camera rect + click-to-pan.
-## M20.1: enemy markers only when VISIBLE.
-## M20.2: fog overlay UNEXPLORED/EXPLORED from VisibilityMap.
-## M24: darker fog tones aligned with world near-black FoW.
+## M20 minimap + M24 fog tones.
+## Perf: fog = one cached texture (no per-cell draw_rect every frame).
 
 const PLAYER_TEAM := 0
-const MARKER_INTERVAL := 0.15
+const MARKER_INTERVAL := 0.2
 const MAP_MIN_X := -95.0
 const MAP_MAX_X := 95.0
 const MAP_MIN_Z := -95.0
@@ -15,6 +12,8 @@ const MAP_MAX_Z := 95.0
 const PANEL_SIZE := 170.0
 
 var _bg: Texture2D
+var _fog_tex: ImageTexture
+var _fog_img: Image
 var _marker_timer: float = 0.0
 var _cam_rig: Node3D = null
 var _unit_uvs: PackedVector2Array = PackedVector2Array()
@@ -23,6 +22,7 @@ var _enemy_unit_uvs: PackedVector2Array = PackedVector2Array()
 var _enemy_building_uvs: PackedVector2Array = PackedVector2Array()
 var _cam_uv: Vector2 = Vector2(0.5, 0.5)
 var _dragging: bool = false
+var _need_redraw: bool = true
 
 
 func _ready() -> void:
@@ -30,13 +30,27 @@ func _ready() -> void:
 	size = Vector2(PANEL_SIZE, PANEL_SIZE)
 	mouse_filter = Control.MOUSE_FILTER_STOP
 	_bg = _make_static_background()
+	call_deferred("_bind_visibility")
 	call_deferred("_find_camera_rig")
 	_collect_markers()
 
 
+func _bind_visibility() -> void:
+	var vm := get_node_or_null("/root/VisibilityMap")
+	if vm != null and vm.has_signal("visibility_updated"):
+		if not vm.visibility_updated.is_connected(_on_visibility_updated):
+			vm.visibility_updated.connect(_on_visibility_updated)
+		_rebuild_fog_texture()
+
+
+func _on_visibility_updated() -> void:
+	_rebuild_fog_texture()
+	_need_redraw = true
+
+
 func set_background(tex: Texture2D) -> void:
 	_bg = tex
-	queue_redraw()
+	_need_redraw = true
 
 
 func world_to_uv(pos: Vector3) -> Vector2:
@@ -56,8 +70,14 @@ func _process(delta: float) -> void:
 	if _marker_timer <= 0.0:
 		_marker_timer = MARKER_INTERVAL
 		_collect_markers()
+		_need_redraw = true
+	var prev := _cam_uv
 	_update_camera_uv()
-	queue_redraw()
+	if prev.distance_squared_to(_cam_uv) > 0.00001:
+		_need_redraw = true
+	if _need_redraw:
+		_need_redraw = false
+		queue_redraw()
 
 
 func _draw() -> void:
@@ -66,7 +86,8 @@ func _draw() -> void:
 		draw_texture_rect(_bg, r, false)
 	else:
 		draw_rect(r, Color(0.12, 0.18, 0.14))
-	_draw_fog_overlay()
+	if _fog_tex != null:
+		draw_texture_rect(_fog_tex, r, false)
 	draw_rect(r, Color(0.35, 0.5, 0.4, 0.9), false, 2.0)
 
 	for i in range(_building_uvs.size()):
@@ -89,26 +110,34 @@ func _draw() -> void:
 	draw_rect(Rect2(c - half, half * 2.0), Color(1.0, 0.95, 0.35, 0.95), false, 1.6)
 
 
-func _draw_fog_overlay() -> void:
+func _rebuild_fog_texture() -> void:
 	var vm := get_node_or_null("/root/VisibilityMap")
 	if vm == null or not vm.has_method("get_grid_size"):
 		return
 	var gs: Vector2i = vm.get_grid_size()
 	if gs.x <= 0 or gs.y <= 0:
 		return
-	var cw := size.x / float(gs.x)
-	var ch := size.y / float(gs.y)
+	var bytes := PackedByteArray()
+	bytes.resize(gs.x * gs.y * 4)
 	for z in range(gs.y):
 		for x in range(gs.x):
 			var st: int = int(vm.get_cell_state(Vector2i(x, z)))
-			if st == 2:  # VISIBLE
-				continue
-			var col: Color
-			if st == 1:  # EXPLORED — dark dim (M24 match world)
-				col = Color(0.0, 0.0, 0.0, 0.58)
-			else:  # UNEXPLORED — near-black
-				col = Color(0.0, 0.0, 0.0, 0.94)
-			draw_rect(Rect2(x * cw, z * ch, cw + 0.5, ch + 0.5), col)
+			var o := (z * gs.x + x) * 4
+			bytes[o] = 0
+			bytes[o + 1] = 0
+			bytes[o + 2] = 0
+			if st == 2:
+				bytes[o + 3] = 0
+			elif st == 1:
+				bytes[o + 3] = 148
+			else:
+				bytes[o + 3] = 240
+	if _fog_img == null or _fog_img.get_width() != gs.x or _fog_img.get_height() != gs.y:
+		_fog_img = Image.create_from_data(gs.x, gs.y, false, Image.FORMAT_RGBA8, bytes)
+		_fog_tex = ImageTexture.create_from_image(_fog_img)
+	else:
+		_fog_img.set_data(gs.x, gs.y, false, Image.FORMAT_RGBA8, bytes)
+		_fog_tex.update(_fog_img)
 
 
 func _gui_input(event: InputEvent) -> void:
@@ -143,6 +172,7 @@ func _pan_to_local(local_pos: Vector2) -> void:
 	else:
 		rig.global_position.x = clampf(rig.global_position.x, MAP_MIN_X, MAP_MAX_X)
 		rig.global_position.z = clampf(rig.global_position.z, MAP_MIN_Z, MAP_MAX_Z)
+	_need_redraw = true
 
 
 func _collect_markers() -> void:
