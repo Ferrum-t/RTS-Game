@@ -1,11 +1,13 @@
 # CHANGELOG
 
-## 2026-09-30 — M24 Fog Visual Polish (F5 pending)
+## 2026-10-01 — M24 Fog Visual Polish ACCEPTED
 
-- World fog: linear sample + smoothstep edges, pure black color
-- Alphas: unexplored ~0.96, explored ~0.60
-- Minimap fog darker to match world
-- VisibilityMap / B2 hide unchanged
+- World fog: linear sample + smoothstep, pure/near-black UNEXPLORED, darker EXPLORED
+- DirectionalLight3D (SunLight) + reduced ambient so geometry is not flat-lit
+- Perf: minimap fog one cached RGBA texture (no per-cell draw_rect/frame)
+- VisibilityMap: PackedByteArray fog write, update interval 0.5s, visible-only toggles
+- VisibilityMap / cell_size / B2 hide unchanged
+- Stable match to VICTORY without hitch spikes
 
 ## 2026-09-30 — M23.1 Projectile Combat ACCEPTED
 
