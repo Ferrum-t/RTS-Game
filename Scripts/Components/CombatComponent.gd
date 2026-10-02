@@ -7,6 +7,7 @@ class_name CombatComponent
 ## Polish: hysteresis — enter attack at attack_range, leave only past exit_range.
 ## M13: _strike passes owner as damage source so IDLE targets can retaliate.
 ## M23.1: RANGED/SIEGE spawn Projectile (damage on arrival); MELEE instant.
+## M26: Horse Archer can fire in-range without canceling movement (shoot-on-move).
 
 enum Status {
 	IDLE,
@@ -57,20 +58,39 @@ func update(delta: float) -> void:
 	var target := owner.attack_target
 
 	if target == null or not is_instance_valid(target):
-		owner.velocity = Vector3.ZERO
+		if not _allows_move_fire():
+			owner.velocity = Vector3.ZERO
 		_in_melee = false
 		status = Status.TARGET_LOST
 		return
 
 	if target.unit_state == BaseUnit.UnitState.DEAD:
-		owner.velocity = Vector3.ZERO
+		if not _allows_move_fire():
+			owner.velocity = Vector3.ZERO
 		_in_melee = false
 		status = Status.TARGET_DEAD
 		return
 
 	var distance := owner.global_position.distance_to(target.global_position)
 
-	# Hysteresis: once in melee, stay until past exit_range
+	# M26: while player is MOVING (kite), do not chase — only fire if still in range.
+	if distance > attack_range:
+		_in_melee = false
+		status = Status.CHASING
+		if _allows_move_fire() and owner.unit_state == BaseUnit.UnitState.MOVING:
+			return
+		var chase_pos := target.global_position
+		chase_pos.y = 0.0
+		owner.movement.ensure_moving_to(chase_pos, chase_retarget_distance)
+		owner.movement.update(delta)
+		return
+
+	# In range
+	if _allows_move_fire():
+		_strike_while_moving(delta, target)
+		return
+
+	# Classic stop-to-shoot / melee hold (Mergen, Soldier, Cavalry, …)
 	if _in_melee:
 		if distance > _exit_range():
 			_in_melee = false
@@ -79,17 +99,21 @@ func update(delta: float) -> void:
 			_hold_and_strike(delta, target)
 			return
 
-	if distance > attack_range:
-		status = Status.CHASING
-		var chase_pos := target.global_position
-		chase_pos.y = 0.0
-		owner.movement.ensure_moving_to(chase_pos, chase_retarget_distance)
-		owner.movement.update(delta)
-		return
-
-	# Enter melee — freeze path agent
 	_in_melee = true
 	_hold_and_strike(delta, target)
+
+
+func _allows_move_fire() -> bool:
+	return owner != null and owner.can_shoot_while_moving
+
+
+func _strike_while_moving(delta: float, target: BaseUnit) -> void:
+	status = Status.IN_RANGE
+	# Do NOT cancel movement or zero velocity — kite.
+	attack_timer -= delta
+	if attack_timer <= 0.0:
+		attack_timer = attack_cooldown
+		_strike(target)
 
 
 func _hold_and_strike(delta: float, target: BaseUnit) -> void:

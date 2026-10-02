@@ -2,7 +2,7 @@ extends BaseUnit
 
 class_name HorseArcher
 
-## M25 — mounted ranged (stop-to-shoot). Costs wood+food+horses.
+## M25 — mounted ranged. M26 — shoot-on-move (kite).
 ## Projectile arrow via CombatComponent (same path as Mergen).
 
 
@@ -15,6 +15,7 @@ func _ready() -> void:
 	health_bar_height = 1.85
 	can_gather = false
 	damage_type = DamageType.Type.RANGED
+	can_shoot_while_moving = true
 
 	super()
 	print("HorseArcher spawned at ", global_position)
