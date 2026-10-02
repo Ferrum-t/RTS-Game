@@ -161,3 +161,53 @@ func update_moving(delta: float) -> void:
 			else:
 				unit_state = UnitState.IDLE
 		_: pass
+
+func update_harvesting(delta: float) -> void:
+	harvest.update(delta)
+	match harvest.status:
+		HarvestComponent.Status.BAG_FULL:
+			if movement: movement.cancel()
+			return_target = null
+			unit_state = UnitState.RETURNING
+		HarvestComponent.Status.RESOURCE_GONE:
+			if movement: movement.cancel()
+			harvest_target = null
+			current_order = Order.none()
+			velocity = Vector3.ZERO
+			unit_state = UnitState.IDLE
+		HarvestComponent.Status.MOVING_TO_RESOURCE:
+			var stand: Vector3 = harvest.approach_pos
+			if stand == Vector3.ZERO and harvest_target != null:
+				stand = harvest.get_approach_position(harvest_target)
+			movement.ensure_moving_to(stand, APPROACH_RETARGET_DIST)
+			movement.update(delta)
+		HarvestComponent.Status.GATHERING:
+			if movement and movement.status == MovementComponent.Status.MOVING:
+				movement.cancel()
+			velocity = Vector3.ZERO
+		_: pass
+
+func update_attacking(delta: float) -> void:
+	if current_order.type == Order.Type.ATTACK_BUILDING or attack_building_target != null:
+		update_attacking_building(delta)
+		return
+	combat.update(delta)
+	match combat.status:
+		CombatComponent.Status.TARGET_LOST, CombatComponent.Status.TARGET_DEAD:
+			attack_target = null
+			current_order = Order.none()
+			velocity = Vector3.ZERO
+			unit_state = UnitState.IDLE
+			_try_reacquire_after_kill()
+		_: pass
+
+
+func _try_reacquire_after_kill() -> void:
+	if unit_state != UnitState.IDLE:
+		return
+	var enemy := _find_nearest_acquire_target()
+	if enemy == null:
+		return
+	replace_order_attack(enemy)
+	if OS.is_debug_build():
+		print(name, " REACQUIRE -> ", enemy.name)
