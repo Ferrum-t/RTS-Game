@@ -12,7 +12,7 @@
 [ext_resource type="PackedScene" uid="uid://brdb78ja5f3oi" path="res://Scenes/Resorces/Stone.tscn" id="11_stone"]
 [ext_resource type="PackedScene" uid="uid://chorseherd001" path="res://Scenes/Resorces/HorseHerd.tscn" id="12_horse"]
 [ext_resource type="PackedScene" uid="uid://ctoqn17qfadcq" path="res://Scenes/UI/ui.tscn" id="15_0phyg"]
-[ext_resource type="Script" path="res://Scripts/Systems/FogOverlay.gd" id="20_fog"]
+[ext_resource type="Script" uid="uid://b840wu0225wuu" path="res://Scripts/Systems/FogOverlay.gd" id="20_fog"]
 
 [sub_resource type="PlaneMesh" id="PlaneMesh_f2orf"]
 size = Vector2(200, 200)
@@ -71,7 +71,7 @@ shape = SubResource("BoxShape3D_f2orf")
 [node name="NavigationRegion3D" type="NavigationRegion3D" parent="." unique_id=159477144]
 navigation_mesh = SubResource("NavigationMesh_map")
 
-[node name="FogOverlay" type="MeshInstance3D" parent="."]
+[node name="FogOverlay" type="MeshInstance3D" parent="." unique_id=534446597]
 script = ExtResource("20_fog")
 
 [node name="Units" type="Node3D" parent="." unique_id=1468272970]
@@ -109,46 +109,46 @@ transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -24, 0, 36)
 [node name="EnemyHorseHerd" parent="." unique_id=1305925391 instance=ExtResource("12_horse")]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -36, 0, 26)
 
-[node name="Tree_R2" parent="." instance=ExtResource("10_ng1ea")]
+[node name="Tree_R2" parent="." unique_id=637686281 instance=ExtResource("10_ng1ea")]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 71, 0, 0)
 
-[node name="Stone_R2" parent="." instance=ExtResource("11_stone")]
+[node name="Stone_R2" parent="." unique_id=464421173 instance=ExtResource("11_stone")]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 82, 0, 4)
 
-[node name="Tree_R3" parent="." instance=ExtResource("10_ng1ea")]
+[node name="Tree_R3" parent="." unique_id=1550467861 instance=ExtResource("10_ng1ea")]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 54, 0, 72)
 
-[node name="Stone_R3" parent="." instance=ExtResource("11_stone")]
+[node name="Stone_R3" parent="." unique_id=1942938154 instance=ExtResource("11_stone")]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 66, 0, 76)
 
-[node name="HorseHerd_R3" parent="." instance=ExtResource("12_horse")]
+[node name="HorseHerd_R3" parent="." unique_id=902241182 instance=ExtResource("12_horse")]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 60, 0, 64)
 
-[node name="Tree_R4" parent="." instance=ExtResource("10_ng1ea")]
+[node name="Tree_R4" parent="." unique_id=1224930037 instance=ExtResource("10_ng1ea")]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -13, 0, 77)
 
-[node name="Stone_R4" parent="." instance=ExtResource("11_stone")]
+[node name="Stone_R4" parent="." unique_id=865913917 instance=ExtResource("11_stone")]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -1, 0, 81)
 
-[node name="Tree_R5" parent="." instance=ExtResource("10_ng1ea")]
+[node name="Tree_R5" parent="." unique_id=1142036026 instance=ExtResource("10_ng1ea")]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -78, 0, 60)
 
-[node name="Stone_R5" parent="." instance=ExtResource("11_stone")]
+[node name="Stone_R5" parent="." unique_id=1083915659 instance=ExtResource("11_stone")]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -66, 0, 64)
 
-[node name="Tree_R6" parent="." instance=ExtResource("10_ng1ea")]
+[node name="Tree_R6" parent="." unique_id=168788844 instance=ExtResource("10_ng1ea")]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -83, 0, -7)
 
-[node name="Stone_R6" parent="." instance=ExtResource("11_stone")]
+[node name="Stone_R6" parent="." unique_id=1044005675 instance=ExtResource("11_stone")]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -71, 0, -3)
 
-[node name="Tree_R7" parent="." instance=ExtResource("10_ng1ea")]
+[node name="Tree_R7" parent="." unique_id=396384304 instance=ExtResource("10_ng1ea")]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -6, 0, -77)
 
-[node name="Stone_R7" parent="." instance=ExtResource("11_stone")]
+[node name="Stone_R7" parent="." unique_id=1881704918 instance=ExtResource("11_stone")]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 6, 0, -73)
 
-[node name="HorseHerd_R7" parent="." instance=ExtResource("12_horse")]
+[node name="HorseHerd_R7" parent="." unique_id=1248724726 instance=ExtResource("12_horse")]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, -85)
 
 [node name="Resources" type="Node" parent="." unique_id=1666807211]
