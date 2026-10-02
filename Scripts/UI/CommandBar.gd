@@ -4,6 +4,7 @@ extends PanelContainer
 ## Selection → context → show one command group, hide the rest.
 ## Leaving Worker context cancels ghost placement (M10.1c).
 ## Polish: Watchtower → Pack / Unpack (same as TC mobility).
+## M27: Orunqar → Train Temirbat.
 
 enum Context {
 	NONE,
@@ -11,12 +12,14 @@ enum Context {
 	BARRACKS,
 	TOWN_CENTER,
 	WATCHTOWER,
+	ORUNQAR,
 }
 
 @onready var worker_group: Control = $Margin/HBox/WorkerGroup
 @onready var barracks_group: Control = $Margin/HBox/BarracksGroup
 @onready var town_center_group: Control = $Margin/HBox/TownCenterGroup
 @onready var watchtower_group: Control = $Margin/HBox/WatchtowerGroup
+@onready var orunqar_group: Control = $Margin/HBox/OrunqarGroup
 
 var _last_context: int = Context.NONE
 
@@ -52,6 +55,8 @@ func _resolve_context() -> int:
 			return Context.TOWN_CENTER
 		if b is Watchtower or b is MobileTower:
 			return Context.WATCHTOWER
+		if b is Orunqar:
+			return Context.ORUNQAR
 		if b is BaseBuilding:
 			return Context.NONE
 
@@ -72,6 +77,7 @@ func _apply_context(ctx: int) -> void:
 		or ctx == Context.BARRACKS
 		or ctx == Context.TOWN_CENTER
 		or ctx == Context.WATCHTOWER
+		or ctx == Context.ORUNQAR
 	)
 	visible = show_bar
 	if worker_group:
@@ -82,6 +88,8 @@ func _apply_context(ctx: int) -> void:
 		town_center_group.visible = ctx == Context.TOWN_CENTER
 	if watchtower_group:
 		watchtower_group.visible = ctx == Context.WATCHTOWER
+	if orunqar_group:
+		orunqar_group.visible = ctx == Context.ORUNQAR
 
 
 func _cancel_ghost() -> void:
