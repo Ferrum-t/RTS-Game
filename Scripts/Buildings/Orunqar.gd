@@ -4,6 +4,7 @@ class_name Orunqar
 
 ## M27 — Sacred standing. Trains Temirbat ONCE per match.
 ## Static, no pack. Cost 100W + 40S via BuildingData.
+## Debug/play: press T while any player Orunqar exists to train.
 
 @export var temirbat_scene: PackedScene
 @export var temirbat_cost_wood: int = 120
@@ -30,6 +31,8 @@ func _ready() -> void:
 	if temirbat_scene == null:
 		temirbat_scene = load("res://Scenes/Units/temirbat.tscn") as PackedScene
 	print("Orunqar ready at ", global_position)
+	if OS.is_debug_build() and team_id == 0:
+		print("Orunqar: press T to train Temirbat (once per match)")
 
 
 func _process(delta: float) -> void:
@@ -38,6 +41,19 @@ func _process(delta: float) -> void:
 	train_timer -= delta
 	if train_timer <= 0.0:
 		_finish_training()
+
+
+func _unhandled_input(event: InputEvent) -> void:
+	if not OS.is_debug_build():
+		return
+	if team_id != 0 or is_destroyed:
+		return
+	if not (event is InputEventKey and event.pressed and not event.echo):
+		return
+	var key := event as InputEventKey
+	if key.keycode == KEY_T:
+		try_train_temirbat()
+		get_viewport().set_input_as_handled()
 
 
 func can_train_temirbat() -> bool:
