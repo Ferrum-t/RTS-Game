@@ -211,3 +211,66 @@ func _try_reacquire_after_kill() -> void:
 	replace_order_attack(enemy)
 	if OS.is_debug_build():
 		print(name, " REACQUIRE -> ", enemy.name)
+
+
+func update_attacking_building(delta: float) -> void:
+	var building := attack_building_target
+	if building == null or not is_instance_valid(building) or building.is_destroyed or building.health <= 0:
+		_clear_building_attack()
+		return
+	var to_b := building.global_position - global_position
+	to_b.y = 0.0
+	var dist := to_b.length()
+	var exit_range: float = building_attack_range * building_exit_range_mult
+	var moved := global_position.distance_to(_siege_last_pos)
+	_siege_last_pos = global_position
+	if moved < 0.03: _siege_stuck_time += delta
+	else: _siege_stuck_time = 0.0
+	if _siege_in_range:
+		if dist > exit_range: _siege_in_range = false
+		else:
+			_siege_hold_and_strike(delta, building)
+			return
+	var in_range := dist <= building_attack_range
+	if not in_range and _siege_stuck_time > 0.8 and dist <= building_attack_range + 1.5:
+		in_range = true
+	if in_range:
+		_siege_in_range = true
+		_siege_hold_and_strike(delta, building)
+		return
+	var approach := building.global_position
+	if to_b.length() > 0.1:
+		approach = building.global_position - to_b.normalized() * (building_attack_range * 0.7)
+	approach.y = 0.0
+	movement.ensure_moving_to(approach, APPROACH_RETARGET_DIST)
+	movement.update(delta)
+
+func _siege_hold_and_strike(delta: float, building: BaseBuilding) -> void:
+	if movement and movement.status == MovementComponent.Status.MOVING: movement.cancel()
+	velocity = Vector3.ZERO
+	_building_attack_timer -= delta
+	if _building_attack_timer > 0.0: return
+	_building_attack_timer = attack_cooldown
+	var dt: int = int(damage_type)
+	if dt == int(DamageType.Type.SIEGE) or dt == int(DamageType.Type.RANGED):
+		var is_stone: bool = dt == int(DamageType.Type.SIEGE)
+		Projectile.fire(self, building, attack_damage, self, is_stone)
+		return
+	if building.has_method("damage"):
+		building.damage(attack_damage, team_id)
+	elif building.has_method("apply_damage"):
+		building.apply_damage(attack_damage, self)
+	elif building.has_method("take_damage"):
+		building.take_damage(attack_damage, self)
+	else:
+		building.health = maxi(0, building.health - attack_damage)
+		if building.health <= 0 and building.has_method("die"): building.die()
+
+func _clear_building_attack() -> void:
+	attack_building_target = null
+	_building_attack_timer = 0.0
+	_siege_stuck_time = 0.0
+	_siege_in_range = false
+	velocity = Vector3.ZERO
+	current_order = Order.none()
+	unit_state = UnitState.IDLE
