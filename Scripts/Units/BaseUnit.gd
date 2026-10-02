@@ -27,6 +27,8 @@ enum UnitState
 @export var building_exit_range_mult := 1.2
 @export var health_bar_height := 1.6
 @export var can_gather: bool = true
+## M26: Horse Archer — fire while pathing; MOVE keeps attack_target.
+var can_shoot_while_moving: bool = false
 @export var damage_type: int = DamageType.Type.MELEE
 
 var health := 100
@@ -88,13 +90,14 @@ func _ready() -> void:
 	print(name, " ready at ", global_position)
 
 func _setup_health_bar() -> void:
-	if HEALTH_BAR_SCENE == null: return
+	if HEALTH_BAR_SCENE == null:
+		return
 	health_bar = HEALTH_BAR_SCENE.instantiate() as HealthBar3D
-	if health_bar == null: return
+	if health_bar == null:
+		return
 	add_child(health_bar)
 	health_bar.position = Vector3(0.0, health_bar_height, 0.0)
-	health_bar.setup(max_health)
-	health_bar.set_health(health)
+	health_bar.set_health(health, max_health)
 
 func _setup_selection_ring() -> void:
 	_selection_ring = MeshInstance3D.new()
@@ -137,15 +140,27 @@ func _physics_process(delta: float) -> void:
 func update_moving(delta: float) -> void:
 	if movement == null: return
 	movement.update(delta)
+	# M26: kite — fire at retained target while pathing (HA only).
+	if can_shoot_while_moving and attack_target != null and is_instance_valid(attack_target):
+		if attack_target.unit_state != UnitState.DEAD and combat != null:
+			combat.update(delta)
+			if combat.status == CombatComponent.Status.TARGET_DEAD or combat.status == CombatComponent.Status.TARGET_LOST:
+				attack_target = null
 	match movement.status:
 		MovementComponent.Status.ARRIVED:
 			last_move_end_reason = "arrived"
 			current_order = Order.none()
-			unit_state = UnitState.IDLE
+			if can_shoot_while_moving and attack_target != null and is_instance_valid(attack_target) and attack_target.unit_state != UnitState.DEAD:
+				unit_state = UnitState.ATTACKING
+			else:
+				unit_state = UnitState.IDLE
 		MovementComponent.Status.FAILED:
 			last_move_end_reason = "failed"
 			current_order = Order.none()
-			unit_state = UnitState.IDLE
+			if can_shoot_while_moving and attack_target != null and is_instance_valid(attack_target) and attack_target.unit_state != UnitState.DEAD:
+				unit_state = UnitState.ATTACKING
+			else:
+				unit_state = UnitState.IDLE
 		_: pass
 
 func update_harvesting(delta: float) -> void:
@@ -248,145 +263,102 @@ func _siege_hold_and_strike(delta: float, building: BaseBuilding) -> void:
 		building.apply_damage(attack_damage, self)
 	elif building.has_method("take_damage"):
 		building.take_damage(attack_damage, self)
-	else:
-		building.health = maxi(0, building.health - attack_damage)
-		if building.health <= 0 and building.has_method("die"): building.die()
 
 func _clear_building_attack() -> void:
 	attack_building_target = null
-	_building_attack_timer = 0.0
-	_siege_stuck_time = 0.0
 	_siege_in_range = false
-	velocity = Vector3.ZERO
+	_siege_stuck_time = 0.0
 	current_order = Order.none()
+	velocity = Vector3.ZERO
 	unit_state = UnitState.IDLE
 
 func update_return(delta: float) -> void:
-	if return_target != null and is_instance_valid(return_target):
-		if return_target.get("is_destroyed") == true: return_target = null
-		elif return_target.get("health") != null and int(return_target.health) <= 0: return_target = null
-		elif return_target.get("team_id") != null and int(return_target.team_id) != team_id: return_target = null
-		elif "is_constructed" in return_target and return_target.is_constructed == false: return_target = null
-	else:
-		return_target = null
+	if return_target == null or not is_instance_valid(return_target):
+		return_target = _find_nearest_tc()
 	if return_target == null:
-		var bm := get_node_or_null("/root/BuildingManager")
-		if bm: return_target = bm.get_nearest_town_center(global_position, team_id)
-		if return_target == null:
-			print(name, " — no own-team Town Center found, keeping inventory")
-			unit_state = UnitState.IDLE
-			velocity = Vector3.ZERO
-			return
-	var distance := global_position.distance_to(return_target.global_position)
-	if distance > deposit_distance:
-		var to_tc := return_target.global_position - global_position
-		to_tc.y = 0.0
-		var approach := return_target.global_position
-		if to_tc.length() > 0.1:
-			approach = return_target.global_position - to_tc.normalized() * 0.5
-		approach.y = 0.0
-		movement.ensure_moving_to(approach, APPROACH_RETARGET_DIST)
-		movement.update(delta)
-		return
-	velocity = Vector3.ZERO
-	var deposited_wood: int = inventory.wood
-	var deposited_stone: int = inventory.stone
-	var deposited_gold: int = inventory.gold
-	var deposited_food: int = inventory.food
-	var deposited_horses: int = inventory.horses
-	inventory.clear()
-	var rm := get_node_or_null("/root/ResourceManager")
-	if rm:
-		rm.add_wood(deposited_wood, team_id)
-		rm.add_stone(deposited_stone, team_id)
-		rm.add_gold(deposited_gold, team_id)
-		rm.add_food(deposited_food, team_id)
-		rm.add_horses(deposited_horses, team_id)
-	print(name, " deposited W:", deposited_wood, " S:", deposited_stone, " H:", deposited_horses, " at ", return_target.name)
-	return_target = null
-	if harvest_target != null and is_instance_valid(harvest_target):
-		if harvest: harvest.reset()
-		if movement: movement.cancel()
-		unit_state = UnitState.HARVESTING
-	else:
-		current_order = Order.none()
 		unit_state = UnitState.IDLE
-
-func take_damage(amount: int, source: Node = null) -> void:
-	if unit_state == UnitState.DEAD:
 		return
-	health = maxi(0, health - amount)
-	if health_bar:
-		health_bar.set_health(health)
-	if health <= 0:
-		die()
-		return
-	_try_retaliate(source)
+	var dest := return_target.global_position
+	dest.y = 0.0
+	movement.ensure_moving_to(dest, APPROACH_RETARGET_DIST)
+	movement.update(delta)
+	if global_position.distance_to(dest) <= deposit_distance:
+		if inventory:
+			inventory.deposit_all(return_target)
+		return_target = null
+		if harvest_target != null and is_instance_valid(harvest_target):
+			unit_state = UnitState.HARVESTING
+		else:
+			unit_state = UnitState.IDLE
 
+func _find_nearest_tc() -> Node3D:
+	var bm := get_node_or_null("/root/BuildingManager")
+	if bm == null: return null
+	var best: Node3D = null
+	var best_d := INF
+	for tc in bm.town_centers:
+		if tc == null or not is_instance_valid(tc): continue
+		if int(tc.get("team_id")) != team_id: continue
+		if tc.get("is_destroyed") == true: continue
+		if tc.get("is_constructed") == false: continue
+		if tc.get("deployment_state") != null and int(tc.deployment_state) != 0: continue
+		var d := global_position.distance_to(tc.global_position)
+		if d < best_d:
+			best_d = d
+			best = tc
+	return best
 
 func _try_idle_acquire(delta: float) -> void:
 	_acquire_timer -= delta
-	if _acquire_timer > 0.0:
-		return
+	if _acquire_timer > 0.0: return
 	_acquire_timer = ACQUIRE_SCAN_INTERVAL
-	if unit_state != UnitState.IDLE:
-		return
 	var enemy := _find_nearest_acquire_target()
-	if enemy == null:
-		return
+	if enemy == null: return
 	replace_order_attack(enemy)
 	if OS.is_debug_build():
 		print(name, " ACQUIRE -> ", enemy.name)
 
-
 func _find_nearest_acquire_target() -> BaseUnit:
+	var um := get_node_or_null("/root/UnitManager")
+	if um == null or not ("units" in um): return null
 	var best: BaseUnit = null
-	var best_dist_sq: float = ACQUIRE_RADIUS * ACQUIRE_RADIUS
-	for n in get_tree().get_nodes_in_group("Unit"):
-		if not (n is BaseUnit):
-			continue
-		var other: BaseUnit = n as BaseUnit
-		if other == self:
-			continue
-		if not is_instance_valid(other):
-			continue
-		if not TeamRules.can_attack(self, other):
-			continue
-		var d_sq: float = global_position.distance_squared_to(other.global_position)
-		if d_sq > best_dist_sq:
-			continue
-		best_dist_sq = d_sq
-		best = other
+	var best_d := ACQUIRE_RADIUS
+	for u in um.units:
+		if u == null or not is_instance_valid(u): continue
+		if not (u is BaseUnit): continue
+		var other := u as BaseUnit
+		if other == self: continue
+		if other.team_id == team_id: continue
+		if other.unit_state == UnitState.DEAD: continue
+		if other.has_method("is_dead") and other.is_dead(): continue
+		var d := global_position.distance_to(other.global_position)
+		if d <= best_d:
+			best_d = d
+			best = other
 	return best
 
-
-func _try_retaliate(source: Node) -> void:
-	match unit_state:
-		UnitState.IDLE, UnitState.MOVING, UnitState.HARVESTING, UnitState.RETURNING:
-			pass
-		_:
-			return
-	if source == null or not is_instance_valid(source):
+func take_damage(amount: int, source = null) -> void:
+	if unit_state == UnitState.DEAD: return
+	health = max(health - amount, 0)
+	if health_bar: health_bar.set_health(health, max_health)
+	if health <= 0:
+		_die()
 		return
-	if not (source is BaseUnit):
-		return
+	# M13 retaliation: only from IDLE
+	if unit_state != UnitState.IDLE: return
+	if source == null or not is_instance_valid(source): return
+	if not (source is BaseUnit): return
 	var attacker := source as BaseUnit
-	if attacker == self:
-		return
-	if attacker.unit_state == UnitState.DEAD:
-		return
-	if int(attacker.team_id) == int(team_id):
-		return
+	if attacker.team_id == team_id: return
+	if attacker.unit_state == UnitState.DEAD: return
 	if unit_state == UnitState.ATTACKING and attack_target == attacker:
 		return
 	replace_order_attack(attacker)
 	if OS.is_debug_build():
 		print(name, " RETALIATE -> ", attacker.name)
 
-
-func die() -> void:
+func _die() -> void:
 	unit_state = UnitState.DEAD
-	current_order = Order.none()
 	velocity = Vector3.ZERO
 	if movement: movement.cancel()
 	print(name, " died")
@@ -404,7 +376,12 @@ func replace_order_move(pos: Vector3) -> void:
 	harvest_target = null
 	build_target = null
 	repair_target = null
-	attack_target = null
+	# M26: Horse Archer keeps combat target while kiting away.
+	var keep_atk: BaseUnit = null
+	if can_shoot_while_moving and attack_target != null and is_instance_valid(attack_target):
+		if attack_target.unit_state != UnitState.DEAD:
+			keep_atk = attack_target
+	attack_target = keep_atk
 	attack_building_target = null
 	return_target = null
 	_build_stuck_time = 0.0
@@ -458,10 +435,6 @@ func replace_order_attack_building(building: BaseBuilding) -> void:
 
 func replace_order_build(building: BaseBuilding) -> void:
 	if building == null or not is_instance_valid(building): return
-	if not (self is Worker):
-		print(name, " cannot BUILD (not a Worker)")
-		return
-	if unit_state == UnitState.BUILDING and build_target == building: return
 	current_order = Order.new(Order.Type.BUILD, building)
 	build_target = building
 	repair_target = null
@@ -473,15 +446,9 @@ func replace_order_build(building: BaseBuilding) -> void:
 	_build_last_pos = global_position
 	if harvest: harvest.reset()
 	unit_state = UnitState.BUILDING
-	print(name, " -> BUILD ", building.name)
 
 func replace_order_repair(building: BaseBuilding) -> void:
 	if building == null or not is_instance_valid(building): return
-	if not (self is Worker):
-		print(name, " cannot REPAIR (not a Worker)")
-		return
-	if not building.is_constructed or building.health >= building.max_health: return
-	if unit_state == UnitState.REPAIRING and repair_target == building: return
 	current_order = Order.new(Order.Type.REPAIR, building)
 	repair_target = building
 	build_target = null
@@ -490,112 +457,62 @@ func replace_order_repair(building: BaseBuilding) -> void:
 	attack_building_target = null
 	return_target = null
 	_build_stuck_time = 0.0
-	_build_last_pos = global_position
 	if harvest: harvest.reset()
 	unit_state = UnitState.REPAIRING
-	print(name, " -> REPAIR ", building.name)
 
-func _build_stand_dist(site: BaseBuilding) -> float:
-	var he: float = 2.2
-	if "nav_half_extents" in site:
-		var v: Vector3 = site.nav_half_extents
-		he = maxf(v.x, v.z)
-	return maxf(BUILD_STAND_DIST, he + BUILD_FOOTPRINT_MARGIN)
+func is_dead() -> bool:
+	return unit_state == UnitState.DEAD
 
 func update_building(delta: float) -> void:
-	var site := build_target
-	if site == null or not is_instance_valid(site) or site.is_destroyed or site.health <= 0:
-		_clear_build("site lost")
+	if build_target == null or not is_instance_valid(build_target):
+		build_target = null
+		unit_state = UnitState.IDLE
 		return
-	if site.is_constructed:
-		_clear_build("already ready")
+	if build_target.get("is_constructed") == true:
+		build_target = null
+		unit_state = UnitState.IDLE
 		return
-	var stand_dist: float = _build_stand_dist(site)
-	var to_s := site.global_position - global_position
-	to_s.y = 0.0
-	var dist := to_s.length()
-	var moved := global_position.distance_to(_build_last_pos)
-	_build_last_pos = global_position
-	if moved < 0.04: _build_stuck_time += delta
-	else: _build_stuck_time = 0.0
-	var in_range: bool = dist <= stand_dist
-	if not in_range and _build_stuck_time > 0.7 and dist <= stand_dist + 2.0:
-		in_range = true
-	if not in_range:
-		var stand := site.global_position
-		if dist > 0.01:
-			stand = site.global_position - to_s.normalized() * (stand_dist * 0.92)
-		stand.y = 0.0
-		if movement:
-			movement.ensure_moving_to(stand, APPROACH_RETARGET_DIST)
-			movement.update(delta)
+	var dest := build_target.global_position
+	dest.y = 0.0
+	var dist := global_position.distance_to(dest)
+	if dist > BUILD_STAND_DIST + BUILD_FOOTPRINT_MARGIN:
+		movement.ensure_moving_to(dest, APPROACH_RETARGET_DIST)
+		movement.update(delta)
+		var moved := global_position.distance_to(_build_last_pos)
+		_build_last_pos = global_position
+		if moved < 0.03: _build_stuck_time += delta
+		else: _build_stuck_time = 0.0
 		return
 	if movement and movement.status == MovementComponent.Status.MOVING: movement.cancel()
 	velocity = Vector3.ZERO
-	var bt: float = maxf(site.build_time_sec, 0.1)
-	var done: bool = site.add_construction_progress(delta / bt)
-	if done:
-		print(name, " finished BUILD ", site.name)
-		_clear_build("complete")
+	if build_target.has_method("request_build_tick"):
+		build_target.request_build_tick(self, delta)
+	elif build_target.has_method("add_construction_progress"):
+		build_target.add_construction_progress(delta)
 
 func update_repairing(delta: float) -> void:
-	var site := repair_target
-	if site == null or not is_instance_valid(site) or site.is_destroyed or site.health <= 0:
-		_clear_repair("site lost")
+	if repair_target == null or not is_instance_valid(repair_target):
+		repair_target = null
+		unit_state = UnitState.IDLE
 		return
-	if not site.is_constructed:
-		_clear_repair("not ready")
+	if repair_target.get("is_destroyed") == true:
+		repair_target = null
+		unit_state = UnitState.IDLE
 		return
-	if site.health >= site.max_health:
-		print(name, " finished REPAIR ", site.name)
-		_clear_repair("complete")
+	var max_hp: int = int(repair_target.get("max_health") if repair_target.get("max_health") != null else 100)
+	var hp: int = int(repair_target.get("health") if repair_target.get("health") != null else max_hp)
+	if hp >= max_hp:
+		repair_target = null
+		unit_state = UnitState.IDLE
 		return
-	var stand_dist: float = _build_stand_dist(site)
-	var to_s := site.global_position - global_position
-	to_s.y = 0.0
-	var dist := to_s.length()
-	var moved := global_position.distance_to(_build_last_pos)
-	_build_last_pos = global_position
-	if moved < 0.04: _build_stuck_time += delta
-	else: _build_stuck_time = 0.0
-	var in_range: bool = dist <= stand_dist
-	if not in_range and _build_stuck_time > 0.7 and dist <= stand_dist + 2.0:
-		in_range = true
-	if not in_range:
-		var stand := site.global_position
-		if dist > 0.01:
-			stand = site.global_position - to_s.normalized() * (stand_dist * 0.92)
-		stand.y = 0.0
-		if movement:
-			movement.ensure_moving_to(stand, APPROACH_RETARGET_DIST)
-			movement.update(delta)
+	var dest := repair_target.global_position
+	dest.y = 0.0
+	var dist := global_position.distance_to(dest)
+	if dist > BUILD_STAND_DIST + BUILD_FOOTPRINT_MARGIN:
+		movement.ensure_moving_to(dest, APPROACH_RETARGET_DIST)
+		movement.update(delta)
 		return
 	if movement and movement.status == MovementComponent.Status.MOVING: movement.cancel()
 	velocity = Vector3.ZERO
-	if site.has_method("request_repair_tick"):
-		var done: bool = site.request_repair_tick(self, delta)
-		if done or site.health >= site.max_health:
-			print(name, " finished REPAIR ", site.name)
-			_clear_repair("complete")
-		return
-	var gain: int = maxi(1, int(round(25.0 * delta)))
-	site.health = mini(site.max_health, site.health + gain)
-	if site.health_bar != null and is_instance_valid(site.health_bar):
-		site.health_bar.set_health(site.health)
-	if site.health >= site.max_health:
-		print(name, " finished REPAIR ", site.name)
-		_clear_repair("complete")
-
-func _clear_build(reason: String) -> void:
-	build_target = null
-	_build_stuck_time = 0.0
-	velocity = Vector3.ZERO
-	current_order = Order.none()
-	unit_state = UnitState.IDLE
-
-func _clear_repair(reason: String) -> void:
-	repair_target = null
-	_build_stuck_time = 0.0
-	velocity = Vector3.ZERO
-	current_order = Order.none()
-	unit_state = UnitState.IDLE
+	if repair_target.has_method("request_repair_tick"):
+		repair_target.request_repair_tick(self, delta)
