@@ -1,4 +1,4 @@
-[gd_resource type="Resource" script_class="BuildingData" format=3 uid="uid://orunqarm27data"]
+[gd_resource type="Resource" script_class="BuildingData" format=3 uid="uid://c0t7dlv3hn4k5"]
 
 [ext_resource type="Script" path="res://Scripts/Buildings/BuildingData.gd" id="1_data"]
 [ext_resource type="PackedScene" path="res://Scenes/Buildings/Orunqar.tscn" id="2_scene"]
