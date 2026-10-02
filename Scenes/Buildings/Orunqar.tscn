@@ -1,0 +1,26 @@
+[gd_scene format=3 uid="uid://orunqarm27b01"]
+
+[ext_resource type="Script" path="res://Scripts/Buildings/Orunqar.gd" id="1_orunqar"]
+
+[sub_resource type="StandardMaterial3D" id="Mat_orun"]
+albedo_color = Color(0.55, 0.42, 0.22, 1)
+
+[sub_resource type="BoxMesh" id="BoxMesh_orun"]
+material = SubResource("Mat_orun")
+size = Vector3(3.2, 2.0, 3.2)
+
+[sub_resource type="BoxShape3D" id="BoxShape_orun"]
+size = Vector3(3.2, 2.0, 3.2)
+
+[node name="Orunqar" type="CharacterBody3D"]
+collision_layer = 1
+collision_mask = 1
+script = ExtResource("1_orunqar")
+
+[node name="MeshInstance3D" type="MeshInstance3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1.0, 0)
+mesh = SubResource("BoxMesh_orun")
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1.0, 0)
+shape = SubResource("BoxShape_orun")
