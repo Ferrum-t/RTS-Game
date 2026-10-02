@@ -100,47 +100,41 @@ func _setup_health_bar() -> void:
 
 func _setup_selection_ring() -> void:
 	_selection_ring = MeshInstance3D.new()
-	var ring := TorusMesh.new()
-	ring.inner_radius = 0.55
-	ring.outer_radius = 0.7
-	ring.rings = 12
-	ring.ring_segments = 24
-	_selection_ring.mesh = ring
+	_selection_ring.name = "SelectionRing"
+	var torus := TorusMesh.new()
+	torus.inner_radius = 0.55
+	torus.outer_radius = 0.72
+	torus.rings = 12
+	torus.ring_segments = 24
+	_selection_ring.mesh = torus
 	var mat := StandardMaterial3D.new()
-	mat.albedo_color = Color(0.2, 0.9, 0.3, 0.85)
+	mat.albedo_color = Color(0.2, 1.0, 0.3, 0.85)
+	mat.emission_enabled = true
+	mat.emission = Color(0.15, 0.9, 0.25)
+	mat.emission_energy_multiplier = 1.2
 	mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
 	mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
 	_selection_ring.material_override = mat
-	_selection_ring.position = Vector3(0, 0.05, 0)
+	_selection_ring.position = Vector3(0.0, 0.05, 0.0)
 	_selection_ring.visible = false
 	add_child(_selection_ring)
 
 func _physics_process(delta: float) -> void:
-	if unit_state == UnitState.DEAD:
-		velocity = Vector3.ZERO
-		return
+	if unit_state == UnitState.DEAD: return
 	if not is_on_floor():
 		velocity.y -= GRAVITY * delta
 	else:
 		velocity.y = 0.0
 	match unit_state:
-		UnitState.IDLE:
-			update_idle(delta)
 		UnitState.MOVING: update_moving(delta)
 		UnitState.HARVESTING: update_harvesting(delta)
-		UnitState.RETURNING: update_returning(delta)
+		UnitState.RETURNING: update_return(delta)
 		UnitState.BUILDING: update_building(delta)
 		UnitState.REPAIRING: update_repairing(delta)
 		UnitState.ATTACKING: update_attacking(delta)
+		UnitState.IDLE: _try_idle_acquire(delta)
 		_: pass
 	move_and_slide()
-
-func update_idle(delta: float) -> void:
-	velocity = Vector3.ZERO
-	_acquire_timer -= delta
-	if _acquire_timer <= 0.0:
-		_acquire_timer = ACQUIRE_SCAN_INTERVAL
-		_try_auto_acquire()
 
 func update_moving(delta: float) -> void:
 	if movement == null: return
