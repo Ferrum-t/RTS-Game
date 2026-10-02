@@ -274,3 +274,140 @@ func _clear_building_attack() -> void:
 	velocity = Vector3.ZERO
 	current_order = Order.none()
 	unit_state = UnitState.IDLE
+
+func update_return(delta: float) -> void:
+	if return_target != null and is_instance_valid(return_target):
+		if return_target.get("is_destroyed") == true: return_target = null
+		elif return_target.get("health") != null and int(return_target.health) <= 0: return_target = null
+		elif return_target.get("team_id") != null and int(return_target.team_id) != team_id: return_target = null
+		elif "is_constructed" in return_target and return_target.is_constructed == false: return_target = null
+	else:
+		return_target = null
+	if return_target == null:
+		var bm := get_node_or_null("/root/BuildingManager")
+		if bm: return_target = bm.get_nearest_town_center(global_position, team_id)
+		if return_target == null:
+			print(name, " — no own-team Town Center found, keeping inventory")
+			unit_state = UnitState.IDLE
+			velocity = Vector3.ZERO
+			return
+	var distance := global_position.distance_to(return_target.global_position)
+	if distance > deposit_distance:
+		var to_tc := return_target.global_position - global_position
+		to_tc.y = 0.0
+		var approach := return_target.global_position
+		if to_tc.length() > 0.1:
+			approach = return_target.global_position - to_tc.normalized() * 0.5
+		approach.y = 0.0
+		movement.ensure_moving_to(approach, APPROACH_RETARGET_DIST)
+		movement.update(delta)
+		return
+	velocity = Vector3.ZERO
+	var deposited_wood: int = inventory.wood
+	var deposited_stone: int = inventory.stone
+	var deposited_gold: int = inventory.gold
+	var deposited_food: int = inventory.food
+	var deposited_horses: int = inventory.horses
+	inventory.clear()
+	var rm := get_node_or_null("/root/ResourceManager")
+	if rm:
+		rm.add_wood(deposited_wood, team_id)
+		rm.add_stone(deposited_stone, team_id)
+		rm.add_gold(deposited_gold, team_id)
+		rm.add_food(deposited_food, team_id)
+		rm.add_horses(deposited_horses, team_id)
+	print(name, " deposited W:", deposited_wood, " S:", deposited_stone, " H:", deposited_horses, " at ", return_target.name)
+	return_target = null
+	if harvest_target != null and is_instance_valid(harvest_target):
+		if harvest: harvest.reset()
+		if movement: movement.cancel()
+		unit_state = UnitState.HARVESTING
+	else:
+		current_order = Order.none()
+		unit_state = UnitState.IDLE
+
+func take_damage(amount: int, source: Node = null) -> void:
+	if unit_state == UnitState.DEAD:
+		return
+	health = maxi(0, health - amount)
+	if health_bar:
+		health_bar.set_health(health)
+	if health <= 0:
+		die()
+		return
+	_try_retaliate(source)
+
+
+func _try_idle_acquire(delta: float) -> void:
+	_acquire_timer -= delta
+	if _acquire_timer > 0.0:
+		return
+	_acquire_timer = ACQUIRE_SCAN_INTERVAL
+	if unit_state != UnitState.IDLE:
+		return
+	var enemy := _find_nearest_acquire_target()
+	if enemy == null:
+		return
+	replace_order_attack(enemy)
+	if OS.is_debug_build():
+		print(name, " ACQUIRE -> ", enemy.name)
+
+
+func _find_nearest_acquire_target() -> BaseUnit:
+	var best: BaseUnit = null
+	var best_dist_sq: float = ACQUIRE_RADIUS * ACQUIRE_RADIUS
+	for n in get_tree().get_nodes_in_group("Unit"):
+		if not (n is BaseUnit):
+			continue
+		var other: BaseUnit = n as BaseUnit
+		if other == self:
+			continue
+		if not is_instance_valid(other):
+			continue
+		if not TeamRules.can_attack(self, other):
+			continue
+		var d_sq: float = global_position.distance_squared_to(other.global_position)
+		if d_sq > best_dist_sq:
+			continue
+		best_dist_sq = d_sq
+		best = other
+	return best
+
+
+func _try_retaliate(source: Node) -> void:
+	match unit_state:
+		UnitState.IDLE, UnitState.MOVING, UnitState.HARVESTING, UnitState.RETURNING:
+			pass
+		_:
+			return
+	if source == null or not is_instance_valid(source):
+		return
+	if not (source is BaseUnit):
+		return
+	var attacker := source as BaseUnit
+	if attacker == self:
+		return
+	if attacker.unit_state == UnitState.DEAD:
+		return
+	if int(attacker.team_id) == int(team_id):
+		return
+	if unit_state == UnitState.ATTACKING and attack_target == attacker:
+		return
+	replace_order_attack(attacker)
+	if OS.is_debug_build():
+		print(name, " RETALIATE -> ", attacker.name)
+
+
+func die() -> void:
+	unit_state = UnitState.DEAD
+	current_order = Order.none()
+	velocity = Vector3.ZERO
+	if movement: movement.cancel()
+	print(name, " died")
+	UnitManager.unregister_unit(self)
+	queue_free()
+
+func set_selected(value: bool) -> void:
+	selected = value
+	if _selection_ring != null and is_instance_valid(_selection_ring):
+		_selection_ring.visible = value
