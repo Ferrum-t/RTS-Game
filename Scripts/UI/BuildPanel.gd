@@ -1,6 +1,6 @@
 extends PanelContainer
 
-## M10.1c — Worker build buttons: Watchtower, Barracks, Town Center, Yurt.
+## M10.1c — Worker build buttons: Watchtower, Barracks, Town Center, Yurt, Orunqar.
 ## Visibility is owned by parent CommandBar WorkerGroup.
 ## Affordability still refreshed while visible.
 
@@ -40,7 +40,7 @@ func _process(_delta: float) -> void:
 
 func _is_worker_buildable(data: BuildingData) -> bool:
 	var n: String = str(data.building_name).strip_edges().to_lower().replace(" ", "")
-	return n == "watchtower" or n == "barracks" or n == "towncenter" or n == "yurt"
+	return n == "watchtower" or n == "barracks" or n == "towncenter" or n == "yurt" or n == "orunqar"
 
 
 func _refresh_affordability() -> void:

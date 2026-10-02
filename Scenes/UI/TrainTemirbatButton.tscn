@@ -1,0 +1,8 @@
+[gd_scene format=3 uid="uid://traintemirbatbtn"]
+
+[ext_resource type="Script" path="res://Scripts/UI/TrainTemirbatButton.gd" id="1_btn"]
+
+[node name="TrainTemirbatButton" type="Button"]
+custom_minimum_size = Vector2(160, 32)
+text = "Temirbat (120W+3F+1H)"
+script = ExtResource("1_btn")
