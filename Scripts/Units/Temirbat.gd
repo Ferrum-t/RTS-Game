@@ -2,8 +2,7 @@ extends BaseUnit
 
 class_name Temirbat
 
-## M27–M30 — Semi-Hero.
-## Soft aura, camp HP/dmg buffs, mana + Qırğın, death text, respawn.
+## M27–M31 — Semi-Hero + persistent artifacts/level via HeroProgress.
 
 var has_camp_buff: bool = false
 var has_dmg_buff: bool = false
@@ -43,9 +42,26 @@ func _ready() -> void:
 	add_to_group("Hero")
 	Orunqar.match_hero_alive = true
 	Orunqar.match_revive_cd = 0.0
+	apply_progress_bonuses()
 	_setup_hero_aura()
 	_setup_mana_bar()
-	print("Temirbat spawned at ", global_position)
+	print("Temirbat spawned L", HeroProgress.hero_level,
+		" arts=", HeroProgress.artifact_count,
+		" at ", global_position)
+
+
+## Re-apply match-persistent artifact bonuses (after death/respawn).
+func apply_progress_bonuses() -> void:
+	if HeroProgress.bonus_hp > 0:
+		max_health = 220 + HeroProgress.bonus_hp
+		health = max_health
+		if health_bar:
+			health_bar.setup(max_health)
+			health_bar.set_health(health)
+	if HeroProgress.bonus_dmg > 0:
+		attack_damage = 32 + HeroProgress.bonus_dmg
+	print(name, " progress L", HeroProgress.hero_level,
+		" HP=", max_health, " dmg=", attack_damage)
 
 
 func die() -> void:
@@ -67,14 +83,15 @@ func _show_hero_fallen_banner() -> void:
 				if c is CanvasLayer:
 					ui_root = c
 					break
+	var lvl_txt := " (Level %d)" % HeroProgress.hero_level
 	if ui_root == null:
-		print(HERO_DISPLAY_NAME, " has fallen!")
+		print(HERO_DISPLAY_NAME, lvl_txt, " has fallen!")
 		return
 
 	var label := Label.new()
 	label.name = "HeroFallenBanner"
 	label.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	label.text = HERO_DISPLAY_NAME + " has fallen"
+	label.text = HERO_DISPLAY_NAME + lvl_txt + " has fallen"
 	label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	label.add_theme_font_size_override("font_size", 32)
 	label.add_theme_color_override("font_color", Color(1.0, 0.32, 0.22, 1.0))
@@ -85,14 +102,14 @@ func _show_hero_fallen_banner() -> void:
 	label.set_anchors_preset(Control.PRESET_CENTER_TOP)
 	label.offset_top = 80.0
 	label.offset_bottom = 120.0
-	label.offset_left = -280.0
-	label.offset_right = 280.0
+	label.offset_left = -320.0
+	label.offset_right = 320.0
 
 	var tw := label.create_tween()
 	tw.tween_interval(2.5)
 	tw.tween_property(label, "modulate:a", 0.0, 0.9)
 	tw.tween_callback(label.queue_free)
-	print(HERO_DISPLAY_NAME, " has fallen!")
+	print(HERO_DISPLAY_NAME, lvl_txt, " has fallen!")
 
 
 func _process(delta: float) -> void:
@@ -270,8 +287,8 @@ func _setup_hero_aura() -> void:
 	_hero_aura = MeshInstance3D.new()
 	_hero_aura.name = "HeroAura"
 	var quad := QuadMesh.new()
-	quad.size = Vector2(2.4, 2.4)
 	_hero_aura.mesh = quad
+	quad.size = Vector2(2.4, 2.4)
 	_hero_aura.rotation_degrees = Vector3(-90.0, 0.0, 0.0)
 	_hero_aura.position = Vector3(0.0, 0.05, 0.0)
 	_hero_aura.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
