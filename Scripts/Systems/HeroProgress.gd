@@ -1,8 +1,8 @@
-extends Node
+extends RefCounted
 
 class_name HeroProgress
 
-## M31 — survives Temirbat death/respawn (match-only, not save file).
+## M31 — survives Temirbat death/respawn (match-only).
 
 static var hero_level: int = 1
 static var artifact_count: int = 0
@@ -29,11 +29,12 @@ static func grant_artifact(source_name: String = "camp") -> void:
 		" → level=", hero_level,
 		" arts=", artifact_count,
 		" +HP=", bonus_hp, " +DMG=", bonus_dmg)
-	# Apply to living hero if any
-	var tree := Engine.get_main_loop() as SceneTree
-	if tree == null:
+	var tree := Engine.get_main_loop()
+	if tree == null or not (tree is SceneTree):
 		return
-	for n in tree.get_nodes_in_group("Hero"):
-		if n is Temirbat and is_instance_valid(n) and n.unit_state != BaseUnit.UnitState.DEAD:
-			n.apply_progress_bonuses()
+	for n in (tree as SceneTree).get_nodes_in_group("Hero"):
+		if n == null or not is_instance_valid(n):
+			continue
+		if n.has_method("apply_progress_bonuses"):
+			n.call("apply_progress_bonuses")
 			break
