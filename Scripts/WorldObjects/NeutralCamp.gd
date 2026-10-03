@@ -2,7 +2,7 @@ extends Node3D
 
 class_name NeutralCamp
 
-## M27/M30/M31 — creep camp + visible chest on clear.
+## M27/M30/M31 — creep camp + chest on clear.
 
 enum CampKind { MELEE, ARCHER }
 
@@ -19,6 +19,7 @@ var _reward_team: int = 0
 var _configured: bool = false
 var _last_death_pos: Vector3 = Vector3.ZERO
 var _has_death_pos: bool = false
+var _alive_count: int = 0
 
 
 func _ready() -> void:
@@ -113,6 +114,8 @@ func _spawn_creeps() -> void:
 	if creep_scene == null:
 		push_error("NeutralCamp: creep_scene null kind=", camp_kind)
 		return
+	_creeps.clear()
+	_alive_count = 0
 	for i in creep_count:
 		var angle: float = TAU * float(i) / float(creep_count)
 		var offset := Vector3(cos(angle) * spawn_radius, 0.0, sin(angle) * spawn_radius)
@@ -129,23 +132,32 @@ func _spawn_creeps() -> void:
 			var creep: Creep = c as Creep
 			creep.owning_camp = self
 			_creeps.append(creep)
-			creep.tree_exiting.connect(_on_creep_exiting.bind(creep))
-	print("[M30] spawned ", _creeps.size(), " creeps kind=", CampKind.keys()[camp_kind])
+			_alive_count += 1
+	print("[M30] spawned ", _alive_count, " creeps kind=", CampKind.keys()[camp_kind])
 
 
-func _on_creep_exiting(creep: Creep) -> void:
-	if creep != null and is_instance_valid(creep):
-		_last_death_pos = creep.global_position
-		_has_death_pos = true
-		print("[M30] creep died at ", _last_death_pos, " left=", _creeps.size() - 1)
-	_creeps.erase(creep)
+## Called from Creep.die() before queue_free — reliable path.
+func on_creep_died(creep: Node) -> void:
 	if _cleared:
 		return
-	if _creeps.is_empty():
+	if creep != null and is_instance_valid(creep) and creep is Node3D:
+		_last_death_pos = (creep as Node3D).global_position
+		_has_death_pos = true
+	_creeps.erase(creep)
+	_alive_count = maxi(0, _alive_count - 1)
+	print("[M30] camp creep died left=", _alive_count, " pos=", _last_death_pos)
+	if _alive_count <= 0:
 		_grant_reward()
 
 
+func _on_creep_exiting(creep: Creep) -> void:
+	# Legacy fallback if die() path missed
+	on_creep_died(creep)
+
+
 func _grant_reward() -> void:
+	if _cleared:
+		return
 	_cleared = true
 	var team: int = _reward_team
 	if team < 0:
@@ -170,7 +182,6 @@ func _grant_reward() -> void:
 
 
 func _spawn_artifact_chest() -> void:
-	# Prefer last kill pos; always fall back to camp center (never miss)
 	var drop_pos: Vector3 = global_position + Vector3(0.0, 0.0, 2.0)
 	if _has_death_pos:
 		drop_pos = _last_death_pos
@@ -190,4 +201,4 @@ func _spawn_artifact_chest() -> void:
 	chest.global_position = drop_pos
 	if "source_label" in chest:
 		chest.source_label = CampKind.keys()[camp_kind]
-	print("[M31] ★ ArtifactChest DROPPED at ", drop_pos, " (look for tall GOLD pillar)")
+	print("[M31] ★ ArtifactChest DROPPED at ", drop_pos, " — tall GOLD pillar")
