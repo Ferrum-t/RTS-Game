@@ -2,7 +2,7 @@ extends BaseBuilding
 
 class_name Orunqar
 
-## M27/M29/M31 — train/revive Temirbat. Rally point for exit.
+## M27/M29/M31 — train/revive Temirbat. Uses BaseBuilding rally flag.
 
 @export var temirbat_scene: PackedScene
 @export var temirbat_cost_wood: int = 120
@@ -14,10 +14,6 @@ class_name Orunqar
 var is_training: bool = false
 var train_timer: float = 0.0
 var train_time_total: float = 0.0
-
-## Where trained Temirbat walks after door. Right-click ground with Orunqar selected.
-var rally_point: Vector3 = Vector3.ZERO
-var has_rally: bool = false
 
 static var match_hero_alive: bool = false
 static var match_revive_cd: float = 0.0
@@ -37,12 +33,9 @@ func _ready() -> void:
 	nav_half_extents = Vector3(2.0, 1.0, 2.0)
 	if temirbat_scene == null:
 		temirbat_scene = load("res://Scenes/Units/temirbat.tscn") as PackedScene
-	# Default rally: in front of current building position
-	rally_point = global_position + Vector3(6.0, 0.0, 0.0)
-	has_rally = true
 	print("Orunqar ready at ", global_position)
 	if OS.is_debug_build() and team_id == 0:
-		print("Orunqar: T = train · right-click ground = rally")
+		print("Orunqar: T = train · right-click ground = rally (BaseBuilding flag)")
 
 
 func _process(delta: float) -> void:
@@ -55,18 +48,12 @@ func _process(delta: float) -> void:
 		_finish_training()
 
 
-func set_rally(world_pos: Vector3) -> void:
-	rally_point = world_pos
-	has_rally = true
-	print("Orunqar rally → ", rally_point)
-
-
 func _unhandled_input(event: InputEvent) -> void:
+	if not OS.is_debug_build():
+		return
 	if team_id != 0 or is_destroyed:
 		return
 	if not (event is InputEventKey and event.pressed and not event.echo):
-		return
-	if not OS.is_debug_build():
 		return
 	var key := event as InputEventKey
 	if key.keycode == KEY_T:
@@ -140,14 +127,11 @@ func _finish_training() -> void:
 	if "team_id" in unit:
 		unit.team_id = team_id
 
-	# Always use CURRENT Orunqar position (not cached from build frame)
-	var door: Vector3 = global_position + Vector3(3.5, 0.0, 0.0)
-	var slot: Vector3 = rally_point if has_rally else (door + Vector3(4.0, 0.0, 2.0))
+	# Use BaseBuilding door + rally (same as Barracks/TC)
+	var door: Vector3 = get_door_position()
+	var slot: Vector3 = next_rally_destination()
 	get_tree().current_scene.add_child(unit)
-	# Set position before physics ticks
 	unit.global_position = door
-	if unit is Node3D:
-		unit.global_position = door
 	if unit is BaseUnit and unit.has_method("replace_order_move"):
 		unit.replace_order_move(slot)
 	print("Orunqar: Temirbat at door ", door, " → rally ", slot)
