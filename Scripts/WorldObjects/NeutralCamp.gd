@@ -2,7 +2,7 @@ extends Node3D
 
 class_name NeutralCamp
 
-## M27/M30/M31 — creep camp + chest at last kill position.
+## M27/M30/M31 — creep camp + visible chest on clear.
 
 enum CampKind { MELEE, ARCHER }
 
@@ -137,6 +137,7 @@ func _on_creep_exiting(creep: Creep) -> void:
 	if creep != null and is_instance_valid(creep):
 		_last_death_pos = creep.global_position
 		_has_death_pos = true
+		print("[M30] creep died at ", _last_death_pos, " left=", _creeps.size() - 1)
 	_creeps.erase(creep)
 	if _cleared:
 		return
@@ -147,6 +148,8 @@ func _on_creep_exiting(creep: Creep) -> void:
 func _grant_reward() -> void:
 	_cleared = true
 	var team: int = _reward_team
+	if team < 0:
+		team = 0
 	var rm := get_node_or_null("/root/ResourceManager")
 	if rm:
 		rm.add_wood(reward_wood, team)
@@ -167,7 +170,8 @@ func _grant_reward() -> void:
 
 
 func _spawn_artifact_chest() -> void:
-	var drop_pos: Vector3 = global_position
+	# Prefer last kill pos; always fall back to camp center (never miss)
+	var drop_pos: Vector3 = global_position + Vector3(0.0, 0.0, 2.0)
 	if _has_death_pos:
 		drop_pos = _last_death_pos
 	drop_pos.y = 0.0
@@ -178,7 +182,7 @@ func _spawn_artifact_chest() -> void:
 		push_error("M31: ArtifactChest.gd missing")
 		return
 	chest.set_script(script)
-	chest.name = "ArtifactChest"
+	chest.name = "ArtifactChest_%s" % CampKind.keys()[camp_kind]
 	var parent: Node = get_tree().current_scene
 	if parent == null:
 		parent = self
@@ -186,4 +190,4 @@ func _spawn_artifact_chest() -> void:
 	chest.global_position = drop_pos
 	if "source_label" in chest:
 		chest.source_label = CampKind.keys()[camp_kind]
-	print("[M31] ArtifactChest dropped at last kill ", drop_pos)
+	print("[M31] ★ ArtifactChest DROPPED at ", drop_pos, " (look for tall GOLD pillar)")
