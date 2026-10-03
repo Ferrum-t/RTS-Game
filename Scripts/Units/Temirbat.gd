@@ -2,14 +2,12 @@ extends BaseUnit
 
 class_name Temirbat
 
-## M27/M28 — Semi-Hero.
-## Soft radial golden aura. Camp HP buff.
-## M28: mana + Qırğın + floating death text (no frame).
+## M27–M29 — Semi-Hero.
+## Soft aura, camp HP buff, mana + Qırğın, death text, respawn at Orunqar.
 
 var has_camp_buff: bool = false
 const CAMP_BUFF_HP := 40
 
-# --- M28 Ability ---
 const MANA_MAX := 100.0
 const MANA_REGEN := 2.0
 const QIRGIN_COST := 40.0
@@ -41,6 +39,8 @@ func _ready() -> void:
 
 	super()
 	add_to_group("Hero")
+	Orunqar.match_hero_alive = true
+	Orunqar.match_revive_cd = 0.0
 	_setup_hero_aura()
 	_setup_mana_bar()
 	print("Temirbat spawned at ", global_position)
@@ -48,11 +48,11 @@ func _ready() -> void:
 
 func die() -> void:
 	_show_hero_fallen_banner()
+	Orunqar.notify_hero_fallen()
 	super.die()
 
 
 func _show_hero_fallen_banner() -> void:
-	# Floating text only — no background / frame (Warcraft-style).
 	var ui_root: Node = get_tree().root.get_node_or_null("UI")
 	if ui_root == null:
 		for n in get_tree().get_nodes_in_group("ui"):
