@@ -2,9 +2,7 @@ extends Node3D
 
 class_name NeutralCamp
 
-## M27/M30 — Static creep camp.
-## MELEE: 4 Creeps, 80W+40S + HP buff on Temirbat
-## ARCHER: 3 CreepArchers, 120W+60S + dmg buff on Temirbat
+## M27/M30/M31 — creep camp + chest drop on clear.
 
 enum CampKind { MELEE, ARCHER }
 
@@ -23,14 +21,12 @@ var _configured: bool = false
 
 func _ready() -> void:
 	add_to_group("NeutralCamp")
-	# If World already called setup_kind, spawn now; else wait one frame.
 	if _configured:
 		_finish_setup()
 	else:
 		call_deferred("_finish_setup")
 
 
-## Called by World before/after add_child. kind: 0=MELEE, 1=ARCHER
 func setup_kind(kind: int) -> void:
 	camp_kind = CampKind.ARCHER if kind == 1 else CampKind.MELEE
 	_configured = true
@@ -62,7 +58,7 @@ func _finish_setup() -> void:
 		_apply_kind_defaults()
 		_configured = true
 	if has_node("CampMarker"):
-		return  # already set up
+		return
 	_setup_marker()
 	_spawn_creeps()
 	print("[M30] NeutralCamp READY kind=", CampKind.keys()[camp_kind],
@@ -73,7 +69,6 @@ func _setup_marker() -> void:
 	var mesh := MeshInstance3D.new()
 	mesh.name = "CampMarker"
 	var cyl := CylinderMesh.new()
-	# Tall pillar so camera spots it easily
 	cyl.top_radius = 0.6
 	cyl.bottom_radius = 1.4
 	cyl.height = 4.0
@@ -92,7 +87,6 @@ func _setup_marker() -> void:
 	mesh.material_override = mat
 	mesh.position = Vector3(0.0, 2.0, 0.0)
 	add_child(mesh)
-	# Ground disc
 	var disc := MeshInstance3D.new()
 	var dmesh := CylinderMesh.new()
 	dmesh.top_radius = 2.5
@@ -163,3 +157,23 @@ func _grant_reward() -> void:
 			else:
 				hero.apply_camp_buff()
 			break
+
+	_spawn_artifact_chest()
+
+
+func _spawn_artifact_chest() -> void:
+	var chest := Node3D.new()
+	var script: Script = load("res://Scripts/WorldObjects/ArtifactChest.gd") as Script
+	if script == null:
+		push_error("M31: ArtifactChest.gd missing")
+		return
+	chest.set_script(script)
+	chest.name = "ArtifactChest"
+	var parent: Node = get_tree().current_scene
+	if parent == null:
+		parent = self
+	parent.add_child(chest)
+	chest.global_position = global_position + Vector3(0.0, 0.0, 1.5)
+	if "source_label" in chest:
+		chest.source_label = CampKind.keys()[camp_kind]
+	print("[M31] ArtifactChest dropped at ", chest.global_position)
