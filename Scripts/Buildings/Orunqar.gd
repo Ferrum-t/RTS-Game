@@ -2,22 +2,29 @@ extends BaseBuilding
 
 class_name Orunqar
 
-## M27 — Sacred standing. Trains Temirbat ONCE per match.
-## Static, no pack. Cost 100W + 40S via BuildingData.
-## Debug/play: press T while any player Orunqar exists to train.
+## M27/M29 — Sacred standing. Trains Temirbat (max 1 alive).
+## M29: on hero death → retrain allowed after revive cooldown.
 
 @export var temirbat_scene: PackedScene
 @export var temirbat_cost_wood: int = 120
 @export var temirbat_cost_food: int = 3
 @export var temirbat_cost_horses: int = 1
 @export var temirbat_train_time: float = 8.0
+@export var revive_cooldown: float = 30.0
 
 var is_training: bool = false
 var train_timer: float = 0.0
 var train_time_total: float = 0.0
-var _hero_trained: bool = false
 
-static var match_hero_trained: bool = false
+## True while a living Temirbat exists for this match (player team).
+static var match_hero_alive: bool = false
+## Seconds left before retrain is allowed after death.
+static var match_revive_cd: float = 0.0
+
+## Legacy alias so old UI checks still compile if any remain.
+static var match_hero_trained: bool:
+	get:
+		return match_hero_alive
 
 
 func _ready() -> void:
@@ -32,10 +39,12 @@ func _ready() -> void:
 		temirbat_scene = load("res://Scenes/Units/temirbat.tscn") as PackedScene
 	print("Orunqar ready at ", global_position)
 	if OS.is_debug_build() and team_id == 0:
-		print("Orunqar: press T to train Temirbat (once per match)")
+		print("Orunqar: press T to train/revive Temirbat")
 
 
 func _process(delta: float) -> void:
+	if match_revive_cd > 0.0:
+		match_revive_cd = maxf(0.0, match_revive_cd - delta)
 	if not is_training:
 		return
 	train_timer -= delta
@@ -56,19 +65,39 @@ func _unhandled_input(event: InputEvent) -> void:
 		get_viewport().set_input_as_handled()
 
 
+## Called from Temirbat.die() — free the slot + start revive CD.
+static func notify_hero_fallen() -> void:
+	match_hero_alive = false
+	match_revive_cd = 30.0
+	print("Orunqar: Temirbat fallen — revive available in 30s")
+
+
 func can_train_temirbat() -> bool:
 	if not is_constructed or is_destroyed:
 		return false
-	if _hero_trained or match_hero_trained:
+	if match_hero_alive:
+		return false
+	if match_revive_cd > 0.0:
 		return false
 	if is_training:
 		return false
+	# Safety: any living Temirbat in world?
+	for n in get_tree().get_nodes_in_group("Hero"):
+		if n is Temirbat and is_instance_valid(n) and n.unit_state != BaseUnit.UnitState.DEAD:
+			if int(n.team_id) == int(team_id):
+				match_hero_alive = true
+				return false
 	return true
 
 
 func try_train_temirbat() -> bool:
 	if not can_train_temirbat():
-		print("Orunqar: cannot train Temirbat (already trained or busy)")
+		if match_hero_alive:
+			print("Orunqar: Temirbat already alive")
+		elif match_revive_cd > 0.0:
+			print("Orunqar: revive CD %.0fs" % match_revive_cd)
+		else:
+			print("Orunqar: cannot train Temirbat")
 		return false
 	if temirbat_scene == null:
 		push_error("Orunqar: temirbat_scene is null")
@@ -93,11 +122,12 @@ func try_train_temirbat() -> bool:
 
 func _finish_training() -> void:
 	is_training = false
-	_hero_trained = true
-	match_hero_trained = true
+	match_hero_alive = true
+	match_revive_cd = 0.0
 
 	var unit: Node3D = temirbat_scene.instantiate()
 	if unit == null:
+		match_hero_alive = false
 		return
 	unit.name = "Temirbat"
 	if "team_id" in unit:
