@@ -2,15 +2,27 @@ extends BaseUnit
 
 class_name Temirbat
 
-## M27 — Semi-Hero. Melee, clearly stronger than Soldier.
-## Soft radial golden aura under feet (Warcraft-style additive glow).
-## Camp buff: +40 max_health (flag, no inventory).
-## Mana bar deferred until spells exist.
+## M27/M28 — Semi-Hero.
+## Soft radial golden aura. Camp HP buff.
+## M28: mana + Qırğın (instant AoE smash around self).
 
 var has_camp_buff: bool = false
 const CAMP_BUFF_HP := 40
 
+# --- M28 Ability ---
+const MANA_MAX := 100.0
+const MANA_REGEN := 2.0          # per second
+const QIRGIN_COST := 40.0
+const QIRGIN_COOLDOWN := 12.0
+const QIRGIN_RADIUS := 3.5
+const QIRGIN_DAMAGE := 40
+
+var mana: float = MANA_MAX
+var _qirgin_cd: float = 0.0
 var _hero_aura: MeshInstance3D = null
+var _mana_bar_bg: MeshInstance3D = null
+var _mana_bar_fill: MeshInstance3D = null
+const MANA_BAR_WIDTH := 2.0
 
 
 func _ready() -> void:
@@ -27,17 +39,185 @@ func _ready() -> void:
 	super()
 	add_to_group("Hero")
 	_setup_hero_aura()
+	_setup_mana_bar()
 	print("Temirbat spawned at ", global_position)
 
 
+func _process(delta: float) -> void:
+	if unit_state == UnitState.DEAD:
+		return
+	# Mana regen
+	if mana < MANA_MAX:
+		mana = minf(MANA_MAX, mana + MANA_REGEN * delta)
+		_update_mana_bar()
+	if _qirgin_cd > 0.0:
+		_qirgin_cd = maxf(0.0, _qirgin_cd - delta)
+
+
+func _unhandled_input(event: InputEvent) -> void:
+	if team_id != 0 or unit_state == UnitState.DEAD:
+		return
+	if not selected:
+		return
+	if not (event is InputEventKey and event.pressed and not event.echo):
+		return
+	var key := event as InputEventKey
+	if key.keycode == KEY_Q:
+		try_cast_qirgin()
+		get_viewport().set_input_as_handled()
+
+
+func can_cast_qirgin() -> bool:
+	if unit_state == UnitState.DEAD:
+		return false
+	if _qirgin_cd > 0.0:
+		return false
+	if mana < QIRGIN_COST:
+		return false
+	return true
+
+
+func try_cast_qirgin() -> bool:
+	if not can_cast_qirgin():
+		if OS.is_debug_build():
+			if mana < QIRGIN_COST:
+				print("Temirbat Qırğın blocked — mana ", int(mana), "/", int(QIRGIN_COST))
+			elif _qirgin_cd > 0.0:
+				print("Temirbat Qırğın blocked — CD ", "%.1f" % _qirgin_cd, "s")
+		return false
+	mana -= QIRGIN_COST
+	_qirgin_cd = QIRGIN_COOLDOWN
+	_update_mana_bar()
+	_apply_qirgin_damage()
+	_flash_cast_vfx()
+	print("Temirbat Qırğın! mana=", int(mana), " CD=", QIRGIN_COOLDOWN)
+	return true
+
+
+func _apply_qirgin_damage() -> void:
+	var r_sq: float = QIRGIN_RADIUS * QIRGIN_RADIUS
+	# Units
+	for n in get_tree().get_nodes_in_group("Unit"):
+		if not (n is BaseUnit):
+			continue
+		var other: BaseUnit = n as BaseUnit
+		if other == self or not is_instance_valid(other):
+			continue
+		if other.unit_state == UnitState.DEAD:
+			continue
+		if not TeamRules.can_attack(self, other):
+			continue
+		if global_position.distance_squared_to(other.global_position) > r_sq:
+			continue
+		other.take_damage(QIRGIN_DAMAGE, self)
+	# Buildings
+	for n in get_tree().get_nodes_in_group("Building"):
+		if not (n is BaseBuilding):
+			continue
+		var b: BaseBuilding = n as BaseBuilding
+		if not is_instance_valid(b) or b.is_destroyed:
+			continue
+		if int(b.team_id) == int(team_id):
+			continue
+		if global_position.distance_squared_to(b.global_position) > r_sq:
+			continue
+		if b.has_method("damage"):
+			b.damage(QIRGIN_DAMAGE, team_id)
+		elif b.has_method("take_damage"):
+			b.take_damage(QIRGIN_DAMAGE, self)
+		elif b.has_method("apply_damage"):
+			b.apply_damage(QIRGIN_DAMAGE, self)
+		else:
+			b.health = maxi(0, b.health - QIRGIN_DAMAGE)
+			if b.health <= 0 and b.has_method("die"):
+				b.die()
+
+
+func _flash_cast_vfx() -> void:
+	# Brief bright pulse under feet
+	var flash := MeshInstance3D.new()
+	var quad := QuadMesh.new()
+	quad.size = Vector2(QIRGIN_RADIUS * 2.2, QIRGIN_RADIUS * 2.2)
+	flash.mesh = quad
+	flash.rotation_degrees = Vector3(-90.0, 0.0, 0.0)
+	flash.position = Vector3(0.0, 0.08, 0.0)
+	flash.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	var shader := Shader.new()
+	shader.code = """
+shader_type spatial;
+render_mode unshaded, blend_add, depth_draw_never, cull_disabled;
+uniform float life : hint_range(0.0, 1.0) = 1.0;
+void fragment() {
+	vec2 p = UV - vec2(0.5);
+	float dist = length(p) * 2.0;
+	float a = (1.0 - smoothstep(0.2, 0.95, dist)) * life;
+	ALBEDO = vec3(1.0, 0.75, 0.2) * 2.0;
+	ALPHA = a;
+}
+"""
+	var mat := ShaderMaterial.new()
+	mat.shader = shader
+	mat.set_shader_parameter("life", 1.0)
+	flash.material_override = mat
+	add_child(flash)
+	# Fade out ~0.35s then free
+	var tw := create_tween()
+	tw.tween_method(func(v: float): mat.set_shader_parameter("life", v), 1.0, 0.0, 0.35)
+	tw.tween_callback(flash.queue_free)
+
+
+func _setup_mana_bar() -> void:
+	# Thin blue bar just under HP bar
+	var y: float = health_bar_height - 0.28
+	_mana_bar_bg = MeshInstance3D.new()
+	_mana_bar_bg.name = "ManaBarBg"
+	var bg_q := QuadMesh.new()
+	bg_q.size = Vector2(MANA_BAR_WIDTH, 0.14)
+	_mana_bar_bg.mesh = bg_q
+	var bg_mat := StandardMaterial3D.new()
+	bg_mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	bg_mat.albedo_color = Color(0.05, 0.05, 0.12, 1)
+	bg_mat.no_depth_test = true
+	bg_mat.render_priority = 5
+	_mana_bar_bg.material_override = bg_mat
+	_mana_bar_bg.position = Vector3(0.0, y, 0.0)
+	add_child(_mana_bar_bg)
+
+	_mana_bar_fill = MeshInstance3D.new()
+	_mana_bar_fill.name = "ManaBarFill"
+	var fill_q := QuadMesh.new()
+	fill_q.size = Vector2(MANA_BAR_WIDTH, 0.10)
+	_mana_bar_fill.mesh = fill_q
+	var fill_mat := StandardMaterial3D.new()
+	fill_mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	fill_mat.albedo_color = Color(0.25, 0.55, 1.0, 1)
+	fill_mat.no_depth_test = true
+	fill_mat.render_priority = 6
+	_mana_bar_fill.material_override = fill_mat
+	_mana_bar_fill.position = Vector3(0.0, y, 0.02)
+	add_child(_mana_bar_fill)
+	_update_mana_bar()
+
+
+func _update_mana_bar() -> void:
+	if _mana_bar_fill == null:
+		return
+	var ratio := clampf(mana / MANA_MAX, 0.0, 1.0)
+	_mana_bar_fill.scale = Vector3(ratio, 1.0, 1.0)
+	_mana_bar_fill.position.x = -MANA_BAR_WIDTH * 0.5 * (1.0 - ratio)
+	# Billboard with camera like HP (simple: copy health_bar basis if present)
+	if health_bar != null and is_instance_valid(health_bar):
+		_mana_bar_bg.global_transform.basis = health_bar.global_transform.basis
+		_mana_bar_fill.global_transform.basis = health_bar.global_transform.basis
+		# Keep local Y offsets after basis copy — re-apply positions in local space each frame is safer in _process
+
+
 func _setup_hero_aura() -> void:
-	# Flat disc + soft radial shader (like WC3 hero glow under unit)
 	_hero_aura = MeshInstance3D.new()
 	_hero_aura.name = "HeroAura"
 	var quad := QuadMesh.new()
 	quad.size = Vector2(2.4, 2.4)
 	_hero_aura.mesh = quad
-	# Lie flat on ground (QuadMesh faces +Z by default → rotate to face up)
 	_hero_aura.rotation_degrees = Vector3(-90.0, 0.0, 0.0)
 	_hero_aura.position = Vector3(0.0, 0.05, 0.0)
 	_hero_aura.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
@@ -57,12 +237,10 @@ uniform float soft_edge : hint_range(0.05, 1.0) = 0.55;
 uniform float intensity : hint_range(0.1, 3.0) = 1.35;
 
 void fragment() {
-	// UV centered: 0 at center, 1 at edge of quad
 	vec2 p = UV - vec2(0.5);
-	float dist = length(p) * 2.0; // 0 center → 1 edge
-	// Soft falloff: full in center core, smooth fade to transparent
+	float dist = length(p) * 2.0;
 	float alpha = 1.0 - smoothstep(inner_radius, soft_edge, dist);
-	alpha = pow(alpha, 1.35); // slightly softer tail
+	alpha = pow(alpha, 1.35);
 	ALBEDO = glow_color.rgb * intensity;
 	ALPHA = alpha * glow_color.a;
 }
