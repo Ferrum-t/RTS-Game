@@ -2,11 +2,13 @@ extends BaseUnit
 
 class_name Temirbat
 
-## M27–M29 — Semi-Hero.
-## Soft aura, camp HP buff, mana + Qırğın, death text, respawn at Orunqar.
+## M27–M30 — Semi-Hero.
+## Soft aura, camp HP/dmg buffs, mana + Qırğın, death text, respawn.
 
 var has_camp_buff: bool = false
+var has_dmg_buff: bool = false
 const CAMP_BUFF_HP := 40
+const CAMP_BUFF_DMG := 10
 
 const MANA_MAX := 100.0
 const MANA_REGEN := 2.0
@@ -316,3 +318,11 @@ func apply_camp_buff() -> void:
 		health_bar.setup(max_health)
 		health_bar.set_health(health)
 	print(name, " CAMP BUFF +", CAMP_BUFF_HP, " HP → max=", max_health)
+
+
+func apply_dmg_buff() -> void:
+	if has_dmg_buff:
+		return
+	has_dmg_buff = true
+	attack_damage += CAMP_BUFF_DMG
+	print(name, " ARCHER CAMP BUFF +", CAMP_BUFF_DMG, " dmg → ", attack_damage)
