@@ -11,6 +11,7 @@
 [ext_resource type="Script" path="res://Scripts/UI/TrainMergenButton.gd" id="7c_mergen"]
 [ext_resource type="Script" path="res://Scripts/UI/TrainHorseArcherButton.gd" id="7d_ha"]
 [ext_resource type="Script" path="res://Scripts/UI/TrainTemirbatButton.gd" id="7e_temir"]
+[ext_resource type="Script" path="res://Scripts/UI/QirginButton.gd" id="7f_qirgin"]
 [ext_resource type="Script" path="res://Scripts/UI/PackButton.gd" id="8_pack"]
 [ext_resource type="Script" path="res://Scripts/UI/UnpackButton.gd" id="9_unpack"]
 [ext_resource type="Script" path="res://Scripts/UI/CommandBar.gd" id="10_cmd"]
@@ -227,3 +228,14 @@ custom_minimum_size = Vector2(180, 28)
 layout_mode = 2
 text = "Temirbat (120W+3F+1H)"
 script = ExtResource("7e_temir")
+
+[node name="HeroGroup" type="HBoxContainer" parent="BottomBar/Margin/HBox"]
+visible = false
+layout_mode = 2
+theme_override_constants/separation = 6
+
+[node name="QirginButton" type="Button" parent="BottomBar/Margin/HBox/HeroGroup"]
+custom_minimum_size = Vector2(160, 28)
+layout_mode = 2
+text = "Qırğın (Q) 40 mana"
+script = ExtResource("7f_qirgin")
