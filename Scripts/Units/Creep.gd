@@ -2,11 +2,12 @@ extends BaseUnit
 
 class_name Creep
 
-## M27 — Neutral melee. team_id = -1. Aggro via IDLE acquire.
+## M27/M31 — Neutral. team_id = -1. Notifies camp on death.
 
 const AGGRO_RADIUS := 11.0
 
 var owning_camp: Node = null
+var _camp_notified: bool = false
 
 
 func _ready() -> void:
@@ -32,6 +33,21 @@ func take_damage(amount: int, source: Node = null) -> void:
 		if t != -1 and owning_camp != null and owning_camp.has_method("note_attacker_team"):
 			owning_camp.note_attacker_team(t)
 	super.take_damage(amount, source)
+
+
+func die() -> void:
+	_notify_camp_death()
+	super.die()
+
+
+func _notify_camp_death() -> void:
+	if _camp_notified:
+		return
+	_camp_notified = true
+	if owning_camp != null and is_instance_valid(owning_camp):
+		if owning_camp.has_method("on_creep_died"):
+			owning_camp.on_creep_died(self)
+			print("[M30] Creep.die → camp notified at ", global_position)
 
 
 func _try_idle_acquire(delta: float) -> void:
