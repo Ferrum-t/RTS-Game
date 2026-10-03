@@ -2,14 +2,14 @@ extends Node3D
 
 
 func _ready() -> void:
-	call_deferred("_spawn_m27_camps")
+	call_deferred("_spawn_m30_camps")
 
 
-func _spawn_m27_camps() -> void:
-	# 0 = MELEE, 1 = ARCHER — away from R0/R1
+func _spawn_m30_camps() -> void:
+	# Closer / easier to find than corners. 0=MELEE (orange), 1=ARCHER (blue)
 	var setups: Array = [
-		{"pos": Vector3(55.0, 0.0, -55.0), "kind": 0},
-		{"pos": Vector3(-55.0, 0.0, 55.0), "kind": 1},
+		{"pos": Vector3(48.0, 0.0, -48.0), "kind": 0},
+		{"pos": Vector3(-48.0, 0.0, 48.0), "kind": 1},
 	]
 	var camp_script: Script = load("res://Scripts/WorldObjects/NeutralCamp.gd") as Script
 	if camp_script == null:
@@ -20,10 +20,11 @@ func _spawn_m27_camps() -> void:
 		var camp := Node3D.new()
 		camp.set_script(camp_script)
 		camp.name = "NeutralCamp_%d" % (i + 1)
-		camp.set("camp_kind", cfg["kind"])
 		add_child(camp)
 		camp.global_position = cfg["pos"]
-		print("[M30] NeutralCamp_", i + 1, " kind=", cfg["kind"], " at ", cfg["pos"])
+		if camp.has_method("setup_kind"):
+			camp.setup_kind(int(cfg["kind"]))
+		print("[M30] World spawned NeutralCamp_", i + 1, " kind=", cfg["kind"], " at ", cfg["pos"])
 
 
 func _process(_delta) -> void:
