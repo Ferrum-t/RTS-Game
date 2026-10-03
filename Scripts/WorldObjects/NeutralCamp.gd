@@ -2,7 +2,7 @@ extends Node3D
 
 class_name NeutralCamp
 
-## M27/M30/M31 — creep camp + chest drop on clear.
+## M27/M30/M31 — creep camp + chest at last kill position.
 
 enum CampKind { MELEE, ARCHER }
 
@@ -17,6 +17,8 @@ var _creeps: Array = []
 var _cleared: bool = false
 var _reward_team: int = 0
 var _configured: bool = false
+var _last_death_pos: Vector3 = Vector3.ZERO
+var _has_death_pos: bool = false
 
 
 func _ready() -> void:
@@ -132,6 +134,9 @@ func _spawn_creeps() -> void:
 
 
 func _on_creep_exiting(creep: Creep) -> void:
+	if creep != null and is_instance_valid(creep):
+		_last_death_pos = creep.global_position
+		_has_death_pos = true
 	_creeps.erase(creep)
 	if _cleared:
 		return
@@ -162,7 +167,12 @@ func _grant_reward() -> void:
 
 
 func _spawn_artifact_chest() -> void:
-	var chest := Node3D.new()
+	var drop_pos: Vector3 = global_position
+	if _has_death_pos:
+		drop_pos = _last_death_pos
+	drop_pos.y = 0.0
+
+	var chest := StaticBody3D.new()
 	var script: Script = load("res://Scripts/WorldObjects/ArtifactChest.gd") as Script
 	if script == null:
 		push_error("M31: ArtifactChest.gd missing")
@@ -173,7 +183,7 @@ func _spawn_artifact_chest() -> void:
 	if parent == null:
 		parent = self
 	parent.add_child(chest)
-	chest.global_position = global_position + Vector3(0.0, 0.0, 1.5)
+	chest.global_position = drop_pos
 	if "source_label" in chest:
 		chest.source_label = CampKind.keys()[camp_kind]
-	print("[M31] ArtifactChest dropped at ", chest.global_position)
+	print("[M31] ArtifactChest dropped at last kill ", drop_pos)
