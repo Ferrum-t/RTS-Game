@@ -4,7 +4,7 @@ class_name Temirbat
 
 ## M27/M28 — Semi-Hero.
 ## Soft radial golden aura. Camp HP buff.
-## M28: mana + Qırğın + death banner.
+## M28: mana + Qırğın + floating death text (no frame).
 
 var has_camp_buff: bool = false
 const CAMP_BUFF_HP := 40
@@ -25,7 +25,6 @@ var _mana_bar_fill: MeshInstance3D = null
 var _mana_bar_y: float = 1.87
 const MANA_BAR_WIDTH := 2.0
 
-## Display name for death banner (no levels yet).
 const HERO_DISPLAY_NAME := "Temirbat"
 
 
@@ -53,10 +52,9 @@ func die() -> void:
 
 
 func _show_hero_fallen_banner() -> void:
-	# Warcraft-style: "Temirbat has fallen" centered near top of screen.
+	# Floating text only — no background / frame (Warcraft-style).
 	var ui_root: Node = get_tree().root.get_node_or_null("UI")
 	if ui_root == null:
-		# Fallback: find any CanvasLayer
 		for n in get_tree().get_nodes_in_group("ui"):
 			ui_root = n
 			break
@@ -71,44 +69,27 @@ func _show_hero_fallen_banner() -> void:
 		print(HERO_DISPLAY_NAME, " has fallen!")
 		return
 
-	var panel := PanelContainer.new()
-	panel.name = "HeroFallenBanner"
-	panel.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	var style := StyleBoxFlat.new()
-	style.bg_color = Color(0.05, 0.02, 0.02, 0.82)
-	style.border_color = Color(0.85, 0.15, 0.1, 0.95)
-	style.set_border_width_all(2)
-	style.set_corner_radius_all(4)
-	style.content_margin_left = 28
-	style.content_margin_right = 28
-	style.content_margin_top = 12
-	style.content_margin_bottom = 12
-	panel.add_theme_stylebox_override("panel", style)
-
 	var label := Label.new()
+	label.name = "HeroFallenBanner"
+	label.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	label.text = HERO_DISPLAY_NAME + " has fallen"
 	label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	label.add_theme_font_size_override("font_size", 28)
-	label.add_theme_color_override("font_color", Color(1.0, 0.35, 0.25, 1.0))
+	label.add_theme_font_size_override("font_size", 32)
+	label.add_theme_color_override("font_color", Color(1.0, 0.32, 0.22, 1.0))
 	label.add_theme_color_override("font_outline_color", Color(0, 0, 0, 1))
-	label.add_theme_constant_override("outline_size", 4)
-	panel.add_child(label)
+	label.add_theme_constant_override("outline_size", 6)
 
-	ui_root.add_child(panel)
-	# Center top
-	panel.set_anchors_preset(Control.PRESET_CENTER_TOP)
-	panel.offset_top = 72.0
-	panel.offset_bottom = 72.0
-	panel.offset_left = -200.0
-	panel.offset_right = 200.0
-	# Grow to content after one frame
-	panel.reset_size()
+	ui_root.add_child(label)
+	label.set_anchors_preset(Control.PRESET_CENTER_TOP)
+	label.offset_top = 80.0
+	label.offset_bottom = 120.0
+	label.offset_left = -280.0
+	label.offset_right = 280.0
 
-	# Fade out after 3.5s
-	var tw := panel.create_tween()
-	tw.tween_interval(2.8)
-	tw.tween_property(panel, "modulate:a", 0.0, 0.7)
-	tw.tween_callback(panel.queue_free)
+	var tw := label.create_tween()
+	tw.tween_interval(2.5)
+	tw.tween_property(label, "modulate:a", 0.0, 0.9)
+	tw.tween_callback(label.queue_free)
 	print(HERO_DISPLAY_NAME, " has fallen!")
 
 
