@@ -22,6 +22,7 @@ var _qirgin_cd: float = 0.0
 var _hero_aura: MeshInstance3D = null
 var _mana_bar_bg: MeshInstance3D = null
 var _mana_bar_fill: MeshInstance3D = null
+var _mana_bar_y: float = 1.87
 const MANA_BAR_WIDTH := 2.0
 
 
@@ -46,12 +47,12 @@ func _ready() -> void:
 func _process(delta: float) -> void:
 	if unit_state == UnitState.DEAD:
 		return
-	# Mana regen
 	if mana < MANA_MAX:
 		mana = minf(MANA_MAX, mana + MANA_REGEN * delta)
 		_update_mana_bar()
 	if _qirgin_cd > 0.0:
 		_qirgin_cd = maxf(0.0, _qirgin_cd - delta)
+	_billboard_mana_bar()
 
 
 func _unhandled_input(event: InputEvent) -> void:
@@ -96,7 +97,6 @@ func try_cast_qirgin() -> bool:
 
 func _apply_qirgin_damage() -> void:
 	var r_sq: float = QIRGIN_RADIUS * QIRGIN_RADIUS
-	# Units
 	for n in get_tree().get_nodes_in_group("Unit"):
 		if not (n is BaseUnit):
 			continue
@@ -110,7 +110,6 @@ func _apply_qirgin_damage() -> void:
 		if global_position.distance_squared_to(other.global_position) > r_sq:
 			continue
 		other.take_damage(QIRGIN_DAMAGE, self)
-	# Buildings
 	for n in get_tree().get_nodes_in_group("Building"):
 		if not (n is BaseBuilding):
 			continue
@@ -134,7 +133,6 @@ func _apply_qirgin_damage() -> void:
 
 
 func _flash_cast_vfx() -> void:
-	# Brief bright pulse under feet
 	var flash := MeshInstance3D.new()
 	var quad := QuadMesh.new()
 	quad.size = Vector2(QIRGIN_RADIUS * 2.2, QIRGIN_RADIUS * 2.2)
@@ -160,15 +158,13 @@ void fragment() {
 	mat.set_shader_parameter("life", 1.0)
 	flash.material_override = mat
 	add_child(flash)
-	# Fade out ~0.35s then free
 	var tw := create_tween()
 	tw.tween_method(func(v: float): mat.set_shader_parameter("life", v), 1.0, 0.0, 0.35)
 	tw.tween_callback(flash.queue_free)
 
 
 func _setup_mana_bar() -> void:
-	# Thin blue bar just under HP bar
-	var y: float = health_bar_height - 0.28
+	_mana_bar_y = health_bar_height - 0.28
 	_mana_bar_bg = MeshInstance3D.new()
 	_mana_bar_bg.name = "ManaBarBg"
 	var bg_q := QuadMesh.new()
@@ -180,7 +176,6 @@ func _setup_mana_bar() -> void:
 	bg_mat.no_depth_test = true
 	bg_mat.render_priority = 5
 	_mana_bar_bg.material_override = bg_mat
-	_mana_bar_bg.position = Vector3(0.0, y, 0.0)
 	add_child(_mana_bar_bg)
 
 	_mana_bar_fill = MeshInstance3D.new()
@@ -194,7 +189,6 @@ func _setup_mana_bar() -> void:
 	fill_mat.no_depth_test = true
 	fill_mat.render_priority = 6
 	_mana_bar_fill.material_override = fill_mat
-	_mana_bar_fill.position = Vector3(0.0, y, 0.02)
 	add_child(_mana_bar_fill)
 	_update_mana_bar()
 
@@ -203,13 +197,22 @@ func _update_mana_bar() -> void:
 	if _mana_bar_fill == null:
 		return
 	var ratio := clampf(mana / MANA_MAX, 0.0, 1.0)
-	_mana_bar_fill.scale = Vector3(ratio, 1.0, 1.0)
-	_mana_bar_fill.position.x = -MANA_BAR_WIDTH * 0.5 * (1.0 - ratio)
-	# Billboard with camera like HP (simple: copy health_bar basis if present)
-	if health_bar != null and is_instance_valid(health_bar):
-		_mana_bar_bg.global_transform.basis = health_bar.global_transform.basis
-		_mana_bar_fill.global_transform.basis = health_bar.global_transform.basis
-		# Keep local Y offsets after basis copy — re-apply positions in local space each frame is safer in _process
+	_mana_bar_fill.scale = Vector3(maxf(ratio, 0.001), 1.0, 1.0)
+
+
+func _billboard_mana_bar() -> void:
+	if _mana_bar_bg == null or _mana_bar_fill == null:
+		return
+	var cam := get_viewport().get_camera_3d()
+	if cam == null:
+		return
+	var basis := cam.global_transform.basis
+	var origin := global_position + Vector3(0.0, _mana_bar_y, 0.0)
+	_mana_bar_bg.global_transform = Transform3D(basis, origin)
+	var ratio := clampf(mana / MANA_MAX, 0.0, 1.0)
+	var fill_origin := origin + basis * Vector3(-MANA_BAR_WIDTH * 0.5 * (1.0 - ratio), 0.0, 0.02)
+	_mana_bar_fill.global_transform = Transform3D(basis, fill_origin)
+	_mana_bar_fill.scale = Vector3(maxf(ratio, 0.001), 1.0, 1.0)
 
 
 func _setup_hero_aura() -> void:
