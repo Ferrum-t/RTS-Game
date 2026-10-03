@@ -1,6 +1,6 @@
 extends Button
 
-## M27 — Train Temirbat from selected / any living Orunqar (once per match).
+## M27/M29 — Train or revive Temirbat from Orunqar (max 1 alive).
 
 const COST_WOOD := 120
 const COST_FOOD := 3
@@ -28,9 +28,13 @@ func _refresh_state() -> void:
 		disabled = true
 		text = "Temirbat — no Orunqar"
 		return
-	if Orunqar.match_hero_trained or orun._hero_trained:
+	if Orunqar.match_hero_alive:
 		disabled = true
-		text = "Temirbat — already trained"
+		text = "Temirbat — alive"
+		return
+	if Orunqar.match_revive_cd > 0.0:
+		disabled = true
+		text = "Revive in %.0fs" % Orunqar.match_revive_cd
 		return
 	if orun.is_training:
 		disabled = true
