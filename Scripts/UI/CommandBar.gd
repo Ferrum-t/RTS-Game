@@ -5,6 +5,7 @@ extends PanelContainer
 ## Leaving Worker context cancels ghost placement (M10.1c).
 ## Polish: Watchtower → Pack / Unpack (same as TC mobility).
 ## M27: Orunqar → Train Temirbat.
+## M28: Temirbat selected → Qırğın ability.
 
 enum Context {
 	NONE,
@@ -13,6 +14,7 @@ enum Context {
 	TOWN_CENTER,
 	WATCHTOWER,
 	ORUNQAR,
+	HERO,
 }
 
 @onready var worker_group: Control = $Margin/HBox/WorkerGroup
@@ -20,6 +22,7 @@ enum Context {
 @onready var town_center_group: Control = $Margin/HBox/TownCenterGroup
 @onready var watchtower_group: Control = $Margin/HBox/WatchtowerGroup
 @onready var orunqar_group: Control = $Margin/HBox/OrunqarGroup
+@onready var hero_group: Control = $Margin/HBox/HeroGroup
 
 var _last_context: int = Context.NONE
 
@@ -64,6 +67,11 @@ func _resolve_context() -> int:
 		return Context.NONE
 	var units: Array = sm.get_valid_selection()
 	for u in units:
+		if u is Temirbat and is_instance_valid(u):
+			var h: BaseUnit = u as BaseUnit
+			if h.team_id == 0 and h.unit_state != BaseUnit.UnitState.DEAD:
+				return Context.HERO
+	for u in units:
 		if u is Worker and is_instance_valid(u):
 			var w: BaseUnit = u as BaseUnit
 			if w.team_id == 0 and w.unit_state != BaseUnit.UnitState.DEAD:
@@ -78,6 +86,7 @@ func _apply_context(ctx: int) -> void:
 		or ctx == Context.TOWN_CENTER
 		or ctx == Context.WATCHTOWER
 		or ctx == Context.ORUNQAR
+		or ctx == Context.HERO
 	)
 	visible = show_bar
 	if worker_group:
@@ -90,6 +99,8 @@ func _apply_context(ctx: int) -> void:
 		watchtower_group.visible = ctx == Context.WATCHTOWER
 	if orunqar_group:
 		orunqar_group.visible = ctx == Context.ORUNQAR
+	if hero_group:
+		hero_group.visible = ctx == Context.HERO
 
 
 func _cancel_ghost() -> void:
