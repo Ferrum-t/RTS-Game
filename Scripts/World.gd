@@ -6,22 +6,26 @@ func _ready() -> void:
 
 
 func _spawn_m27_camps() -> void:
-	# 2 NeutralCamps away from R0/R1 home zones
-	var positions: Array[Vector3] = [
-		Vector3(55.0, 0.0, -55.0),
-		Vector3(-55.0, 0.0, 55.0),
+	# Camp 1 melee, Camp 2 archer — away from R0/R1
+	var setups: Array = [
+		{"pos": Vector3(55.0, 0.0, -55.0), "kind": NeutralCamp.CampKind.MELEE},
+		{"pos": Vector3(-55.0, 0.0, 55.0), "kind": NeutralCamp.CampKind.ARCHER},
 	]
 	var camp_script: Script = load("res://Scripts/WorldObjects/NeutralCamp.gd") as Script
 	if camp_script == null:
-		push_error("M27: NeutralCamp.gd missing")
+		push_error("M30: NeutralCamp.gd missing")
 		return
-	for i in positions.size():
+	for i in setups.size():
+		var cfg: Dictionary = setups[i]
 		var camp := Node3D.new()
 		camp.set_script(camp_script)
 		camp.name = "NeutralCamp_%d" % (i + 1)
+		# kind must be set before _ready — set after add triggers _ready
+		# so set property before add_child via deferred property:
+		camp.set("camp_kind", cfg["kind"])
 		add_child(camp)
-		camp.global_position = positions[i]
-		print("[M27] NeutralCamp_", i + 1, " at ", positions[i])
+		camp.global_position = cfg["pos"]
+		print("[M30] NeutralCamp_", i + 1, " kind=", cfg["kind"], " at ", cfg["pos"])
 
 
 func _process(_delta) -> void:
