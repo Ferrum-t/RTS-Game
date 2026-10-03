@@ -2,8 +2,7 @@ extends BaseBuilding
 
 class_name Orunqar
 
-## M27/M29 — Sacred standing. Trains Temirbat (max 1 alive).
-## M29: on hero death → retrain allowed after revive cooldown.
+## M27/M29/M31 — train/revive Temirbat. Rally point for exit.
 
 @export var temirbat_scene: PackedScene
 @export var temirbat_cost_wood: int = 120
@@ -16,12 +15,13 @@ var is_training: bool = false
 var train_timer: float = 0.0
 var train_time_total: float = 0.0
 
-## True while a living Temirbat exists for this match (player team).
+## Where trained Temirbat walks after door. Right-click ground with Orunqar selected.
+var rally_point: Vector3 = Vector3.ZERO
+var has_rally: bool = false
+
 static var match_hero_alive: bool = false
-## Seconds left before retrain is allowed after death.
 static var match_revive_cd: float = 0.0
 
-## Legacy alias so old UI checks still compile if any remain.
 static var match_hero_trained: bool:
 	get:
 		return match_hero_alive
@@ -37,9 +37,12 @@ func _ready() -> void:
 	nav_half_extents = Vector3(2.0, 1.0, 2.0)
 	if temirbat_scene == null:
 		temirbat_scene = load("res://Scenes/Units/temirbat.tscn") as PackedScene
+	# Default rally: in front of current building position
+	rally_point = global_position + Vector3(6.0, 0.0, 0.0)
+	has_rally = true
 	print("Orunqar ready at ", global_position)
 	if OS.is_debug_build() and team_id == 0:
-		print("Orunqar: press T to train/revive Temirbat")
+		print("Orunqar: T = train · right-click ground = rally")
 
 
 func _process(delta: float) -> void:
@@ -52,12 +55,18 @@ func _process(delta: float) -> void:
 		_finish_training()
 
 
+func set_rally(world_pos: Vector3) -> void:
+	rally_point = world_pos
+	has_rally = true
+	print("Orunqar rally → ", rally_point)
+
+
 func _unhandled_input(event: InputEvent) -> void:
-	if not OS.is_debug_build():
-		return
 	if team_id != 0 or is_destroyed:
 		return
 	if not (event is InputEventKey and event.pressed and not event.echo):
+		return
+	if not OS.is_debug_build():
 		return
 	var key := event as InputEventKey
 	if key.keycode == KEY_T:
@@ -65,7 +74,6 @@ func _unhandled_input(event: InputEvent) -> void:
 		get_viewport().set_input_as_handled()
 
 
-## Called from Temirbat.die() — free the slot + start revive CD.
 static func notify_hero_fallen() -> void:
 	match_hero_alive = false
 	match_revive_cd = 30.0
@@ -81,7 +89,6 @@ func can_train_temirbat() -> bool:
 		return false
 	if is_training:
 		return false
-	# Safety: any living Temirbat in world?
 	for n in get_tree().get_nodes_in_group("Hero"):
 		if n is Temirbat and is_instance_valid(n) and n.unit_state != BaseUnit.UnitState.DEAD:
 			if int(n.team_id) == int(team_id):
@@ -133,13 +140,17 @@ func _finish_training() -> void:
 	if "team_id" in unit:
 		unit.team_id = team_id
 
+	# Always use CURRENT Orunqar position (not cached from build frame)
 	var door: Vector3 = global_position + Vector3(3.5, 0.0, 0.0)
-	var slot: Vector3 = door + Vector3(4.0, 0.0, 2.0)
+	var slot: Vector3 = rally_point if has_rally else (door + Vector3(4.0, 0.0, 2.0))
 	get_tree().current_scene.add_child(unit)
+	# Set position before physics ticks
 	unit.global_position = door
+	if unit is Node3D:
+		unit.global_position = door
 	if unit is BaseUnit and unit.has_method("replace_order_move"):
 		unit.replace_order_move(slot)
-	print("Orunqar: Temirbat trained at door ", door, " → slot ", slot)
+	print("Orunqar: Temirbat at door ", door, " → rally ", slot)
 
 
 func get_train_progress() -> float:
