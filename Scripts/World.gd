@@ -6,10 +6,10 @@ func _ready() -> void:
 
 
 func _spawn_m27_camps() -> void:
-	# Camp 1 melee, Camp 2 archer — away from R0/R1
+	# 0 = MELEE, 1 = ARCHER — away from R0/R1
 	var setups: Array = [
-		{"pos": Vector3(55.0, 0.0, -55.0), "kind": NeutralCamp.CampKind.MELEE},
-		{"pos": Vector3(-55.0, 0.0, 55.0), "kind": NeutralCamp.CampKind.ARCHER},
+		{"pos": Vector3(55.0, 0.0, -55.0), "kind": 0},
+		{"pos": Vector3(-55.0, 0.0, 55.0), "kind": 1},
 	]
 	var camp_script: Script = load("res://Scripts/WorldObjects/NeutralCamp.gd") as Script
 	if camp_script == null:
@@ -20,8 +20,6 @@ func _spawn_m27_camps() -> void:
 		var camp := Node3D.new()
 		camp.set_script(camp_script)
 		camp.name = "NeutralCamp_%d" % (i + 1)
-		# kind must be set before _ready — set after add triggers _ready
-		# so set property before add_child via deferred property:
 		camp.set("camp_kind", cfg["kind"])
 		add_child(camp)
 		camp.global_position = cfg["pos"]
