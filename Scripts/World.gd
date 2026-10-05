@@ -1,16 +1,17 @@
 extends Node3D
 
+var _debug_chest: Node = null
+
 
 func _ready() -> void:
 	call_deferred("_spawn_m30_camps")
 
 
 func _spawn_m30_camps() -> void:
-	# VERY close to player TC (28,-22) so easy to find
-	# MELEE orange ~ SE of base, ARCHER still near enemy side but closer
+	# Away from main worker tree/stone so creeps don't aggro eco
 	var setups: Array = [
-		{"pos": Vector3(40.0, 0.0, -38.0), "kind": 0},
-		{"pos": Vector3(-40.0, 0.0, 38.0), "kind": 1},
+		{"pos": Vector3(55.0, 0.0, -45.0), "kind": 0},
+		{"pos": Vector3(-55.0, 0.0, 45.0), "kind": 1},
 	]
 	var camp_script: Script = load("res://Scripts/WorldObjects/NeutralCamp.gd") as Script
 	if camp_script == null:
@@ -40,7 +41,7 @@ func _unhandled_input(event) -> void:
 				cm.cancel_build_mode()
 				get_viewport().set_input_as_handled()
 				return
-		# Debug: L = spawn loot chest at Temirbat feet
+		# Debug: L = one chest at Temirbat (replaces previous debug chest)
 		if event.keycode == KEY_L and OS.is_debug_build():
 			_debug_spawn_chest_at_hero()
 			get_viewport().set_input_as_handled()
@@ -52,10 +53,13 @@ func _unhandled_input(event) -> void:
 
 
 func _debug_spawn_chest_at_hero() -> void:
+	if _debug_chest != null and is_instance_valid(_debug_chest):
+		_debug_chest.queue_free()
+		_debug_chest = null
 	var pos := Vector3(30.0, 0.0, -25.0)
 	for n in get_tree().get_nodes_in_group("Hero"):
 		if is_instance_valid(n) and n is Node3D:
-			pos = (n as Node3D).global_position + Vector3(2.0, 0.0, 2.0)
+			pos = (n as Node3D).global_position + Vector3(2.5, 0.0, 2.5)
 			break
 	var chest := StaticBody3D.new()
 	var script: Script = load("res://Scripts/WorldObjects/ArtifactChest.gd") as Script
@@ -68,4 +72,5 @@ func _debug_spawn_chest_at_hero() -> void:
 	chest.global_position = pos
 	if "source_label" in chest:
 		chest.source_label = "DEBUG"
-	print("[M31] DEBUG chest at ", pos, " — press L near hero")
+	_debug_chest = chest
+	print("[M31] DEBUG chest (only 1) at ", pos)
