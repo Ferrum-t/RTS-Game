@@ -1,7 +1,6 @@
 extends CanvasLayer
 
-## M33 — Warcraft-like selection info (unit stats + hero level progress).
-## Spawns itself under the current scene if missing.
+## M33 — Selection stats (bottom-right, does not cover minimap).
 
 const PLAYER_TEAM := 0
 
@@ -25,14 +24,17 @@ func _ready() -> void:
 func _build_ui() -> void:
 	_root = PanelContainer.new()
 	_root.name = "SelectionInfoRoot"
-	_root.anchor_left = 0.0
+	# Bottom-right corner
+	_root.anchor_left = 1.0
 	_root.anchor_top = 1.0
-	_root.anchor_right = 0.0
+	_root.anchor_right = 1.0
 	_root.anchor_bottom = 1.0
-	_root.offset_left = 12.0
+	_root.offset_left = -250.0
 	_root.offset_top = -210.0
-	_root.offset_right = 240.0
+	_root.offset_right = -12.0
 	_root.offset_bottom = -12.0
+	_root.grow_horizontal = Control.GROW_DIRECTION_BEGIN
+	_root.grow_vertical = Control.GROW_DIRECTION_BEGIN
 	_root.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	add_child(_root)
 
@@ -112,7 +114,6 @@ func _resolve_unit() -> BaseUnit:
 	if sm == null or not sm.has_method("get_valid_selection"):
 		return null
 	var units: Array = sm.get_valid_selection()
-	# Prefer hero if in selection
 	for u in units:
 		if u is Temirbat and is_instance_valid(u) and int(u.team_id) == PLAYER_TEAM:
 			if u.unit_state != BaseUnit.UnitState.DEAD:
@@ -148,12 +149,9 @@ func _fill_unit(u: BaseUnit) -> void:
 		_level_lbl.visible = true
 		_mana_bar.value = clampf(mana / maxf(1.0, mmana), 0.0, 1.0)
 		_mana_lbl.text = "Mana  %d / %d" % [int(mana), int(mmana)]
-		# Level progress: artifacts toward soft cap 6 (each artifact = +1 level)
 		var arts: int = HeroProgress.artifact_count
-		var next_need: int = 1  # next artifact levels up
-		# Show bar as arts/6 power growth; level text shows current
 		_level_bar.value = clampf(float(arts) / float(HeroProgress.SLOT_COUNT), 0.0, 1.0)
-		_level_lbl.text = "Level %d  ·  artifacts %d/%d  (next art = level up)" % [
+		_level_lbl.text = "Level %d  ·  artifacts %d/%d" % [
 			HeroProgress.hero_level, arts, HeroProgress.SLOT_COUNT
 		]
 		_stats_lbl.text = "Damage  %d\nArmor  —\n+HP %d   +Dmg %d" % [
