@@ -2,8 +2,7 @@ extends StaticBody3D
 
 class_name ArtifactChest
 
-## M31 — big gold chest at last kill.
-## Does NOT auto-loot. Hero must click it OR deal damage (attack order).
+## M31/M32 — chest. Click/attack Temirbat. Fills first free inventory slot.
 
 const PICKUP_RADIUS := 3.0
 var _taken: bool = false
@@ -31,7 +30,6 @@ func _setup_collision() -> void:
 	add_child(shape)
 
 
-## Called if combat system hits this node (attack order).
 func take_damage(_amount: int, source: Node = null) -> void:
 	if _taken:
 		return
@@ -63,6 +61,9 @@ func _input_event(_camera: Node, event: InputEvent, _pos: Vector3, _normal: Vect
 
 
 func _order_hero_to_loot() -> void:
+	if HeroProgress.is_inventory_full():
+		print("[M32] inventory full — cannot order loot")
+		return
 	var hero: Node = _find_selected_hero()
 	if hero == null:
 		hero = _find_any_player_hero()
@@ -101,7 +102,6 @@ func _find_any_player_hero() -> Node:
 func _process(_delta: float) -> void:
 	if _taken:
 		return
-	# Only loot after explicit order (click or attack) — never auto
 	if not _ordered:
 		return
 	for n in get_tree().get_nodes_in_group("Hero"):
@@ -119,14 +119,17 @@ func _process(_delta: float) -> void:
 func _pickup(_hero: Node) -> void:
 	if _taken:
 		return
+	if not HeroProgress.grant_artifact(source_label):
+		# Inventory full — leave chest on ground
+		_ordered = false
+		print("[M32] loot failed — inventory full, chest stays")
+		return
 	_taken = true
-	HeroProgress.grant_artifact(source_label)
-	print("[M31] LOOTED artifact (", source_label, ") at ", global_position)
+	print("[M32] LOOTED artifact (", source_label, ") at ", global_position)
 	queue_free()
 
 
 func _build_mesh() -> void:
-	# Tall beacon so you cannot miss it
 	var pillar := MeshInstance3D.new()
 	var cyl := CylinderMesh.new()
 	cyl.top_radius = 0.35
@@ -143,7 +146,6 @@ func _build_mesh() -> void:
 	pillar.position = Vector3(0.0, 2.5, 0.0)
 	add_child(pillar)
 
-	# Chest body
 	var box := MeshInstance3D.new()
 	var mesh := BoxMesh.new()
 	mesh.size = Vector3(1.4, 0.9, 1.0)
@@ -169,7 +171,6 @@ func _build_mesh() -> void:
 	lid.position = Vector3(0, 1.05, 0)
 	add_child(lid)
 
-	# Ground glow disc
 	var disc := MeshInstance3D.new()
 	var dmesh := CylinderMesh.new()
 	dmesh.top_radius = 2.2
