@@ -5,10 +5,25 @@ var _debug_chest: Node = null
 
 func _ready() -> void:
 	call_deferred("_spawn_m30_camps")
+	call_deferred("_ensure_selection_info_ui")
+
+
+func _ensure_selection_info_ui() -> void:
+	if get_tree().get_first_node_in_group("SelectionInfoPanel") != null:
+		return
+	var script: Script = load("res://Scripts/UI/SelectionInfoPanel.gd") as Script
+	if script == null:
+		push_error("M33: SelectionInfoPanel.gd missing")
+		return
+	var layer := CanvasLayer.new()
+	layer.set_script(script)
+	layer.name = "SelectionInfoPanel"
+	layer.add_to_group("SelectionInfoPanel")
+	get_tree().current_scene.add_child(layer)
+	print("[M33] SelectionInfoPanel ready")
 
 
 func _spawn_m30_camps() -> void:
-	# Away from main worker tree/stone so creeps don't aggro eco
 	var setups: Array = [
 		{"pos": Vector3(55.0, 0.0, -45.0), "kind": 0},
 		{"pos": Vector3(-55.0, 0.0, 45.0), "kind": 1},
@@ -41,7 +56,6 @@ func _unhandled_input(event) -> void:
 				cm.cancel_build_mode()
 				get_viewport().set_input_as_handled()
 				return
-		# Debug: L = one chest at Temirbat (replaces previous debug chest)
 		if event.keycode == KEY_L and OS.is_debug_build():
 			_debug_spawn_chest_at_hero()
 			get_viewport().set_input_as_handled()
