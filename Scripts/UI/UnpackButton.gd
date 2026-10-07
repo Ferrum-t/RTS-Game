@@ -19,12 +19,24 @@ func _refresh_enabled() -> void:
 
 func _on_pressed() -> void:
 	var targets: Array = _unpackable_targets()
+	if targets.is_empty():
+		print("Unpack: no mobile building ready (still moving or not packed)")
+		return
 	var n: int = 0
+	var failed: int = 0
 	for b in targets:
 		if b.has_method("request_unpack") and b.request_unpack():
 			n += 1
+		else:
+			failed += 1
 	var mode: String = "selected" if _has_building_selection() else "all"
 	print("Unpack: started on ", n, " mobile building(s) [", mode, "]")
+	if n == 0 and failed > 0:
+		print("Unpack: blocked — too close to another building. Move tower a bit, then Unpack.")
+		text = "Blocked!"
+		await get_tree().create_timer(1.2).timeout
+		if is_instance_valid(self):
+			text = "Unpack"
 
 
 func _unpackable_targets() -> Array:
@@ -34,7 +46,6 @@ func _unpackable_targets() -> Array:
 			continue
 		if int(b.get("deployment_state")) != DeploymentState.State.MOBILE:
 			continue
-		# Skip while still moving toward target (request_unpack would fail).
 		var dep = b.get("deployment")
 		if dep != null and dep.has_method("can_unpack") and not dep.can_unpack():
 			continue
