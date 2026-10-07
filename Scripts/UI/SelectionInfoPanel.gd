@@ -1,6 +1,6 @@
 extends CanvasLayer
 
-## M33 — Selection stats (bottom-right, does not cover minimap).
+## M33 — Selection stats (bottom-right). Readable names, not @CharacterBody3D@.
 
 const PLAYER_TEAM := 0
 
@@ -24,7 +24,6 @@ func _ready() -> void:
 func _build_ui() -> void:
 	_root = PanelContainer.new()
 	_root.name = "SelectionInfoRoot"
-	# Bottom-right corner
 	_root.anchor_left = 1.0
 	_root.anchor_top = 1.0
 	_root.anchor_right = 1.0
@@ -125,14 +124,36 @@ func _resolve_unit() -> BaseUnit:
 	return null
 
 
+func _display_name(u: BaseUnit) -> String:
+	if u is Temirbat:
+		return "Temirbat  ·  Level %d" % HeroProgress.hero_level
+	if u is Worker:
+		return "Worker"
+	var sn: String = ""
+	var scr = u.get_script()
+	if scr != null:
+		sn = scr.get_global_name()
+		if sn.is_empty():
+			var path: String = str(scr.resource_path)
+			if path.ends_with(".gd"):
+				sn = path.get_file().get_basename()
+	if sn.is_empty():
+		var raw: String = str(u.name)
+		sn = "Unit" if raw.begins_with("@") else raw
+	match sn:
+		"HorseArcher":
+			return "Horse Archer"
+		"CreepArcher":
+			return "Creep Archer"
+		"Temirbat":
+			return "Temirbat  ·  Level %d" % HeroProgress.hero_level
+		_:
+			return sn
+
+
 func _fill_unit(u: BaseUnit) -> void:
 	var is_hero: bool = u is Temirbat
-	var title: String = str(u.name)
-	if is_hero:
-		title = "Temirbat  ·  Level %d" % HeroProgress.hero_level
-	elif u is Worker:
-		title = "Worker"
-	_name_lbl.text = title
+	_name_lbl.text = _display_name(u)
 
 	var hp: float = float(u.health)
 	var mhp: float = maxf(1.0, float(u.max_health))
