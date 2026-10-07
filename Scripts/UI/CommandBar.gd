@@ -1,11 +1,9 @@
 extends PanelContainer
 
 ## M10.1b/c — Bottom Command Bar.
-## Selection → context → show one command group, hide the rest.
-## Leaving Worker context cancels ghost placement (M10.1c).
-## Polish: Watchtower → Pack / Unpack (same as TC mobility).
 ## M27: Orunqar → Train Temirbat.
-## M28: Temirbat selected → Qırğın ability.
+## M28: Temirbat → Qırğın.
+## M32: Temirbat → 6 inventory slots.
 
 enum Context {
 	NONE,
@@ -25,9 +23,12 @@ enum Context {
 @onready var hero_group: Control = $Margin/HBox/HeroGroup
 
 var _last_context: int = Context.NONE
+var _inv_row: HBoxContainer = null
+var _slot_btns: Array = []
 
 
 func _ready() -> void:
+	_ensure_inventory_ui()
 	_apply_context(Context.NONE)
 
 
@@ -38,6 +39,57 @@ func _process(_delta: float) -> void:
 			_cancel_ghost()
 		_apply_context(ctx)
 		_last_context = ctx
+	if ctx == Context.HERO:
+		_refresh_inventory_slots()
+
+
+func _ensure_inventory_ui() -> void:
+	if hero_group == null:
+		return
+	if _inv_row != null and is_instance_valid(_inv_row):
+		return
+	_inv_row = HBoxContainer.new()
+	_inv_row.name = "InventoryRow"
+	_inv_row.add_theme_constant_override("separation", 4)
+	var title := Label.new()
+	title.text = "Inv"
+	title.add_theme_font_size_override("font_size", 12)
+	_inv_row.add_child(title)
+	_slot_btns.clear()
+	for i in HeroProgress.SLOT_COUNT:
+		var b := Button.new()
+		b.custom_minimum_size = Vector2(44, 36)
+		b.focus_mode = Control.FOCUS_NONE
+		b.disabled = true
+		b.text = "·"
+		b.tooltip_text = "Artifact slot %d" % (i + 1)
+		_inv_row.add_child(b)
+		_slot_btns.append(b)
+	hero_group.add_child(_inv_row)
+	# Keep Qırğın first if present: move inv after ability buttons
+	_inv_row.move_to_front()
+	var q := hero_group.get_node_or_null("QirginButton")
+	if q:
+		hero_group.move_child(q, 0)
+		hero_group.move_child(_inv_row, 1)
+
+
+func _refresh_inventory_slots() -> void:
+	if _slot_btns.is_empty():
+		_ensure_inventory_ui()
+	for i in _slot_btns.size():
+		var b: Button = _slot_btns[i] as Button
+		if b == null:
+			continue
+		var lab: String = HeroProgress.slot_label(i)
+		if lab.is_empty():
+			b.text = "·"
+			b.modulate = Color(0.55, 0.55, 0.6, 1)
+			b.tooltip_text = "Empty slot %d" % (i + 1)
+		else:
+			b.text = lab.substr(0, 4)
+			b.modulate = Color(1.0, 0.85, 0.25, 1)
+			b.tooltip_text = "%s  (+%d HP +%d dmg)" % [lab, HeroProgress.ARTIFACT_HP, HeroProgress.ARTIFACT_DMG]
 
 
 func _resolve_context() -> int:
@@ -45,7 +97,6 @@ func _resolve_context() -> int:
 	if sm == null:
 		return Context.NONE
 
-	# Buildings exclusive with units in SelectionManager.
 	var buildings: Array = []
 	if sm.has_method("get_selected_mobile_buildings"):
 		buildings = sm.get_selected_mobile_buildings()
@@ -101,6 +152,9 @@ func _apply_context(ctx: int) -> void:
 		orunqar_group.visible = ctx == Context.ORUNQAR
 	if hero_group:
 		hero_group.visible = ctx == Context.HERO
+		if ctx == Context.HERO:
+			_ensure_inventory_ui()
+			_refresh_inventory_slots()
 
 
 func _cancel_ghost() -> void:
