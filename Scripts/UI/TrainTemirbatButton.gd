@@ -1,6 +1,6 @@
 extends Button
 
-## M27/M29 — Train or revive Temirbat from Orunqar (max 1 alive).
+## M27/M29/M33 — Train or revive Temirbat from Orunqar (max 1 alive).
 
 const COST_WOOD := 120
 const COST_FOOD := 3
@@ -38,7 +38,10 @@ func _refresh_state() -> void:
 		return
 	if orun.is_training:
 		disabled = true
-		text = "Temirbat — training..."
+		var p: float = 0.0
+		if orun.has_method("get_train_progress"):
+			p = float(orun.get_train_progress())
+		text = "Training... %d%%" % int(p * 100.0)
 		return
 	if rm == null or not rm.can_afford(ResourceManager.make_cost(COST_WOOD, 0, 0, COST_FOOD, COST_HORSES), PLAYER_TEAM):
 		disabled = true
@@ -59,6 +62,10 @@ func _resolve_orunqar():
 	if sm != null:
 		if sm.has_method("get_selected_buildings"):
 			for b in sm.get_selected_buildings():
+				if b is Orunqar and is_instance_valid(b) and not b.is_destroyed:
+					return b
+		elif sm.has_method("get_selected_mobile_buildings"):
+			for b in sm.get_selected_mobile_buildings():
 				if b is Orunqar and is_instance_valid(b) and not b.is_destroyed:
 					return b
 		elif "selected_buildings" in sm:
