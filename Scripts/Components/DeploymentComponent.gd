@@ -28,7 +28,6 @@ var _timer_max: float = 0.0
 var _moving: bool = false
 var _move_target: Vector3 = Vector3.ZERO
 
-## Stuck detection (same idea as unit _no_progress_time / BLOCKED).
 var _stuck_time: float = 0.0
 var _last_move_pos: Vector3 = Vector3.ZERO
 const STUCK_TIMEOUT: float = 1.5
@@ -43,7 +42,6 @@ func get_state() -> int:
 	return int(owner.get("deployment_state"))
 
 
-## 1.0 at start of PACKING/UNPACKING, 0.0 when timer finishes.
 func get_transition_progress() -> float:
 	var st: int = get_state()
 	if st != DeploymentState.State.PACKING and st != DeploymentState.State.UNPACKING:
@@ -120,12 +118,18 @@ func request_unpack() -> bool:
 		else:
 			print(owner.name, " Deployment: cannot unpack (need MOBILE, not moving)")
 		return false
-	# Phase 8.2 — refuse unpack if footprint overlaps other buildings.
+
 	var reason: String = _validate_placement()
 	if reason != "":
-		unpack_blocked.emit(reason)
-		print(owner.name, " Deployment: unpack blocked — ", reason)
-		return false
+		# Try small offsets so towers near walls/other buildings still unpack
+		var fixed: bool = _try_nudge_clear()
+		if not fixed:
+			unpack_blocked.emit(reason)
+			print(owner.name, " Deployment: unpack blocked — ", reason,
+				" (move a few meters away and Unpack again)")
+			return false
+		print(owner.name, " Deployment: nudged clear of overlap, unpacking")
+
 	_moving = false
 	_reset_stuck()
 	owner.velocity = Vector3.ZERO
@@ -206,7 +210,6 @@ func _update_move(delta: float) -> void:
 		print(owner.name, " Deployment: ARRIVED ", pos, " — waiting for Unpack")
 		return
 
-	# Progress since last frame (same pattern as unit BLOCKED / _no_progress_time).
 	var cur: Vector3 = owner.global_position
 	cur.y = 0.0
 	var moved: float = cur.distance_to(_last_move_pos)
@@ -236,7 +239,6 @@ func _on_move_stuck() -> void:
 	var reason: String = "no progress toward target for %.1fs" % STUCK_TIMEOUT
 	move_stuck.emit(pos, reason)
 	print(owner.name, " Deployment: STUCK at ", pos, " — ", reason)
-	# Stay MOBILE — do NOT auto-unpack (placement may be invalid).
 	_reset_stuck()
 
 
@@ -251,8 +253,6 @@ func _set_state(new_state: int) -> void:
 	if old_state == new_state:
 		return
 	owner.set("deployment_state", new_state)
-	if owner.has_method("_on_deployment_state_changed"):
-		pass
 	state_changed.emit(old_state, new_state)
 
 
@@ -260,12 +260,12 @@ func _validate_placement() -> String:
 	var bm := owner.get_node_or_null("/root/BuildingManager")
 	if bm == null:
 		return ""
-	var he: Vector3 = Vector3(2.2, 1.0, 2.2)
+	var he: Vector3 = Vector3(2.0, 1.0, 2.0)
 	if owner.get("nav_half_extents") != null:
 		he = owner.nav_half_extents
 	var my_pos: Vector3 = owner.global_position
 	my_pos.y = 0.0
-	var margin: float = 0.4
+	var margin: float = 0.15
 	for b in bm.buildings:
 		if b == null or not is_instance_valid(b):
 			continue
@@ -275,7 +275,7 @@ func _validate_placement() -> String:
 			continue
 		if b.get("health") != null and int(b.health) <= 0:
 			continue
-		var other_he: Vector3 = Vector3(2.2, 1.0, 2.2)
+		var other_he: Vector3 = Vector3(2.0, 1.0, 2.0)
 		if b.get("nav_half_extents") != null:
 			other_he = b.nav_half_extents
 		var op: Vector3 = b.global_position
@@ -289,6 +289,24 @@ func _validate_placement() -> String:
 	return ""
 
 
+## Shift a few meters if current spot overlaps; returns true if found clear spot.
+func _try_nudge_clear() -> bool:
+	var origin: Vector3 = owner.global_position
+	var offsets: Array = [
+		Vector3(3, 0, 0), Vector3(-3, 0, 0), Vector3(0, 0, 3), Vector3(0, 0, -3),
+		Vector3(4, 0, 4), Vector3(-4, 0, 4), Vector3(4, 0, -4), Vector3(-4, 0, -4),
+		Vector3(6, 0, 0), Vector3(-6, 0, 0),
+	]
+	for off in offsets:
+		var p: Vector3 = origin + off
+		p.y = 0.0
+		owner.global_position = p
+		if _validate_placement() == "":
+			return true
+	owner.global_position = origin
+	return false
+
+
 func _unregister_nav() -> void:
 	var nav := owner.get_node_or_null("/root/NavigationBakeService")
 	if nav:
@@ -299,16 +317,13 @@ func _register_nav() -> void:
 	var nav := owner.get_node_or_null("/root/NavigationBakeService")
 	if nav == null:
 		return
-	var he: Vector3 = Vector3(2.2, 1.0, 2.2)
+	var he: Vector3 = Vector3(2.0, 1.0, 2.0)
 	if owner.get("nav_half_extents") != null:
 		he = owner.nav_half_extents
 	nav.register_building(owner, he)
 
 
 func _apply_mobile_collision() -> void:
-	# FLOATING + mask=1: intentional post-Phase-3 design.
-	# Phase 3 spike used mask=0 (phasing) to avoid ground sink; here buildings
-	# must collide with trees/stone/other buildings while mobile (not ghost).
 	owner.motion_mode = CharacterBody3D.MOTION_MODE_FLOATING
 	owner.collision_layer = 1
 	owner.collision_mask = 1
