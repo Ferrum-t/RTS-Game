@@ -2,7 +2,7 @@ extends BaseBuilding
 
 class_name Orunqar
 
-## M27/M29/M31 — train/revive Temirbat. Uses BaseBuilding rally flag.
+## M27/M29/M31/M33 — train/revive Temirbat + train UI API.
 
 @export var temirbat_scene: PackedScene
 @export var temirbat_cost_wood: int = 120
@@ -127,7 +127,6 @@ func _finish_training() -> void:
 	if "team_id" in unit:
 		unit.team_id = team_id
 
-	# Use BaseBuilding door + rally (same as Barracks/TC)
 	var door: Vector3 = get_door_position()
 	var slot: Vector3 = next_rally_destination()
 	get_tree().current_scene.add_child(unit)
@@ -141,3 +140,13 @@ func get_train_progress() -> float:
 	if not is_training or train_time_total <= 0.0:
 		return 0.0
 	return clampf(1.0 - (train_timer / train_time_total), 0.0, 1.0)
+
+
+func get_train_pipeline_count() -> int:
+	return 1 if is_training else 0
+
+
+func get_queue_labels() -> Array:
+	if is_training:
+		return ["Temirbat"]
+	return []
