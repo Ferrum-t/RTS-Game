@@ -3,7 +3,7 @@ extends PanelContainer
 ## M10.1b/c — Bottom Command Bar.
 ## M27: Orunqar → Train Temirbat.
 ## M28: Temirbat → Qırğın.
-## M32: Temirbat → 6 inventory slots.
+## M32: Temirbat → 6 inventory slots (2×3).
 
 enum Context {
 	NONE,
@@ -23,7 +23,7 @@ enum Context {
 @onready var hero_group: Control = $Margin/HBox/HeroGroup
 
 var _last_context: int = Context.NONE
-var _inv_row: HBoxContainer = null
+var _inv_box: VBoxContainer = null
 var _slot_btns: Array = []
 
 
@@ -46,32 +46,43 @@ func _process(_delta: float) -> void:
 func _ensure_inventory_ui() -> void:
 	if hero_group == null:
 		return
-	if _inv_row != null and is_instance_valid(_inv_row):
+	if _inv_box != null and is_instance_valid(_inv_box):
 		return
-	_inv_row = HBoxContainer.new()
-	_inv_row.name = "InventoryRow"
-	_inv_row.add_theme_constant_override("separation", 4)
+
+	_inv_box = VBoxContainer.new()
+	_inv_box.name = "InventoryGrid"
+	_inv_box.add_theme_constant_override("separation", 3)
+
 	var title := Label.new()
 	title.text = "Inv"
-	title.add_theme_font_size_override("font_size", 12)
-	_inv_row.add_child(title)
+	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	title.add_theme_font_size_override("font_size", 11)
+	_inv_box.add_child(title)
+
 	_slot_btns.clear()
-	for i in HeroProgress.SLOT_COUNT:
-		var b := Button.new()
-		b.custom_minimum_size = Vector2(44, 36)
-		b.focus_mode = Control.FOCUS_NONE
-		b.disabled = true
-		b.text = "·"
-		b.tooltip_text = "Artifact slot %d" % (i + 1)
-		_inv_row.add_child(b)
-		_slot_btns.append(b)
-	hero_group.add_child(_inv_row)
-	# Keep Qırğın first if present: move inv after ability buttons
-	_inv_row.move_to_front()
+	# 2 rows × 3 slots
+	for row in 2:
+		var h := HBoxContainer.new()
+		h.add_theme_constant_override("separation", 3)
+		for col in 3:
+			var i: int = row * 3 + col
+			var b := Button.new()
+			b.custom_minimum_size = Vector2(40, 32)
+			b.focus_mode = Control.FOCUS_NONE
+			b.disabled = true
+			b.text = "·"
+			b.tooltip_text = "Artifact slot %d" % (i + 1)
+			h.add_child(b)
+			_slot_btns.append(b)
+		_inv_box.add_child(h)
+
+	hero_group.add_child(_inv_box)
 	var q := hero_group.get_node_or_null("QirginButton")
 	if q:
 		hero_group.move_child(q, 0)
-		hero_group.move_child(_inv_row, 1)
+		hero_group.move_child(_inv_box, 1)
+	else:
+		_inv_box.move_to_front()
 
 
 func _refresh_inventory_slots() -> void:
