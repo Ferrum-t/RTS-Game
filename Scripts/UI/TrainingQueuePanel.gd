@@ -1,7 +1,6 @@
 extends PanelContainer
 
-## M19.1 — Selection-only training queue UI for player TC / Barracks.
-## Shows pipeline labels, progress of current unit, Cancel last / Cancel all.
+## M19.1 / M33 — Training queue UI for TC / Barracks / Orunqar.
 
 const PLAYER_TEAM := 0
 
@@ -83,11 +82,15 @@ func _process(_delta: float) -> void:
 		count = int(_building.get_train_pipeline_count())
 
 	var kind := "Building"
+	var max_q: int = 5
 	if _building is TownCenter:
 		kind = "Town Center"
 	elif _building is Barracks:
 		kind = "Barracks"
-	_title.text = "%s · train %d/%d" % [kind, count, 5]
+	elif _building is Orunqar:
+		kind = "Orunqar"
+		max_q = 1
+	_title.text = "%s · train %d/%d" % [kind, count, max_q]
 
 	_progress.value = progress
 	if count <= 0:
@@ -100,23 +103,29 @@ func _process(_delta: float) -> void:
 			parts.append(mark + str(labels[i]))
 		_queue_label.text = " ".join(parts)
 
-	var busy: bool = count > 0
-	_btn_last.disabled = not busy
-	_btn_all.disabled = not busy
+	# Orunqar: no cancel refund path yet
+	var can_cancel: bool = count > 0 and not (_building is Orunqar)
+	_btn_last.disabled = not can_cancel
+	_btn_all.disabled = not can_cancel
 
 
 func _resolve_selected_building() -> Node:
 	var sm: Node = get_tree().get_first_node_in_group("selection_manager")
-	if sm == null or not sm.has_method("get_selected_mobile_buildings"):
+	if sm == null:
 		return null
-	for b in sm.get_selected_mobile_buildings():
+	var list: Array = []
+	if sm.has_method("get_selected_mobile_buildings"):
+		list = sm.get_selected_mobile_buildings()
+	elif sm.has_method("get_selected_buildings"):
+		list = sm.get_selected_buildings()
+	for b in list:
 		if b == null or not is_instance_valid(b):
 			continue
 		if int(b.get("team_id")) != PLAYER_TEAM:
 			continue
 		if b.get("is_destroyed") == true:
 			continue
-		if b is TownCenter or b is Barracks:
+		if b is TownCenter or b is Barracks or b is Orunqar:
 			return b
 	return null
 
