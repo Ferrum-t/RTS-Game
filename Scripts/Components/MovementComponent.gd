@@ -2,9 +2,7 @@ extends RefCounted
 
 class_name MovementComponent
 
-## M6 Movement (M1 status contract)
-## M6.4–M6.6 path following
-## Polish: soft RVO via NavigationAgent3D.avoidance + velocity_computed
+## M6 Movement + M34 crowd polish (softer RVO, blocked recovery, less jitter)
 
 enum Status {
 	IDLE,
@@ -20,10 +18,10 @@ var status: Status = Status.IDLE
 var agent: NavigationAgent3D = null
 
 var arrival_distance: float = 0.55
-var block_timeout: float = 1.75
-## Soft push between units (backup if RVO neighbor list empty).
-var separation_radius: float = 1.55
-var separation_strength: float = 1.2
+## Was 1.75 — longer so rear units don't flip MOVING/BLOCKED every frame
+var block_timeout: float = 2.6
+var separation_radius: float = 1.35
+var separation_strength: float = 0.85
 var waypoint_skip_distance: float = 0.4
 var default_retarget_distance: float = 0.85
 
@@ -35,6 +33,8 @@ var _last_bake_id: int = -1
 var _current_waypoint_index: int = 0
 var _last_path_size: int = 0
 var _awaiting_avoidance: bool = false
+var _blocked_hold: float = 0.0
+var _jitter_dampen: float = 0.0
 
 
 func _init(unit: BaseUnit, nav_agent: NavigationAgent3D = null) -> void:
@@ -53,16 +53,17 @@ func set_agent(nav_agent: NavigationAgent3D) -> void:
 
 
 func _configure_agent() -> void:
-	agent.path_desired_distance = 0.5
+	agent.path_desired_distance = 0.55
 	agent.target_desired_distance = arrival_distance
-	agent.radius = 0.45
+	# Slightly larger agent = fewer overlaps / less thrash
+	agent.radius = 0.55
 	agent.height = 1.2
 	agent.path_max_distance = 50.0
-	# Soft RVO — units avoid each other; path still from NavMesh
 	agent.avoidance_enabled = true
-	agent.neighbor_distance = 3.5
-	agent.max_neighbors = 10
-	agent.time_horizon_agents = 1.0
+	# Softer, earlier avoidance — less last-second twitch
+	agent.neighbor_distance = 4.5
+	agent.max_neighbors = 12
+	agent.time_horizon_agents = 1.4
 	agent.time_horizon_obstacles = 0.0
 	agent.max_speed = 12.0
 	agent.avoidance_layers = 1
@@ -81,6 +82,8 @@ func set_target(world_pos: Vector3) -> void:
 	owner.move_target = p
 	_stuck_time = 0.0
 	_no_progress_time = 0.0
+	_blocked_hold = 0.0
+	_jitter_dampen = 0.0
 	_last_pos = owner.global_position
 	_current_waypoint_index = 0
 	_last_path_size = 0
@@ -120,6 +123,8 @@ func cancel() -> void:
 	owner.velocity = Vector3.ZERO
 	_stuck_time = 0.0
 	_no_progress_time = 0.0
+	_blocked_hold = 0.0
+	_jitter_dampen = 0.0
 	_current_waypoint_index = 0
 	_last_path_size = 0
 	_awaiting_avoidance = false
@@ -158,7 +163,6 @@ func _get_follow_point(final_target: Vector3) -> Vector3:
 	if agent == null:
 		return final_target
 
-	# M6.5: wake NavigationAgent internal path query (Godot 4.7).
 	agent.get_next_path_position()
 
 	var path: PackedVector3Array = agent.get_current_navigation_path()
@@ -185,7 +189,6 @@ func _get_follow_point(final_target: Vector3) -> Vector3:
 			continue
 		break
 
-	# M6.6: path exhausted → last path point, NEVER raw final_target
 	if _current_waypoint_index >= path.size():
 		var last: Vector3 = path[path.size() - 1]
 		last.y = 0.0
@@ -201,7 +204,26 @@ func update(delta: float) -> void:
 		owner.velocity = Vector3.ZERO
 		return
 
-	if status == Status.ARRIVED or status == Status.BLOCKED or status == Status.FAILED:
+	# Soft recovery from BLOCKED — pause briefly, then nudge sideways and retry
+	if status == Status.BLOCKED:
+		owner.velocity = Vector3.ZERO
+		_blocked_hold += delta
+		if _blocked_hold >= 0.55:
+			_blocked_hold = 0.0
+			_no_progress_time = 0.0
+			_stuck_time = 0.0
+			var nudge := _side_nudge()
+			var retry: Vector3 = owner.move_target + nudge
+			retry.y = 0.0
+			status = Status.MOVING
+			if agent:
+				agent.target_position = retry
+			_current_waypoint_index = 0
+			_last_path_size = 0
+		else:
+			return
+
+	if status == Status.ARRIVED or status == Status.FAILED:
 		var wake := owner.move_target - owner.global_position
 		wake.y = 0.0
 		if wake.length() > arrival_distance * 1.25:
@@ -241,7 +263,6 @@ func update(delta: float) -> void:
 	if agent:
 		path_n = agent.get_current_navigation_path().size()
 
-	# M6.6: reached last path point after path exhausted → ARRIVED (nav edge)
 	if path_n > 0 and _current_waypoint_index >= path_n:
 		var to_edge := follow - owner.global_position
 		to_edge.y = 0.0
@@ -255,7 +276,7 @@ func update(delta: float) -> void:
 	if to_follow.length() < 0.001:
 		var moved0 := owner.global_position.distance_to(_last_pos)
 		_last_pos = owner.global_position
-		if moved0 < 0.02:
+		if moved0 < 0.025:
 			_no_progress_time += delta
 		else:
 			_no_progress_time = 0.0
@@ -268,12 +289,14 @@ func update(delta: float) -> void:
 
 	var moved := owner.global_position.distance_to(_last_pos)
 	_last_pos = owner.global_position
-	if moved < 0.02:
+	if moved < 0.025:
 		_stuck_time += delta
 		_no_progress_time += delta
+		_jitter_dampen = minf(1.0, _jitter_dampen + delta * 1.5)
 	else:
 		_stuck_time = 0.0
 		_no_progress_time = 0.0
+		_jitter_dampen = maxf(0.0, _jitter_dampen - delta * 2.0)
 
 	if _no_progress_time >= block_timeout:
 		_set_blocked()
@@ -281,21 +304,35 @@ func update(delta: float) -> void:
 
 	var sep := _separation()
 	if sep.length_squared() > 0.001:
-		direction = (direction + sep * separation_strength).normalized()
+		# When nearly stuck, lean harder on separation so rear units slide out
+		var sep_w: float = separation_strength * (1.0 + _jitter_dampen * 0.8)
+		direction = (direction + sep * sep_w).normalized()
 
 	status = Status.MOVING
-	var desired := Vector3(direction.x * owner.move_speed, 0.0, direction.z * owner.move_speed)
+	var speed_scale: float = 1.0 - _jitter_dampen * 0.35
+	var desired := Vector3(
+		direction.x * owner.move_speed * speed_scale,
+		0.0,
+		direction.z * owner.move_speed * speed_scale
+	)
 
 	if agent.avoidance_enabled:
-		agent.max_speed = maxf(owner.move_speed, 0.1)
+		agent.max_speed = maxf(owner.move_speed * speed_scale, 0.1)
 		_awaiting_avoidance = true
 		agent.set_velocity(desired)
-		# Physical move applied in _on_velocity_computed (same physics frame).
 	else:
 		owner.velocity.x = desired.x
 		owner.velocity.z = desired.z
 		_face_move_dir(owner.velocity)
 		owner.move_and_slide()
+
+
+func _side_nudge() -> Vector3:
+	# Stable-ish lateral offset from instance id so neighbors pick different sides
+	var seed: int = int(owner.get_instance_id()) if owner else 0
+	var a: float = float((seed * 37) % 360) * 0.0174533
+	var r: float = 1.1 + float((seed * 13) % 10) * 0.08
+	return Vector3(cos(a) * r, 0.0, sin(a) * r)
 
 
 func _on_velocity_computed(safe_velocity: Vector3) -> void:
@@ -306,6 +343,17 @@ func _on_velocity_computed(safe_velocity: Vector3) -> void:
 		return
 	if owner == null or not is_instance_valid(owner):
 		return
+	# Ignore near-zero safe velocity when still far — apply soft separation slide instead of freeze-twitch
+	var spd_sq: float = safe_velocity.x * safe_velocity.x + safe_velocity.z * safe_velocity.z
+	if spd_sq < 0.04 and _jitter_dampen > 0.35:
+		var sep := _separation()
+		if sep.length_squared() > 0.001:
+			sep = sep.normalized() * owner.move_speed * 0.45
+			owner.velocity.x = sep.x
+			owner.velocity.z = sep.z
+			_face_move_dir(owner.velocity)
+			owner.move_and_slide()
+			return
 	owner.velocity.x = safe_velocity.x
 	owner.velocity.z = safe_velocity.z
 	_face_move_dir(owner.velocity)
@@ -330,6 +378,8 @@ func _set_arrived() -> void:
 	owner.velocity = Vector3.ZERO
 	_stuck_time = 0.0
 	_no_progress_time = 0.0
+	_blocked_hold = 0.0
+	_jitter_dampen = 0.0
 	_current_waypoint_index = 0
 	_last_path_size = 0
 	_awaiting_avoidance = false
@@ -342,6 +392,7 @@ func _set_blocked() -> void:
 	owner.velocity = Vector3.ZERO
 	_stuck_time = 0.0
 	_no_progress_time = 0.0
+	_blocked_hold = 0.0
 	_awaiting_avoidance = false
 	status = Status.BLOCKED
 	if agent and agent.avoidance_enabled:
@@ -352,6 +403,7 @@ func _set_failed() -> void:
 	owner.velocity = Vector3.ZERO
 	_stuck_time = 0.0
 	_no_progress_time = 0.0
+	_blocked_hold = 0.0
 	_awaiting_avoidance = false
 	status = Status.FAILED
 	if agent and agent.avoidance_enabled:
@@ -365,7 +417,6 @@ func _face_move_dir(vel: Vector3) -> void:
 	if d.length_squared() < 0.0004:
 		return
 	d = d.normalized()
-	# Model forward = -Z (Godot default). Ready for 3D mesh import.
 	owner.rotation.y = atan2(-d.x, -d.z)
 
 
