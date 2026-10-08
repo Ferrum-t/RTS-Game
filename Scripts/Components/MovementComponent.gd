@@ -2,7 +2,7 @@ extends RefCounted
 
 class_name MovementComponent
 
-## M6 Movement + M35 crowd hybrid: no ally RVO thrash, soft de-overlap so units don't full-ghost
+## M6 + M35.2: no ally RVO thrash; strong soft-body so units don't full-ghost
 
 enum Status {
 	IDLE,
@@ -19,8 +19,8 @@ var agent: NavigationAgent3D = null
 
 var arrival_distance: float = 0.55
 var block_timeout: float = 3.0
-var separation_radius: float = 1.15
-var separation_strength: float = 0.7
+var separation_radius: float = 1.4
+var separation_strength: float = 1.1
 var waypoint_skip_distance: float = 0.4
 var default_retarget_distance: float = 0.85
 
@@ -63,7 +63,6 @@ func _configure_agent() -> void:
 	agent.time_horizon_agents = 1.2
 	agent.time_horizon_obstacles = 0.0
 	agent.max_speed = 12.0
-	# Allies do not RVO each other (avoids thrash); soft body via _separation
 	_apply_team_avoidance_bits()
 	if not agent.velocity_computed.is_connected(_on_velocity_computed):
 		agent.velocity_computed.connect(_on_velocity_computed)
@@ -214,6 +213,17 @@ func update(delta: float) -> void:
 		owner.velocity = Vector3.ZERO
 		return
 
+	# Soft body even when standing still — prevent permanent stacking
+	if status == Status.ARRIVED or status == Status.IDLE or status == Status.FAILED:
+		var idle_sep := _separation()
+		if idle_sep.length_squared() > 0.02:
+			idle_sep = idle_sep.normalized() * minf(owner.move_speed * 0.55, 1.6)
+			owner.velocity.x = idle_sep.x
+			owner.velocity.z = idle_sep.z
+			owner.move_and_slide()
+			return
+		owner.velocity = Vector3.ZERO
+
 	if status == Status.BLOCKED:
 		owner.velocity = Vector3.ZERO
 		_blocked_hold += delta
@@ -312,7 +322,6 @@ func update(delta: float) -> void:
 		_set_blocked()
 		return
 
-	# Hard hold only when really stuck (soft sep still runs below this threshold)
 	if _jitter_dampen > 0.75:
 		owner.velocity = Vector3.ZERO
 		if agent and agent.avoidance_enabled:
@@ -322,8 +331,8 @@ func update(delta: float) -> void:
 
 	var sep := _separation()
 	if sep.length_squared() > 0.001:
-		var sep_w: float = separation_strength * (1.0 + _jitter_dampen * 0.35)
-		var blended := direction + sep * sep_w
+		var sep_w: float = separation_strength * (1.15 + _jitter_dampen * 0.25)
+		var blended := direction * 0.85 + sep * sep_w
 		if blended.length_squared() > 0.0001:
 			direction = blended.normalized()
 
@@ -442,7 +451,7 @@ func _separation() -> Vector3:
 	if UnitManager == null or owner == null:
 		return push
 	var my_team: int = int(owner.team_id)
-	var ally_soft_r: float = 0.85
+	var ally_soft_r: float = 1.25
 	for other in UnitManager.units:
 		if other == null or other == owner or not is_instance_valid(other):
 			continue
@@ -452,13 +461,16 @@ func _separation() -> Vector3:
 		offset.y = 0.0
 		var dist := offset.length()
 		if dist < 0.001:
+			var seed: int = int(owner.get_instance_id())
+			var a: float = float((seed * 41) % 360) * 0.0174533
+			push += Vector3(cos(a), 0.0, sin(a))
 			continue
 		var is_ally: bool = int(other.team_id) == my_team
 		if is_ally:
-			# Soft body: slide apart when overlapping, allow pass-through at distance
 			if dist >= ally_soft_r:
 				continue
-			push += offset.normalized() * (1.0 - dist / ally_soft_r) * 0.55
+			var w: float = 1.0 - dist / ally_soft_r
+			push += offset.normalized() * (w * w) * 1.4
 		else:
 			if dist >= separation_radius:
 				continue
