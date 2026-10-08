@@ -2,7 +2,8 @@ extends RefCounted
 
 class_name MovementComponent
 
-## M6 + M35.2: no ally RVO thrash; strong soft-body so units don't full-ghost
+## M35.3 WC3-style: NO RVO. Nav path + formation targets + soft body.
+## RVO was the main source of rear-unit thrash.
 
 enum Status {
 	IDLE,
@@ -18,10 +19,10 @@ var status: Status = Status.IDLE
 var agent: NavigationAgent3D = null
 
 var arrival_distance: float = 0.55
-var block_timeout: float = 3.0
-var separation_radius: float = 1.4
-var separation_strength: float = 1.1
-var waypoint_skip_distance: float = 0.4
+var block_timeout: float = 3.2
+var body_radius: float = 1.15
+var body_push: float = 1.35
+var waypoint_skip_distance: float = 0.45
 var default_retarget_distance: float = 0.85
 
 var _stuck_time: float = 0.0
@@ -31,9 +32,8 @@ var _last_bake_id: int = -1
 
 var _current_waypoint_index: int = 0
 var _last_path_size: int = 0
-var _awaiting_avoidance: bool = false
 var _blocked_hold: float = 0.0
-var _jitter_dampen: float = 0.0
+var _wait_timer: float = 0.0
 
 
 func _init(unit: BaseUnit, nav_agent: NavigationAgent3D = null) -> void:
@@ -52,32 +52,14 @@ func set_agent(nav_agent: NavigationAgent3D) -> void:
 
 
 func _configure_agent() -> void:
-	agent.path_desired_distance = 0.55
+	agent.path_desired_distance = 0.5
 	agent.target_desired_distance = arrival_distance
-	agent.radius = 0.5
+	agent.radius = 0.45
 	agent.height = 1.2
 	agent.path_max_distance = 50.0
-	agent.avoidance_enabled = true
-	agent.neighbor_distance = 5.0
-	agent.max_neighbors = 8
-	agent.time_horizon_agents = 1.2
-	agent.time_horizon_obstacles = 0.0
+	# WC3-style: path only, no continuous RVO avoidance
+	agent.avoidance_enabled = false
 	agent.max_speed = 12.0
-	_apply_team_avoidance_bits()
-	if not agent.velocity_computed.is_connected(_on_velocity_computed):
-		agent.velocity_computed.connect(_on_velocity_computed)
-
-
-func _apply_team_avoidance_bits() -> void:
-	if agent == null or owner == null:
-		return
-	var tid: int = int(owner.team_id)
-	if tid == 0:
-		agent.avoidance_layers = 1
-		agent.avoidance_mask = 2
-	else:
-		agent.avoidance_layers = 2
-		agent.avoidance_mask = 1
 
 
 func request_move(world_pos: Vector3) -> void:
@@ -91,14 +73,12 @@ func set_target(world_pos: Vector3) -> void:
 	_stuck_time = 0.0
 	_no_progress_time = 0.0
 	_blocked_hold = 0.0
-	_jitter_dampen = 0.0
+	_wait_timer = 0.0
 	_last_pos = owner.global_position
 	_current_waypoint_index = 0
 	_last_path_size = 0
-	_awaiting_avoidance = false
 	status = Status.MOVING
 	if agent:
-		_apply_team_avoidance_bits()
 		agent.target_position = p
 
 
@@ -133,15 +113,12 @@ func cancel() -> void:
 	_stuck_time = 0.0
 	_no_progress_time = 0.0
 	_blocked_hold = 0.0
-	_jitter_dampen = 0.0
+	_wait_timer = 0.0
 	_current_waypoint_index = 0
 	_last_path_size = 0
-	_awaiting_avoidance = false
 	status = Status.CANCELLED
 	if agent:
 		agent.target_position = owner.global_position
-		if agent.avoidance_enabled:
-			agent.set_velocity(Vector3.ZERO)
 
 
 func get_status() -> Status:
@@ -213,25 +190,38 @@ func update(delta: float) -> void:
 		owner.velocity = Vector3.ZERO
 		return
 
-	# Soft body even when standing still — prevent permanent stacking
+	# Soft body while idle — settle spacing like WC3 stack fix
 	if status == Status.ARRIVED or status == Status.IDLE or status == Status.FAILED:
-		var idle_sep := _separation()
-		if idle_sep.length_squared() > 0.02:
-			idle_sep = idle_sep.normalized() * minf(owner.move_speed * 0.55, 1.6)
+		var idle_sep := _soft_body()
+		if idle_sep.length_squared() > 0.04:
+			idle_sep = idle_sep.normalized() * minf(owner.move_speed * 0.4, 1.2)
 			owner.velocity.x = idle_sep.x
 			owner.velocity.z = idle_sep.z
 			owner.move_and_slide()
 			return
 		owner.velocity = Vector3.ZERO
+		if status == Status.ARRIVED or status == Status.FAILED:
+			var wake := owner.move_target - owner.global_position
+			wake.y = 0.0
+			if wake.length() > arrival_distance * 1.25:
+				status = Status.MOVING
+				_stuck_time = 0.0
+				_no_progress_time = 0.0
+				_current_waypoint_index = 0
+				_last_path_size = 0
+				if agent:
+					agent.target_position = owner.move_target
+			return
+		return
 
 	if status == Status.BLOCKED:
 		owner.velocity = Vector3.ZERO
 		_blocked_hold += delta
-		if _blocked_hold >= 0.55:
+		if _blocked_hold >= 0.45:
 			_blocked_hold = 0.0
 			_no_progress_time = 0.0
 			_stuck_time = 0.0
-			_jitter_dampen = 0.0
+			_wait_timer = 0.0
 			var nudge := _side_nudge()
 			var retry: Vector3 = owner.move_target + nudge
 			retry.y = 0.0
@@ -240,31 +230,19 @@ func update(delta: float) -> void:
 				agent.target_position = retry
 			_current_waypoint_index = 0
 			_last_path_size = 0
-		else:
-			return
+		return
 
-	if status == Status.ARRIVED or status == Status.FAILED:
-		var wake := owner.move_target - owner.global_position
-		wake.y = 0.0
-		if wake.length() > arrival_distance * 1.25:
-			status = Status.MOVING
-			_stuck_time = 0.0
-			_no_progress_time = 0.0
-			_current_waypoint_index = 0
-			_last_path_size = 0
-			if agent:
-				agent.target_position = owner.move_target
-		else:
-			owner.velocity = Vector3.ZERO
-			return
+	# Brief wait instead of thrash when crowded in front
+	if _wait_timer > 0.0:
+		_wait_timer -= delta
+		owner.velocity = Vector3.ZERO
+		return
 
 	var final_target := owner.move_target
 	final_target.y = 0.0
 	var to_final := final_target - owner.global_position
 	to_final.y = 0.0
-	var dist_final := to_final.length()
-
-	if dist_final <= arrival_distance:
+	if to_final.length() <= arrival_distance:
 		_set_arrived()
 		return
 
@@ -274,29 +252,18 @@ func update(delta: float) -> void:
 	_refresh_path_if_bake_changed()
 
 	if agent == null:
-		_direct_steer(delta, final_target)
+		_direct_steer(final_target)
 		return
 
 	var follow := _get_follow_point(final_target)
 	follow.y = 0.0
-	var path_n := 0
-	if agent:
-		path_n = agent.get_current_navigation_path().size()
-
-	if path_n > 0 and _current_waypoint_index >= path_n:
-		var to_edge := follow - owner.global_position
-		to_edge.y = 0.0
-		if to_edge.length() <= arrival_distance:
-			_set_arrived()
-			return
-
 	var to_follow := follow - owner.global_position
 	to_follow.y = 0.0
 
 	if to_follow.length() < 0.001:
 		var moved0 := owner.global_position.distance_to(_last_pos)
 		_last_pos = owner.global_position
-		if moved0 < 0.025:
+		if moved0 < 0.02:
 			_no_progress_time += delta
 		else:
 			_no_progress_time = 0.0
@@ -309,90 +276,57 @@ func update(delta: float) -> void:
 
 	var moved := owner.global_position.distance_to(_last_pos)
 	_last_pos = owner.global_position
-	if moved < 0.025:
+	if moved < 0.02:
 		_stuck_time += delta
 		_no_progress_time += delta
-		_jitter_dampen = minf(1.0, _jitter_dampen + delta * 1.5)
 	else:
 		_stuck_time = 0.0
 		_no_progress_time = 0.0
-		_jitter_dampen = maxf(0.0, _jitter_dampen - delta * 2.0)
 
 	if _no_progress_time >= block_timeout:
 		_set_blocked()
 		return
 
-	if _jitter_dampen > 0.75:
-		owner.velocity = Vector3.ZERO
-		if agent and agent.avoidance_enabled:
-			agent.set_velocity(Vector3.ZERO)
-		_awaiting_avoidance = false
-		return
-
-	var sep := _separation()
+	var sep := _soft_body()
+	var speed: float = owner.move_speed
 	if sep.length_squared() > 0.001:
-		var sep_w: float = separation_strength * (1.15 + _jitter_dampen * 0.25)
-		var blended := direction * 0.85 + sep * sep_w
+		var sep_n := sep.normalized()
+		var ahead: float = direction.dot(-sep_n)
+		if ahead > 0.55 and sep.length() > 0.6:
+			_wait_timer = 0.18
+			owner.velocity = Vector3.ZERO
+			return
+		var blended := direction * 0.75 + sep_n * body_push * 0.55
 		if blended.length_squared() > 0.0001:
 			direction = blended.normalized()
+		speed *= 0.85
 
 	status = Status.MOVING
-	var speed_scale: float = 1.0 - _jitter_dampen * 0.25
-	var desired := Vector3(
-		direction.x * owner.move_speed * speed_scale,
-		0.0,
-		direction.z * owner.move_speed * speed_scale
-	)
-
-	if agent.avoidance_enabled:
-		agent.max_speed = maxf(owner.move_speed * speed_scale, 0.1)
-		_awaiting_avoidance = true
-		agent.set_velocity(desired)
-	else:
-		owner.velocity.x = desired.x
-		owner.velocity.z = desired.z
-		_face_move_dir(owner.velocity)
-		owner.move_and_slide()
+	owner.velocity.x = direction.x * speed
+	owner.velocity.z = direction.z * speed
+	_face_move_dir(owner.velocity)
+	owner.move_and_slide()
 
 
 func _side_nudge() -> Vector3:
 	var seed: int = int(owner.get_instance_id()) if owner else 0
 	var a: float = float((seed * 37) % 360) * 0.0174533
-	var r: float = 1.1 + float((seed * 13) % 10) * 0.08
+	var r: float = 1.25 + float((seed * 13) % 10) * 0.1
 	return Vector3(cos(a) * r, 0.0, sin(a) * r)
 
 
-func _on_velocity_computed(safe_velocity: Vector3) -> void:
-	if not _awaiting_avoidance:
-		return
-	_awaiting_avoidance = false
-	if status != Status.MOVING:
-		return
-	if owner == null or not is_instance_valid(owner):
-		return
-	var spd_sq: float = safe_velocity.x * safe_velocity.x + safe_velocity.z * safe_velocity.z
-	if spd_sq < 0.04 and _jitter_dampen > 0.35:
-		var sep := _separation()
-		if sep.length_squared() > 0.001:
-			sep = sep.normalized() * owner.move_speed * 0.45
-			owner.velocity.x = sep.x
-			owner.velocity.z = sep.z
-			_face_move_dir(owner.velocity)
-			owner.move_and_slide()
-			return
-	owner.velocity.x = safe_velocity.x
-	owner.velocity.z = safe_velocity.z
-	_face_move_dir(owner.velocity)
-	owner.move_and_slide()
-
-
-func _direct_steer(_delta: float, final_target: Vector3) -> void:
+func _direct_steer(final_target: Vector3) -> void:
 	var to_seek := final_target - owner.global_position
 	to_seek.y = 0.0
 	if to_seek.length() <= arrival_distance:
 		_set_arrived()
 		return
 	var direction := to_seek.normalized()
+	var sep := _soft_body()
+	if sep.length_squared() > 0.001:
+		var blended := direction + sep.normalized() * 0.6
+		if blended.length_squared() > 0.0001:
+			direction = blended.normalized()
 	status = Status.MOVING
 	owner.velocity.x = direction.x * owner.move_speed
 	owner.velocity.z = direction.z * owner.move_speed
@@ -405,13 +339,10 @@ func _set_arrived() -> void:
 	_stuck_time = 0.0
 	_no_progress_time = 0.0
 	_blocked_hold = 0.0
-	_jitter_dampen = 0.0
+	_wait_timer = 0.0
 	_current_waypoint_index = 0
 	_last_path_size = 0
-	_awaiting_avoidance = false
 	status = Status.ARRIVED
-	if agent and agent.avoidance_enabled:
-		agent.set_velocity(Vector3.ZERO)
 
 
 func _set_blocked() -> void:
@@ -419,21 +350,7 @@ func _set_blocked() -> void:
 	_stuck_time = 0.0
 	_no_progress_time = 0.0
 	_blocked_hold = 0.0
-	_awaiting_avoidance = false
 	status = Status.BLOCKED
-	if agent and agent.avoidance_enabled:
-		agent.set_velocity(Vector3.ZERO)
-
-
-func _set_failed() -> void:
-	owner.velocity = Vector3.ZERO
-	_stuck_time = 0.0
-	_no_progress_time = 0.0
-	_blocked_hold = 0.0
-	_awaiting_avoidance = false
-	status = Status.FAILED
-	if agent and agent.avoidance_enabled:
-		agent.set_velocity(Vector3.ZERO)
 
 
 func _face_move_dir(vel: Vector3) -> void:
@@ -446,12 +363,11 @@ func _face_move_dir(vel: Vector3) -> void:
 	owner.rotation.y = atan2(-d.x, -d.z)
 
 
-func _separation() -> Vector3:
+func _soft_body() -> Vector3:
 	var push := Vector3.ZERO
 	if UnitManager == null or owner == null:
 		return push
 	var my_team: int = int(owner.team_id)
-	var ally_soft_r: float = 1.25
 	for other in UnitManager.units:
 		if other == null or other == owner or not is_instance_valid(other):
 			continue
@@ -465,14 +381,13 @@ func _separation() -> Vector3:
 			var a: float = float((seed * 41) % 360) * 0.0174533
 			push += Vector3(cos(a), 0.0, sin(a))
 			continue
-		var is_ally: bool = int(other.team_id) == my_team
-		if is_ally:
-			if dist >= ally_soft_r:
-				continue
-			var w: float = 1.0 - dist / ally_soft_r
-			push += offset.normalized() * (w * w) * 1.4
-		else:
-			if dist >= separation_radius:
-				continue
-			push += offset.normalized() * (1.0 - dist / separation_radius)
+		var r: float = body_radius
+		var w: float = 1.0
+		if int(other.team_id) != my_team:
+			r = body_radius * 0.75
+			w = 0.55
+		if dist >= r:
+			continue
+		var t: float = 1.0 - dist / r
+		push += offset.normalized() * (t * t) * w
 	return push
