@@ -13,7 +13,7 @@ enum FormationType
 static func generate_positions(
 	center: Vector3,
 	count: int,
-	spacing: float = 2.5,
+	spacing: float = 3.4,
 	formation: FormationType = FormationType.SQUARE
 ) -> Array[Vector3]:
 
@@ -36,10 +36,6 @@ static func generate_positions(
 
 	return []
 
-
-# =====================================================
-# Square Formation
-# =====================================================
 
 static func _generate_square(
 	center: Vector3,
@@ -75,57 +71,44 @@ static func _generate_square(
 	return positions
 
 
-# =====================================================
-# Line Formation
-# =====================================================
-
 static func _generate_line(
 	center: Vector3,
 	count: int,
 	spacing: float
 ) -> Array[Vector3]:
-
-	# TODO
 	return _generate_square(center, count, spacing)
 
-
-# =====================================================
-# Column Formation
-# =====================================================
 
 static func _generate_column(
 	center: Vector3,
 	count: int,
 	spacing: float
 ) -> Array[Vector3]:
-
-	# TODO
 	return _generate_square(center, count, spacing)
 
-
-# =====================================================
-# Wedge Formation
-# =====================================================
 
 static func _generate_wedge(
 	center: Vector3,
 	count: int,
 	spacing: float
 ) -> Array[Vector3]:
-
-	# TODO
 	return _generate_square(center, count, spacing)
 
-
-# =====================================================
-# Circle Formation
-# =====================================================
 
 static func _generate_circle(
 	center: Vector3,
 	count: int,
 	spacing: float
 ) -> Array[Vector3]:
-
-	# TODO
-	return _generate_square(center, count, spacing)
+	var positions: Array[Vector3] = []
+	if count <= 0:
+		return positions
+	if count == 1:
+		positions.append(center)
+		return positions
+	var radius: float = spacing * 0.6 * float(count) / TAU
+	radius = maxf(radius, spacing)
+	for i: int in range(count):
+		var a: float = float(i) * TAU / float(count)
+		positions.append(center + Vector3(cos(a) * radius, 0.0, sin(a) * radius))
+	return positions

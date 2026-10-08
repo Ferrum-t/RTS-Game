@@ -2,7 +2,7 @@ extends RefCounted
 
 class_name MovementComponent
 
-## M6 Movement + M34 crowd polish (softer RVO, blocked recovery, less jitter)
+## M6 Movement + M34/M35 crowd: allied soft-pass, stuck-hold, softer RVO
 
 enum Status {
 	IDLE,
@@ -18,10 +18,9 @@ var status: Status = Status.IDLE
 var agent: NavigationAgent3D = null
 
 var arrival_distance: float = 0.55
-## Was 1.75 — longer so rear units don't flip MOVING/BLOCKED every frame
-var block_timeout: float = 2.6
-var separation_radius: float = 1.35
-var separation_strength: float = 0.85
+var block_timeout: float = 3.0
+var separation_radius: float = 1.15
+var separation_strength: float = 0.35
 var waypoint_skip_distance: float = 0.4
 var default_retarget_distance: float = 0.85
 
@@ -55,21 +54,31 @@ func set_agent(nav_agent: NavigationAgent3D) -> void:
 func _configure_agent() -> void:
 	agent.path_desired_distance = 0.55
 	agent.target_desired_distance = arrival_distance
-	# Slightly larger agent = fewer overlaps / less thrash
-	agent.radius = 0.55
+	agent.radius = 0.5
 	agent.height = 1.2
 	agent.path_max_distance = 50.0
 	agent.avoidance_enabled = true
-	# Softer, earlier avoidance — less last-second twitch
-	agent.neighbor_distance = 4.5
-	agent.max_neighbors = 12
-	agent.time_horizon_agents = 1.4
+	agent.neighbor_distance = 5.0
+	agent.max_neighbors = 8
+	agent.time_horizon_agents = 1.2
 	agent.time_horizon_obstacles = 0.0
 	agent.max_speed = 12.0
-	agent.avoidance_layers = 1
-	agent.avoidance_mask = 1
+	# M35-B: allied soft-pass — only avoid OTHER teams via RVO
+	_apply_team_avoidance_bits()
 	if not agent.velocity_computed.is_connected(_on_velocity_computed):
 		agent.velocity_computed.connect(_on_velocity_computed)
+
+
+func _apply_team_avoidance_bits() -> void:
+	if agent == null or owner == null:
+		return
+	var tid: int = int(owner.team_id)
+	if tid == 0:
+		agent.avoidance_layers = 1
+		agent.avoidance_mask = 2
+	else:
+		agent.avoidance_layers = 2
+		agent.avoidance_mask = 1
 
 
 func request_move(world_pos: Vector3) -> void:
@@ -90,6 +99,7 @@ func set_target(world_pos: Vector3) -> void:
 	_awaiting_avoidance = false
 	status = Status.MOVING
 	if agent:
+		_apply_team_avoidance_bits()
 		agent.target_position = p
 
 
@@ -204,7 +214,6 @@ func update(delta: float) -> void:
 		owner.velocity = Vector3.ZERO
 		return
 
-	# Soft recovery from BLOCKED — pause briefly, then nudge sideways and retry
 	if status == Status.BLOCKED:
 		owner.velocity = Vector3.ZERO
 		_blocked_hold += delta
@@ -212,6 +221,7 @@ func update(delta: float) -> void:
 			_blocked_hold = 0.0
 			_no_progress_time = 0.0
 			_stuck_time = 0.0
+			_jitter_dampen = 0.0
 			var nudge := _side_nudge()
 			var retry: Vector3 = owner.move_target + nudge
 			retry.y = 0.0
@@ -302,14 +312,21 @@ func update(delta: float) -> void:
 		_set_blocked()
 		return
 
+	# M35-C: if nearly stuck, HOLD still (no RVO thrash)
+	if _jitter_dampen > 0.55:
+		owner.velocity = Vector3.ZERO
+		if agent and agent.avoidance_enabled:
+			agent.set_velocity(Vector3.ZERO)
+		_awaiting_avoidance = false
+		return
+
 	var sep := _separation()
 	if sep.length_squared() > 0.001:
-		# When nearly stuck, lean harder on separation so rear units slide out
-		var sep_w: float = separation_strength * (1.0 + _jitter_dampen * 0.8)
+		var sep_w: float = separation_strength * (1.0 + _jitter_dampen * 0.5)
 		direction = (direction + sep * sep_w).normalized()
 
 	status = Status.MOVING
-	var speed_scale: float = 1.0 - _jitter_dampen * 0.35
+	var speed_scale: float = 1.0 - _jitter_dampen * 0.25
 	var desired := Vector3(
 		direction.x * owner.move_speed * speed_scale,
 		0.0,
@@ -328,7 +345,6 @@ func update(delta: float) -> void:
 
 
 func _side_nudge() -> Vector3:
-	# Stable-ish lateral offset from instance id so neighbors pick different sides
 	var seed: int = int(owner.get_instance_id()) if owner else 0
 	var a: float = float((seed * 37) % 360) * 0.0174533
 	var r: float = 1.1 + float((seed * 13) % 10) * 0.08
@@ -343,7 +359,6 @@ func _on_velocity_computed(safe_velocity: Vector3) -> void:
 		return
 	if owner == null or not is_instance_valid(owner):
 		return
-	# Ignore near-zero safe velocity when still far — apply soft separation slide instead of freeze-twitch
 	var spd_sq: float = safe_velocity.x * safe_velocity.x + safe_velocity.z * safe_velocity.z
 	if spd_sq < 0.04 and _jitter_dampen > 0.35:
 		var sep := _separation()
@@ -422,12 +437,16 @@ func _face_move_dir(vel: Vector3) -> void:
 
 func _separation() -> Vector3:
 	var push := Vector3.ZERO
-	if UnitManager == null:
+	if UnitManager == null or owner == null:
 		return push
+	var my_team: int = int(owner.team_id)
 	for other in UnitManager.units:
 		if other == null or other == owner or not is_instance_valid(other):
 			continue
 		if other.unit_state == BaseUnit.UnitState.DEAD:
+			continue
+		# M35-B: do not separate from allies (soft-pass)
+		if int(other.team_id) == my_team:
 			continue
 		var offset := owner.global_position - other.global_position
 		offset.y = 0.0
