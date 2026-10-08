@@ -2,7 +2,7 @@ extends RefCounted
 
 class_name MovementComponent
 
-## M6 Movement + M34/M35 crowd: allied soft-pass, stuck-hold, softer RVO
+## M6 Movement + M35 crowd hybrid: no ally RVO thrash, soft de-overlap so units don't full-ghost
 
 enum Status {
 	IDLE,
@@ -20,7 +20,7 @@ var agent: NavigationAgent3D = null
 var arrival_distance: float = 0.55
 var block_timeout: float = 3.0
 var separation_radius: float = 1.15
-var separation_strength: float = 0.35
+var separation_strength: float = 0.7
 var waypoint_skip_distance: float = 0.4
 var default_retarget_distance: float = 0.85
 
@@ -63,7 +63,7 @@ func _configure_agent() -> void:
 	agent.time_horizon_agents = 1.2
 	agent.time_horizon_obstacles = 0.0
 	agent.max_speed = 12.0
-	# M35-B: allied soft-pass — only avoid OTHER teams via RVO
+	# Allies do not RVO each other (avoids thrash); soft body via _separation
 	_apply_team_avoidance_bits()
 	if not agent.velocity_computed.is_connected(_on_velocity_computed):
 		agent.velocity_computed.connect(_on_velocity_computed)
@@ -312,8 +312,8 @@ func update(delta: float) -> void:
 		_set_blocked()
 		return
 
-	# M35-C: if nearly stuck, HOLD still (no RVO thrash)
-	if _jitter_dampen > 0.55:
+	# Hard hold only when really stuck (soft sep still runs below this threshold)
+	if _jitter_dampen > 0.75:
 		owner.velocity = Vector3.ZERO
 		if agent and agent.avoidance_enabled:
 			agent.set_velocity(Vector3.ZERO)
@@ -322,8 +322,10 @@ func update(delta: float) -> void:
 
 	var sep := _separation()
 	if sep.length_squared() > 0.001:
-		var sep_w: float = separation_strength * (1.0 + _jitter_dampen * 0.5)
-		direction = (direction + sep * sep_w).normalized()
+		var sep_w: float = separation_strength * (1.0 + _jitter_dampen * 0.35)
+		var blended := direction + sep * sep_w
+		if blended.length_squared() > 0.0001:
+			direction = blended.normalized()
 
 	status = Status.MOVING
 	var speed_scale: float = 1.0 - _jitter_dampen * 0.25
@@ -440,18 +442,25 @@ func _separation() -> Vector3:
 	if UnitManager == null or owner == null:
 		return push
 	var my_team: int = int(owner.team_id)
+	var ally_soft_r: float = 0.85
 	for other in UnitManager.units:
 		if other == null or other == owner or not is_instance_valid(other):
 			continue
 		if other.unit_state == BaseUnit.UnitState.DEAD:
 			continue
-		# M35-B: do not separate from allies (soft-pass)
-		if int(other.team_id) == my_team:
-			continue
 		var offset := owner.global_position - other.global_position
 		offset.y = 0.0
 		var dist := offset.length()
-		if dist < 0.001 or dist >= separation_radius:
+		if dist < 0.001:
 			continue
-		push += offset.normalized() * (1.0 - dist / separation_radius)
+		var is_ally: bool = int(other.team_id) == my_team
+		if is_ally:
+			# Soft body: slide apart when overlapping, allow pass-through at distance
+			if dist >= ally_soft_r:
+				continue
+			push += offset.normalized() * (1.0 - dist / ally_soft_r) * 0.55
+		else:
+			if dist >= separation_radius:
+				continue
+			push += offset.normalized() * (1.0 - dist / separation_radius)
 	return push
