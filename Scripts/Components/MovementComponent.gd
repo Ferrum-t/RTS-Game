@@ -2,7 +2,7 @@ extends RefCounted
 
 class_name MovementComponent
 
-## M35.5 WC3-style: NO RVO. Path + light soft body. Velocity only (BaseUnit does move_and_slide once).
+## M35.6 E: soft-body idle-only; no wait-stop; full speed while moving.
 
 enum Status {
 	IDLE,
@@ -19,8 +19,8 @@ var agent: NavigationAgent3D = null
 
 var arrival_distance: float = 0.55
 var block_timeout: float = 3.2
-var body_radius: float = 0.95
-var body_push: float = 0.9
+var body_radius: float = 0.55
+var body_push: float = 0.5
 var waypoint_skip_distance: float = 0.45
 var default_retarget_distance: float = 0.85
 
@@ -188,10 +188,11 @@ func update(delta: float) -> void:
 		owner.velocity = Vector3.ZERO
 		return
 
+	# Soft-body only when idle/arrived — settle spacing, never while marching
 	if status == Status.ARRIVED or status == Status.IDLE or status == Status.FAILED:
 		var idle_sep := _soft_body()
 		if idle_sep.length_squared() > 0.04:
-			idle_sep = idle_sep.normalized() * minf(owner.move_speed * 0.25, 0.7)
+			idle_sep = idle_sep.normalized() * minf(owner.move_speed * 0.2, 0.55)
 			owner.velocity.x = idle_sep.x
 			owner.velocity.z = idle_sep.z
 			return
@@ -226,11 +227,6 @@ func update(delta: float) -> void:
 				agent.target_position = retry
 			_current_waypoint_index = 0
 			_last_path_size = 0
-		return
-
-	if _wait_timer > 0.0:
-		_wait_timer -= delta
-		owner.velocity = Vector3.ZERO
 		return
 
 	var final_target := owner.move_target
@@ -282,24 +278,10 @@ func update(delta: float) -> void:
 		_set_blocked()
 		return
 
-	var sep := _soft_body()
-	var speed: float = owner.move_speed
-	if sep.length_squared() > 0.001:
-		var sep_n := sep.normalized()
-		var ahead: float = direction.dot(-sep_n)
-		if ahead > 0.55 and sep.length() > 0.6:
-			if owner.unit_state != BaseUnit.UnitState.ATTACKING:
-				_wait_timer = 0.06
-				owner.velocity = Vector3.ZERO
-				return
-		var blended := direction * 0.9 + sep_n * body_push * 0.35
-		if blended.length_squared() > 0.0001:
-			direction = blended.normalized()
-		speed *= 0.95
-
+	# Full speed while MOVING — no soft-body, no wait-stop
 	status = Status.MOVING
-	owner.velocity.x = direction.x * speed
-	owner.velocity.z = direction.z * speed
+	owner.velocity.x = direction.x * owner.move_speed
+	owner.velocity.z = direction.z * owner.move_speed
 	_face_move_dir(owner.velocity)
 
 
@@ -317,11 +299,6 @@ func _direct_steer(final_target: Vector3) -> void:
 		_set_arrived()
 		return
 	var direction := to_seek.normalized()
-	var sep := _soft_body()
-	if sep.length_squared() > 0.001:
-		var blended := direction + sep.normalized() * 0.6
-		if blended.length_squared() > 0.0001:
-			direction = blended.normalized()
 	status = Status.MOVING
 	owner.velocity.x = direction.x * owner.move_speed
 	owner.velocity.z = direction.z * owner.move_speed
@@ -361,9 +338,6 @@ func _soft_body() -> Vector3:
 	var push := Vector3.ZERO
 	if UnitManager == null or owner == null:
 		return push
-	var attack_scale: float = 1.0
-	if owner.unit_state == BaseUnit.UnitState.ATTACKING:
-		attack_scale = 0.15
 	var my_team: int = int(owner.team_id)
 	for other in UnitManager.units:
 		if other == null or other == owner or not is_instance_valid(other):
@@ -386,5 +360,5 @@ func _soft_body() -> Vector3:
 		if dist >= r:
 			continue
 		var t: float = 1.0 - dist / r
-		push += offset.normalized() * (t * t) * w * attack_scale
+		push += offset.normalized() * (t * t) * w
 	return push
