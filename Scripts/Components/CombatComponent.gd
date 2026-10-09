@@ -21,6 +21,9 @@ var chase_retarget_distance: float = 1.0
 
 var attack_timer: float = 0.0
 var _in_melee: bool = false
+## M35.8-B3 — ring of approach points when path is BLOCKED near target
+var _approach_slot: int = 0
+const APPROACH_SLOTS := 6
 
 
 func _init(unit: BaseUnit) -> void:
@@ -30,6 +33,7 @@ func _init(unit: BaseUnit) -> void:
 func set_target(t: BaseUnit) -> void:
 	target = t
 	_in_melee = false
+	_approach_slot = 0
 	status = Status.CHASING if t != null else Status.IDLE
 	attack_timer = 0.0
 
@@ -37,6 +41,7 @@ func set_target(t: BaseUnit) -> void:
 func clear() -> void:
 	target = null
 	_in_melee = false
+	_approach_slot = 0
 	status = Status.IDLE
 	attack_timer = 0.0
 
@@ -64,12 +69,21 @@ func update(delta: float) -> void:
 		status = Status.CHASING
 		if _allows_move_fire() and owner.unit_state == BaseUnit.UnitState.MOVING:
 			return
-		# Approach to edge of range, not into target center (stops thrash)
+		var r: float = maxf(attack_range * 0.75, 0.8)
+		var chase_pos := target.global_position
+		# If path stuck, step around the target on a ring (unblocks frozen melee)
+		if owner.movement != null and owner.movement.status == MovementComponent.Status.BLOCKED:
+			_approach_slot = (_approach_slot + 1) % APPROACH_SLOTS
+			var ang: float = float(_approach_slot) * TAU / float(APPROACH_SLOTS)
+			chase_pos = target.global_position + Vector3(cos(ang) * r, 0.0, sin(ang) * r)
+			chase_pos.y = 0.0
+			owner.movement.set_target(chase_pos)
+			owner.movement.update(delta)
+			return
 		var to_t := target.global_position - owner.global_position
 		to_t.y = 0.0
-		var chase_pos := target.global_position
 		if to_t.length() > 0.1:
-			chase_pos = target.global_position - to_t.normalized() * maxf(attack_range * 0.75, 0.8)
+			chase_pos = target.global_position - to_t.normalized() * r
 		chase_pos.y = 0.0
 		owner.movement.ensure_moving_to(chase_pos, maxf(chase_retarget_distance, 1.2))
 		owner.movement.update(delta)
