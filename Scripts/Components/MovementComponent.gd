@@ -2,7 +2,7 @@ extends RefCounted
 
 class_name MovementComponent
 
-## M35.8-B2 — keep ensure_moving BLOCKED guard; restore waypoint path follow (B next-point thrash).
+## M35.8-B3 — combat approach ring on BLOCKED; wider side nudge recovery.
 
 enum Status {
 	IDLE,
@@ -82,7 +82,6 @@ func ensure_moving_to(world_pos: Vector3, retarget_distance: float = -1.0) -> vo
 	if thresh < 0.0:
 		thresh = default_retarget_distance
 
-	# BLOCKED: never hard-reset recovery for the same-ish goal
 	if status == Status.BLOCKED:
 		var cur_b := owner.move_target
 		cur_b.y = 0.0
@@ -290,7 +289,7 @@ func update(delta: float) -> void:
 func _side_nudge() -> Vector3:
 	var seed: int = int(owner.get_instance_id()) if owner else 0
 	var a: float = float((seed * 37) % 360) * 0.0174533
-	var r: float = 1.2 + float((seed * 13) % 10) * 0.1
+	var r: float = 2.0 + float((seed * 13) % 15) * 0.15
 	return Vector3(cos(a) * r, 0.0, sin(a) * r)
 
 
