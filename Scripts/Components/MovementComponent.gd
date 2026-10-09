@@ -2,8 +2,7 @@ extends RefCounted
 
 class_name MovementComponent
 
-## M35.3 WC3-style: NO RVO. Nav path + formation targets + soft body.
-## RVO was the main source of rear-unit thrash.
+## M35.4 WC3-style: NO RVO. Path + soft body. Velocity only (BaseUnit does move_and_slide once).
 
 enum Status {
 	IDLE,
@@ -57,7 +56,6 @@ func _configure_agent() -> void:
 	agent.radius = 0.45
 	agent.height = 1.2
 	agent.path_max_distance = 50.0
-	# WC3-style: path only, no continuous RVO avoidance
 	agent.avoidance_enabled = false
 	agent.max_speed = 12.0
 
@@ -190,14 +188,12 @@ func update(delta: float) -> void:
 		owner.velocity = Vector3.ZERO
 		return
 
-	# Soft body while idle — settle spacing like WC3 stack fix
 	if status == Status.ARRIVED or status == Status.IDLE or status == Status.FAILED:
 		var idle_sep := _soft_body()
 		if idle_sep.length_squared() > 0.04:
 			idle_sep = idle_sep.normalized() * minf(owner.move_speed * 0.4, 1.2)
 			owner.velocity.x = idle_sep.x
 			owner.velocity.z = idle_sep.z
-			owner.move_and_slide()
 			return
 		owner.velocity = Vector3.ZERO
 		if status == Status.ARRIVED or status == Status.FAILED:
@@ -232,7 +228,6 @@ func update(delta: float) -> void:
 			_last_path_size = 0
 		return
 
-	# Brief wait instead of thrash when crowded in front
 	if _wait_timer > 0.0:
 		_wait_timer -= delta
 		owner.velocity = Vector3.ZERO
@@ -293,9 +288,10 @@ func update(delta: float) -> void:
 		var sep_n := sep.normalized()
 		var ahead: float = direction.dot(-sep_n)
 		if ahead > 0.55 and sep.length() > 0.6:
-			_wait_timer = 0.18
-			owner.velocity = Vector3.ZERO
-			return
+			if owner.unit_state != BaseUnit.UnitState.ATTACKING:
+				_wait_timer = 0.12
+				owner.velocity = Vector3.ZERO
+				return
 		var blended := direction * 0.75 + sep_n * body_push * 0.55
 		if blended.length_squared() > 0.0001:
 			direction = blended.normalized()
@@ -305,7 +301,6 @@ func update(delta: float) -> void:
 	owner.velocity.x = direction.x * speed
 	owner.velocity.z = direction.z * speed
 	_face_move_dir(owner.velocity)
-	owner.move_and_slide()
 
 
 func _side_nudge() -> Vector3:
@@ -331,7 +326,6 @@ func _direct_steer(final_target: Vector3) -> void:
 	owner.velocity.x = direction.x * owner.move_speed
 	owner.velocity.z = direction.z * owner.move_speed
 	_face_move_dir(owner.velocity)
-	owner.move_and_slide()
 
 
 func _set_arrived() -> void:
@@ -367,6 +361,9 @@ func _soft_body() -> Vector3:
 	var push := Vector3.ZERO
 	if UnitManager == null or owner == null:
 		return push
+	var attack_scale: float = 1.0
+	if owner.unit_state == BaseUnit.UnitState.ATTACKING:
+		attack_scale = 0.15
 	var my_team: int = int(owner.team_id)
 	for other in UnitManager.units:
 		if other == null or other == owner or not is_instance_valid(other):
@@ -389,5 +386,5 @@ func _soft_body() -> Vector3:
 		if dist >= r:
 			continue
 		var t: float = 1.0 - dist / r
-		push += offset.normalized() * (t * t) * w
+		push += offset.normalized() * (t * t) * w * attack_scale
 	return push
