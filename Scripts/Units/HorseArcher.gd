@@ -11,7 +11,7 @@ func _ready() -> void:
 	attack_damage = 13
 	attack_range = 10.0
 	attack_cooldown = 1.0
-	move_speed = 4.2
+	move_speed = 4.8
 	health_bar_height = 1.85
 	can_gather = false
 	damage_type = DamageType.Type.RANGED
