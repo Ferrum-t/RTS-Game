@@ -2,7 +2,7 @@ extends RefCounted
 
 class_name MovementComponent
 
-## M35.8-B3 — combat approach ring on BLOCKED; wider side nudge recovery.
+## M35.8-smooth — velocity lerp + arrival slowdown + direction deadzone (no RVO).
 
 enum Status {
 	IDLE,
@@ -17,7 +17,7 @@ var owner: BaseUnit
 var status: Status = Status.IDLE
 var agent: NavigationAgent3D = null
 
-var arrival_distance: float = 0.55
+var arrival_distance: float = 0.65
 var block_timeout: float = 3.0
 var waypoint_skip_distance: float = 0.45
 var default_retarget_distance: float = 0.85
@@ -29,6 +29,14 @@ var _last_bake_id: int = -1
 var _current_waypoint_index: int = 0
 var _last_path_size: int = 0
 var _blocked_hold: float = 0.0
+var _smooth_vel: Vector3 = Vector3.ZERO
+
+## Higher = snappier turn-in; lower = softer (less micro-jitter).
+const VEL_SMOOTH_RATE := 10.0
+## Within this distance of final target, steer direct + slow down (skip path chatter).
+const ARRIVAL_SLOW_RADIUS := 1.35
+## Ignore desired-direction flips smaller than this (dot product).
+const DIR_DEADZONE_DOT := 0.97
 
 
 func _init(unit: BaseUnit, nav_agent: NavigationAgent3D = null) -> void:
@@ -70,6 +78,7 @@ func set_target(world_pos: Vector3) -> void:
 	_last_pos = owner.global_position
 	_current_waypoint_index = 0
 	_last_path_size = 0
+	_smooth_vel = Vector3.ZERO
 	status = Status.MOVING
 	if agent:
 		agent.target_position = p
@@ -116,6 +125,7 @@ func ensure_moving_to(world_pos: Vector3, retarget_distance: float = -1.0) -> vo
 
 func cancel() -> void:
 	owner.velocity = Vector3.ZERO
+	_smooth_vel = Vector3.ZERO
 	_stuck_time = 0.0
 	_no_progress_time = 0.0
 	_blocked_hold = 0.0
@@ -135,19 +145,17 @@ func get_target() -> Vector3:
 
 
 func _refresh_path_if_bake_changed() -> void:
-	var nav = owner.get_node_or_null("/root/NavigationBakeService")
-	if nav == null or not ("bake_id" in nav):
+	var nav := owner.get_node_or_null("/root/NavigationBakeService")
+	if nav == null:
 		return
-	var bid: int = nav.bake_id
+	var bid: int = int(nav.bake_id) if "bake_id" in nav else -1
 	if bid == _last_bake_id:
 		return
 	_last_bake_id = bid
 	if status == Status.MOVING and agent:
+		agent.target_position = owner.move_target
 		_current_waypoint_index = 0
 		_last_path_size = 0
-		agent.target_position = owner.move_target
-		_no_progress_time = 0.0
-		_stuck_time = 0.0
 
 
 func _get_follow_point(final_target: Vector3) -> Vector3:
@@ -155,8 +163,6 @@ func _get_follow_point(final_target: Vector3) -> Vector3:
 		return final_target
 	agent.get_next_path_position()
 	var path: PackedVector3Array = agent.get_current_navigation_path()
-	var pos := owner.global_position
-	pos.y = 0.0
 	if path.is_empty():
 		_current_waypoint_index = 0
 		_last_path_size = 0
@@ -168,7 +174,7 @@ func _get_follow_point(final_target: Vector3) -> Vector3:
 		for i in range(path.size()):
 			var w: Vector3 = path[i]
 			w.y = 0.0
-			var d: float = pos.distance_squared_to(w)
+			var d: float = owner.global_position.distance_squared_to(w)
 			if d < best_d:
 				best_d = d
 				best_i = i
@@ -178,7 +184,7 @@ func _get_follow_point(final_target: Vector3) -> Vector3:
 	while _current_waypoint_index < path.size():
 		var wp: Vector3 = path[_current_waypoint_index]
 		wp.y = 0.0
-		if pos.distance_to(wp) <= waypoint_skip_distance:
+		if owner.global_position.distance_to(wp) <= waypoint_skip_distance:
 			_current_waypoint_index += 1
 			continue
 		break
@@ -198,6 +204,7 @@ func update(delta: float) -> void:
 
 	if status == Status.BLOCKED:
 		owner.velocity = Vector3.ZERO
+		_smooth_vel = Vector3.ZERO
 		_blocked_hold += delta
 		if _blocked_hold >= 0.35:
 			_blocked_hold = 0.0
@@ -215,6 +222,7 @@ func update(delta: float) -> void:
 
 	if status == Status.ARRIVED or status == Status.IDLE or status == Status.FAILED:
 		owner.velocity = Vector3.ZERO
+		_smooth_vel = Vector3.ZERO
 		if status == Status.ARRIVED or status == Status.FAILED:
 			var wake := owner.move_target - owner.global_position
 			wake.y = 0.0
@@ -243,10 +251,15 @@ func update(delta: float) -> void:
 	_refresh_path_if_bake_changed()
 
 	if agent == null:
-		_direct_steer(final_target)
+		_direct_steer(final_target, delta)
 		return
 
-	var follow := _get_follow_point(final_target)
+	# Near final target: steer straight to goal (avoids path-point oscillation).
+	var follow: Vector3
+	if to_final.length() <= ARRIVAL_SLOW_RADIUS:
+		follow = final_target
+	else:
+		follow = _get_follow_point(final_target)
 	follow.y = 0.0
 	var to_follow := follow - owner.global_position
 	to_follow.y = 0.0
@@ -263,9 +276,16 @@ func update(delta: float) -> void:
 			if _no_progress_time >= block_timeout:
 				_set_blocked()
 			owner.velocity = Vector3.ZERO
+			_smooth_vel = Vector3.ZERO
 			return
 
 	var direction := to_follow.normalized()
+
+	# Direction deadzone: ignore tiny heading flips that cause visual twitch.
+	if _smooth_vel.length_squared() > 0.01:
+		var prev_dir := Vector3(_smooth_vel.x, 0.0, _smooth_vel.z).normalized()
+		if direction.dot(prev_dir) >= DIR_DEADZONE_DOT:
+			direction = prev_dir
 
 	var moved := owner.global_position.distance_to(_last_pos)
 	_last_pos = owner.global_position
@@ -281,8 +301,16 @@ func update(delta: float) -> void:
 		return
 
 	status = Status.MOVING
-	owner.velocity.x = direction.x * owner.move_speed
-	owner.velocity.z = direction.z * owner.move_speed
+	var desired := direction * owner.move_speed
+	# Soft arrival: ease speed down near the goal.
+	var dist_f: float = to_final.length()
+	if dist_f < ARRIVAL_SLOW_RADIUS:
+		desired *= clampf(dist_f / ARRIVAL_SLOW_RADIUS, 0.2, 1.0)
+
+	var t: float = clampf(VEL_SMOOTH_RATE * delta, 0.0, 1.0)
+	_smooth_vel = _smooth_vel.lerp(desired, t)
+	owner.velocity.x = _smooth_vel.x
+	owner.velocity.z = _smooth_vel.z
 	_face_move_dir(owner.velocity)
 
 
@@ -293,21 +321,28 @@ func _side_nudge() -> Vector3:
 	return Vector3(cos(a) * r, 0.0, sin(a) * r)
 
 
-func _direct_steer(final_target: Vector3) -> void:
+func _direct_steer(final_target: Vector3, delta: float = 0.016) -> void:
 	var to_seek := final_target - owner.global_position
 	to_seek.y = 0.0
-	if to_seek.length() <= arrival_distance:
+	var dist: float = to_seek.length()
+	if dist <= arrival_distance:
 		_set_arrived()
 		return
 	var direction := to_seek.normalized()
 	status = Status.MOVING
-	owner.velocity.x = direction.x * owner.move_speed
-	owner.velocity.z = direction.z * owner.move_speed
+	var desired := direction * owner.move_speed
+	if dist < ARRIVAL_SLOW_RADIUS:
+		desired *= clampf(dist / ARRIVAL_SLOW_RADIUS, 0.2, 1.0)
+	var t: float = clampf(VEL_SMOOTH_RATE * delta, 0.0, 1.0)
+	_smooth_vel = _smooth_vel.lerp(desired, t)
+	owner.velocity.x = _smooth_vel.x
+	owner.velocity.z = _smooth_vel.z
 	_face_move_dir(owner.velocity)
 
 
 func _set_arrived() -> void:
 	owner.velocity = Vector3.ZERO
+	_smooth_vel = Vector3.ZERO
 	_stuck_time = 0.0
 	_no_progress_time = 0.0
 	_blocked_hold = 0.0
@@ -318,6 +353,7 @@ func _set_arrived() -> void:
 
 func _set_blocked() -> void:
 	owner.velocity = Vector3.ZERO
+	_smooth_vel = Vector3.ZERO
 	_stuck_time = 0.0
 	_no_progress_time = 0.0
 	_blocked_hold = 0.0
