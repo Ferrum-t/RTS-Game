@@ -1,15 +1,15 @@
 extends Node
 
-## M6: thin nav bake helper. Not a gameplay manager.
+## M6 + M35.8-B4: tighter footprints (agent_radius 0.55, margin 0.35) so units can build near buildings.
 ## Runtime buildings register footprints → debounced NavigationMesh rebake.
 
 const DEBOUNCE_SEC := 0.08
 ## Must match visual ground half-extent (World plane ~200×200 → half 100).
 const MAP_HALF := 100.0
-const AGENT_RADIUS := 1.1
+const AGENT_RADIUS := 0.55
 const AGENT_HEIGHT := 1.5
 const DEFAULT_BUILDING_HALF := 2.2
-const FOOTPRINT_MARGIN := 0.7
+const FOOTPRINT_MARGIN := 0.35
 
 ## id (instance_id) -> { center: Vector3, half_extents: Vector3 }
 var _footprints: Dictionary = {}
@@ -61,20 +61,7 @@ func unregister_building(building: Node3D) -> void:
 		request_rebake()
 
 
-func update_building_position(building: Node3D) -> void:
-	if building == null or not is_instance_valid(building):
-		return
-	var id: int = building.get_instance_id()
-	if not _footprints.has(id):
-		return
-	_footprints[id]["center"] = building.global_position
-	request_rebake()
-
-
 func request_rebake() -> void:
-	if _baking:
-		_pending_after_bake = true
-		return
 	_debounce_left = DEBOUNCE_SEC
 
 
@@ -86,17 +73,21 @@ func _initial_bake() -> void:
 func _resolve_region() -> void:
 	if _region != null and is_instance_valid(_region):
 		return
-	var scene := get_tree().current_scene
-	if scene == null:
+	var tree := get_tree()
+	if tree == null:
 		return
-	_region = scene.find_child("NavigationRegion3D", true, false) as NavigationRegion3D
+	var nodes := tree.get_nodes_in_group("NavigationRegion")
+	if nodes.size() > 0:
+		_region = nodes[0] as NavigationRegion3D
+		return
+	# Fallback: search scene tree
+	var root := tree.current_scene
+	if root == null:
+		return
+	_region = root.find_child("NavigationRegion3D", true, false) as NavigationRegion3D
 
 
 func _run_bake() -> void:
-	_resolve_region()
-	if _region == null:
-		push_warning("NavigationBakeService: NavigationRegion3D not found")
-		return
 	if _baking:
 		_pending_after_bake = true
 		return

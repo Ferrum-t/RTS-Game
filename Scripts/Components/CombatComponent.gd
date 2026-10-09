@@ -21,9 +21,11 @@ var chase_retarget_distance: float = 1.0
 
 var attack_timer: float = 0.0
 var _in_melee: bool = false
-## M35.8-B3 — ring of approach points when path is BLOCKED near target
+## M35.8-B4 — approach ring on BLOCKED; rotate slot at most every 0.5s (not every frame)
 var _approach_slot: int = 0
+var _approach_slot_cd: float = 0.0
 const APPROACH_SLOTS := 6
+const APPROACH_SLOT_INTERVAL := 0.5
 
 
 func _init(unit: BaseUnit) -> void:
@@ -34,6 +36,7 @@ func set_target(t: BaseUnit) -> void:
 	target = t
 	_in_melee = false
 	_approach_slot = 0
+	_approach_slot_cd = 0.0
 	status = Status.CHASING if t != null else Status.IDLE
 	attack_timer = 0.0
 
@@ -71,13 +74,15 @@ func update(delta: float) -> void:
 			return
 		var r: float = maxf(attack_range * 0.75, 0.8)
 		var chase_pos := target.global_position
-		# If path stuck, step around the target on a ring (unblocks frozen melee)
 		if owner.movement != null and owner.movement.status == MovementComponent.Status.BLOCKED:
-			_approach_slot = (_approach_slot + 1) % APPROACH_SLOTS
-			var ang: float = float(_approach_slot) * TAU / float(APPROACH_SLOTS)
-			chase_pos = target.global_position + Vector3(cos(ang) * r, 0.0, sin(ang) * r)
-			chase_pos.y = 0.0
-			owner.movement.set_target(chase_pos)
+			_approach_slot_cd -= delta
+			if _approach_slot_cd <= 0.0:
+				_approach_slot_cd = APPROACH_SLOT_INTERVAL
+				_approach_slot = (_approach_slot + 1) % APPROACH_SLOTS
+				var ang: float = float(_approach_slot) * TAU / float(APPROACH_SLOTS)
+				chase_pos = target.global_position + Vector3(cos(ang) * r, 0.0, sin(ang) * r)
+				chase_pos.y = 0.0
+				owner.movement.set_target(chase_pos)
 			owner.movement.update(delta)
 			return
 		var to_t := target.global_position - owner.global_position
@@ -89,7 +94,6 @@ func update(delta: float) -> void:
 		owner.movement.update(delta)
 		return
 
-	# In range
 	if _allows_move_fire():
 		_strike_while_moving(delta, target)
 		return
