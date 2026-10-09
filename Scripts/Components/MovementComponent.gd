@@ -2,7 +2,7 @@ extends RefCounted
 
 class_name MovementComponent
 
-## M35.4 WC3-style: NO RVO. Path + soft body. Velocity only (BaseUnit does move_and_slide once).
+## M35.5 WC3-style: NO RVO. Path + light soft body. Velocity only (BaseUnit does move_and_slide once).
 
 enum Status {
 	IDLE,
@@ -19,8 +19,8 @@ var agent: NavigationAgent3D = null
 
 var arrival_distance: float = 0.55
 var block_timeout: float = 3.2
-var body_radius: float = 1.15
-var body_push: float = 1.35
+var body_radius: float = 0.95
+var body_push: float = 0.9
 var waypoint_skip_distance: float = 0.45
 var default_retarget_distance: float = 0.85
 
@@ -191,7 +191,7 @@ func update(delta: float) -> void:
 	if status == Status.ARRIVED or status == Status.IDLE or status == Status.FAILED:
 		var idle_sep := _soft_body()
 		if idle_sep.length_squared() > 0.04:
-			idle_sep = idle_sep.normalized() * minf(owner.move_speed * 0.4, 1.2)
+			idle_sep = idle_sep.normalized() * minf(owner.move_speed * 0.25, 0.7)
 			owner.velocity.x = idle_sep.x
 			owner.velocity.z = idle_sep.z
 			return
@@ -289,13 +289,13 @@ func update(delta: float) -> void:
 		var ahead: float = direction.dot(-sep_n)
 		if ahead > 0.55 and sep.length() > 0.6:
 			if owner.unit_state != BaseUnit.UnitState.ATTACKING:
-				_wait_timer = 0.12
+				_wait_timer = 0.06
 				owner.velocity = Vector3.ZERO
 				return
-		var blended := direction * 0.75 + sep_n * body_push * 0.55
+		var blended := direction * 0.9 + sep_n * body_push * 0.35
 		if blended.length_squared() > 0.0001:
 			direction = blended.normalized()
-		speed *= 0.85
+		speed *= 0.95
 
 	status = Status.MOVING
 	owner.velocity.x = direction.x * speed
