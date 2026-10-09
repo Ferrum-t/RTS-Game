@@ -509,7 +509,7 @@ func replace_order_repair(building: BaseBuilding) -> void:
 
 func _build_stand_dist(site: BaseBuilding) -> float:
 	var he: float = 2.2
-	if "nav_half_extents" in site:
+	if site != null and ("nav_half_extents" in site):
 		var v: Vector3 = site.nav_half_extents
 		he = maxf(v.x, v.z)
 	return maxf(BUILD_STAND_DIST, he + BUILD_FOOTPRINT_MARGIN)
@@ -538,30 +538,39 @@ func update_building(delta: float) -> void:
 	var dist := to_s.length()
 	var moved := global_position.distance_to(_build_last_pos)
 	_build_last_pos = global_position
-	if moved < 0.04: _build_stuck_time += delta
-	else: _build_stuck_time = 0.0
+	if moved < 0.04:
+		_build_stuck_time += delta
+	else:
+		_build_stuck_time = 0.0
 	var in_range: bool = dist <= stand_dist
-	if not in_range and _build_stuck_time > 0.7 and dist <= stand_dist + 1.5:
+	if not in_range and _build_stuck_time > 0.7 and dist <= stand_dist + 2.0:
 		in_range = true
-	if in_range:
-		if movement: movement.cancel()
-		velocity = Vector3.ZERO
-		if site.has_method("add_builder"):
-			site.add_builder(self)
-		elif site.has_method("register_builder"):
-			site.register_builder(self)
+	if not in_range:
+		var stand := _build_stand_point(site, stand_dist)
+		if movement:
+			movement.ensure_moving_to(stand, APPROACH_RETARGET_DIST)
+			movement.update(delta)
 		return
-	var stand := _build_stand_point(site, stand_dist)
-	movement.ensure_moving_to(stand, APPROACH_RETARGET_DIST)
-	movement.update(delta)
+	if movement and movement.status == MovementComponent.Status.MOVING:
+		movement.cancel()
+	velocity = Vector3.ZERO
+	var bt: float = maxf(site.build_time_sec, 0.1)
+	var done: bool = site.add_construction_progress(delta / bt)
+	if done:
+		print(name, " finished BUILD ", site.name)
+		_clear_build("complete")
 
 func update_repairing(delta: float) -> void:
 	var site := repair_target
-	if site == null or not is_instance_valid(site) or site.is_destroyed:
-		_clear_repair("lost")
+	if site == null or not is_instance_valid(site) or site.is_destroyed or site.health <= 0:
+		_clear_repair("site lost")
 		return
-	if not site.is_constructed or site.health >= site.max_health:
-		_clear_repair("done")
+	if not site.is_constructed:
+		_clear_repair("not ready")
+		return
+	if site.health >= site.max_health:
+		print(name, " finished REPAIR ", site.name)
+		_clear_repair("complete")
 		return
 	var stand_dist: float = _build_stand_dist(site)
 	var to_s := site.global_position - global_position
@@ -569,22 +578,35 @@ func update_repairing(delta: float) -> void:
 	var dist := to_s.length()
 	var moved := global_position.distance_to(_build_last_pos)
 	_build_last_pos = global_position
-	if moved < 0.04: _build_stuck_time += delta
-	else: _build_stuck_time = 0.0
-	if dist <= stand_dist or (_build_stuck_time > 1.2 and dist <= stand_dist + 1.8):
-		if movement: movement.cancel()
-		velocity = Vector3.ZERO
-		var gain: int = maxi(1, int(20.0 * delta))
-		site.health = mini(site.max_health, site.health + gain)
-		if site.health_bar != null and is_instance_valid(site.health_bar):
-			site.health_bar.set_health(site.health)
-		if site.health >= site.max_health:
+	if moved < 0.04:
+		_build_stuck_time += delta
+	else:
+		_build_stuck_time = 0.0
+	var in_range: bool = dist <= stand_dist
+	if not in_range and _build_stuck_time > 0.7 and dist <= stand_dist + 2.0:
+		in_range = true
+	if not in_range:
+		var stand := _build_stand_point(site, stand_dist)
+		if movement:
+			movement.ensure_moving_to(stand, APPROACH_RETARGET_DIST)
+			movement.update(delta)
+		return
+	if movement and movement.status == MovementComponent.Status.MOVING:
+		movement.cancel()
+	velocity = Vector3.ZERO
+	if site.has_method("request_repair_tick"):
+		var done: bool = site.request_repair_tick(self, delta)
+		if done or site.health >= site.max_health:
 			print(name, " finished REPAIR ", site.name)
 			_clear_repair("complete")
 		return
-	var stand := _build_stand_point(site, stand_dist)
-	movement.ensure_moving_to(stand, APPROACH_RETARGET_DIST)
-	movement.update(delta)
+	var gain: int = maxi(1, int(round(25.0 * delta)))
+	site.health = mini(site.max_health, site.health + gain)
+	if site.health_bar != null and is_instance_valid(site.health_bar):
+		site.health_bar.set_health(site.health)
+	if site.health >= site.max_health:
+		print(name, " finished REPAIR ", site.name)
+		_clear_repair("complete")
 
 func _clear_build(_reason: String) -> void:
 	build_target = null
