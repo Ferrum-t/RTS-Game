@@ -2,9 +2,8 @@ extends RefCounted
 
 class_name MovementComponent
 
-## M35.7 — restore brisk RTS movement.
-## No RVO, no soft-body while moving, full move_speed every frame.
-## Velocity only; BaseUnit calls move_and_slide once.
+## M35.8-B — jitter fix: ensure_moving_to does not abort BLOCKED; stable path follow.
+## No RVO, no soft-body on march. Velocity only; BaseUnit move_and_slide once.
 
 enum Status {
 	IDLE,
@@ -20,7 +19,7 @@ var status: Status = Status.IDLE
 var agent: NavigationAgent3D = null
 
 var arrival_distance: float = 0.55
-var block_timeout: float = 2.8
+var block_timeout: float = 3.5
 var waypoint_skip_distance: float = 0.45
 var default_retarget_distance: float = 0.85
 
@@ -83,13 +82,32 @@ func ensure_moving_to(world_pos: Vector3, retarget_distance: float = -1.0) -> vo
 	var thresh := retarget_distance
 	if thresh < 0.0:
 		thresh = default_retarget_distance
-	if status == Status.CANCELLED \
-		or status == Status.IDLE \
-		or status == Status.ARRIVED \
-		or status == Status.BLOCKED \
-		or status == Status.FAILED:
+
+	# BLOCKED: never hard-reset recovery for the same-ish goal (chase/harvest call this every frame)
+	if status == Status.BLOCKED:
+		var cur_b := owner.move_target
+		cur_b.y = 0.0
+		if cur_b.distance_to(p) > thresh * 1.5:
+			set_target(p)
+		else:
+			owner.move_target = p
+		return
+
+	if status == Status.CANCELLED or status == Status.IDLE or status == Status.FAILED:
 		set_target(p)
 		return
+
+	# ARRIVED: only restart if goal moved or we are still far from it
+	if status == Status.ARRIVED:
+		var cur_a := owner.move_target
+		cur_a.y = 0.0
+		var far_goal: bool = cur_a.distance_to(p) > thresh
+		var still_away: bool = owner.global_position.distance_to(p) > arrival_distance * 1.5
+		if far_goal or still_away:
+			set_target(p)
+		return
+
+	# MOVING: full retarget only if destination jumped
 	var cur := owner.move_target
 	cur.y = 0.0
 	if cur.distance_to(p) > thresh:
@@ -139,33 +157,18 @@ func _refresh_path_if_bake_changed() -> void:
 func _get_follow_point(final_target: Vector3) -> Vector3:
 	if agent == null:
 		return final_target
-	agent.get_next_path_position()
-	var path: PackedVector3Array = agent.get_current_navigation_path()
+	# Prefer engine next point — avoids index thrash when path is rebuilt
+	var next: Vector3 = agent.get_next_path_position()
+	next.y = 0.0
 	var pos := owner.global_position
 	pos.y = 0.0
-	if path.is_empty():
-		_current_waypoint_index = 0
-		_last_path_size = 0
-		return final_target
-	if path.size() != _last_path_size:
-		_current_waypoint_index = 0
-		_last_path_size = path.size()
-	if _current_waypoint_index >= path.size():
-		_current_waypoint_index = maxi(path.size() - 1, 0)
-	while _current_waypoint_index < path.size():
-		var wp: Vector3 = path[_current_waypoint_index]
-		wp.y = 0.0
-		if pos.distance_to(wp) <= waypoint_skip_distance:
-			_current_waypoint_index += 1
-			continue
-		break
-	if _current_waypoint_index >= path.size():
-		var last: Vector3 = path[path.size() - 1]
-		last.y = 0.0
-		return last
-	var follow: Vector3 = path[_current_waypoint_index]
-	follow.y = 0.0
-	return follow
+	# If next is underfoot, fall back to final target (don't zero-velocity thrash)
+	if pos.distance_to(next) <= waypoint_skip_distance * 0.5:
+		var ft := final_target
+		ft.y = 0.0
+		if pos.distance_to(ft) > arrival_distance:
+			return ft
+	return next
 
 
 func update(delta: float) -> void:
@@ -176,7 +179,7 @@ func update(delta: float) -> void:
 	if status == Status.BLOCKED:
 		owner.velocity = Vector3.ZERO
 		_blocked_hold += delta
-		if _blocked_hold >= 0.4:
+		if _blocked_hold >= 0.35:
 			_blocked_hold = 0.0
 			_no_progress_time = 0.0
 			_stuck_time = 0.0
@@ -229,12 +232,11 @@ func update(delta: float) -> void:
 	to_follow.y = 0.0
 
 	if to_follow.length() < 0.001:
-		# Prefer final target if waypoint is underfoot
 		to_follow = to_final
 		if to_follow.length() < 0.001:
 			var moved0 := owner.global_position.distance_to(_last_pos)
 			_last_pos = owner.global_position
-			if moved0 < 0.02:
+			if moved0 < 0.015:
 				_no_progress_time += delta
 			else:
 				_no_progress_time = 0.0
@@ -247,7 +249,7 @@ func update(delta: float) -> void:
 
 	var moved := owner.global_position.distance_to(_last_pos)
 	_last_pos = owner.global_position
-	if moved < 0.02:
+	if moved < 0.015:
 		_stuck_time += delta
 		_no_progress_time += delta
 	else:
@@ -258,7 +260,6 @@ func update(delta: float) -> void:
 		_set_blocked()
 		return
 
-	# Full speed — no soft-body, no wait, no scale-down
 	status = Status.MOVING
 	owner.velocity.x = direction.x * owner.move_speed
 	owner.velocity.z = direction.z * owner.move_speed
